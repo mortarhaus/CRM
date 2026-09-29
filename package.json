@@ -1,0 +1,26 @@
+{
+  "name": "crm",
+  "private": true,
+  "packageManager": "pnpm@11.6.0",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @crm/web dev",
+    "build": "pnpm --filter @crm/web build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:e2e": "pnpm --filter @crm/web test:e2e",
+    "db:generate": "pnpm --filter @crm/web db:generate",
+    "db:migrate": "pnpm --filter @crm/web db:migrate",
+    "worker:dev": "pnpm --filter @crm/web worker:dev",
+    "stack:up": "docker compose -f docker/compose.dev.yml up --build -d --wait",
+    "stack:down": "docker compose -f docker/compose.dev.yml down"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.2"
+  }
+}
