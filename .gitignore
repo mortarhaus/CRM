@@ -1,0 +1,12 @@
+.andy/
+.claude/
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
