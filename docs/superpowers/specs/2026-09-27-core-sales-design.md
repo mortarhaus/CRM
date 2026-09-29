@@ -1,22 +1,39 @@
 # CRM — Part 1 "Core Sales" Design Spec (v4.5)
 
-**Status:** v4.5 **draft for Bob review**, 2026-09-30. Merges approved v4.4 (Bob: Approve; Charlie: Approved 2026-09-29) with the parallel "v4" draft (strategy, hosting, scope), following the reset analysis §3 route and Charlie's relayed scope picks. **Not yet approved**: Bob reviews, then Charlie approves. Until then v4.4 (commit on `main`) remains the approved text. Phase 0 stays authorised.
+**Status:** v4.5 **draft for Bob review** (revision 2: MSA + SOW kept, NDA deferred, spike results recorded), 2026-09-30. Merges approved v4.4 (Bob: Approve; Charlie: Approved 2026-09-29) with the parallel "v4" draft (strategy, hosting, scope), following the reset analysis §3 route and Charlie's relayed scope picks. **Not yet approved**: Bob reviews, then Charlie approves. Until then v4.4 (commit on `main`) remains the approved text. Phase 0 stays authorised.
+
+## Changes in v4.5 revision 2 (on top of the first v4.5 draft)
+
+1. **Agreements: MSA + SOW kept, NDA deferred** (Charlie's decision, relayed; reverses the first draft's cut). Part 1 types: Service Agreement, MSA, SOW, Change order, Sign-off. NDA becomes a later template on the same engine (no redesign). Only v4.4 flow step 2 (NDA) is removed; the flow is **13 steps** (v4.4 had 14).
+2. **Agreement pattern moves to the customer**: new `customer.agreement_pattern` (`service_agreement` | `msa_sow`); `workspace_settings.default_agreement_pattern` is the default for new customers. v4.4 had it per workspace only.
+3. **Approval transaction simplified**: it creates exactly one agreement (Service Agreement, or a SOW pointing at the customer's signed MSA or at none) and emits `agreement.created`. v4.4's "MSA-if-missing" creation inside the locked approval transaction is replaced by a post-commit job that creates a draft MSA (one open MSA per customer, unique partial index) and links the SOW. Lock order unchanged.
+4. **SOW signing requires a signed MSA**: the signing link signs the MSA first, then the SOW, in one OTP session. `parent_msa_id` is kept and used; new `agreement.parent_agreement_id` lets change orders and sign-offs reference the SOW (`msa_sow` customers) or the Service Agreement; `agreement.status` gains `void`. New event `agreement.created`. Phase 8 done-when and Verification add: one MSA under concurrent approvals, SOW blocked until MSA signed, race test still passing.
+5. **Spike results recorded** (both PASSED, 2026-09-29): "Checks before the Phase 1 plan" now holds results, versions and decisions instead of conditions.
+6. **Transactional enqueue is the design**: `boss.send(…, { db: fromDrizzle(tx, sql), id: event.id })` inside the business transaction. The outbox + relay fallback, `domain_event.relayed_at`, its index and the relay job are **dropped** (one history line kept).
+7. **`nullif` in every policy is required**, backed by a policy lint/test; RLS tests must seed rows in other workspaces (the missing-`nullif` error appears only when rows exist).
+8. **postgres.js `prepare: false`** on the app client (non-overridable when `DATABASE_URL` points at a pooler).
+9. **`pgboss` grants for `crm_app`** recorded (USAGE; SELECT on `version`, `queue`; INSERT + column SELECT on `job_common`); `crm_app` still cannot read job payloads. Grants are per queue table (`ALTER DEFAULT PRIVILEGES` or re-grant per queue). pg-boss installed and upgraded by `crm_migrator` in migrations; app instances run with `migrate/createSchema: false`.
+10. **Fifth role `crm_worker`** (spike recommendation): owns the worker-side pg-boss rights (fetch, complete, maintenance) on `pgboss.*`; exact grants measured in Phase 1.
+11. **Pools and connections**: starting pool sizes recorded; pooler must be transaction mode; LISTEN/NOTIFY needs a direct connection; queue `notify` stays off in Phase 1 (polling) and `notify` changes happen only in migrations.
+12. **Known risks updated**: R1 confirmed and fixed; untested items added (pg-boss maintenance through the pooler over a full cycle, `crm_worker` exact grants, DO Managed PG pooler run, 60 s web queue-cache lag). `pg`-driver question stays open, now noting the web-side pg-boss instance opens a small `pg` pool.
 
 ## Changes in v4.5 (from v4.4) — merge with the parallel "v4" draft
+
+*(Items 5, 9 and 11 are superseded by revision 2 above; they are shown as corrected.)*
 
 All v4.1–v4.4 fixes are kept: `document_artifact` (no `pdf_key` anywhere), Resend + `crm_link_resolver`, lock order `proposal` → `share_link` → `quotation`, `clock_timestamp()`, exact money rules (3-decimal quantities, worked examples), Phase 4 first invoice / Phase 5 first quote, Node 24 LTS, `crm_app` INSERT + SELECT on append-only tables. Where the other draft disagreed on these, v4.4 wins.
 
 1. **`account` → `billing_account`** (bug): Better Auth creates its own `account` table; the billing owner table would collide in Phase 1.
 2. **Workspace context set with `select set_config('app.workspace_id', $1, true)`** (bug): `SET LOCAL` cannot take a bind parameter. Policies use `workspace_id = (select nullif(current_setting('app.workspace_id', true), '')::uuid)`: the sub-select reads the setting once per query, and `nullif` makes a reused pooled connection return 0 rows instead of failing on `''::uuid`.
-3. **Four DB roles**: new `crm_purge` (no `BYPASSRLS`) may DELETE only `quotation_version` / `proposal_sent_version` rows whose parent never led to an issued invoice, plus their `document_artifact` rows and files. Issued documents are retained. Reason: PDPA purge vs append-only tables.
+3. **New role `crm_purge`** (no `BYPASSRLS`; four roles in the first draft, five after revision 2 adds `crm_worker`): may DELETE only `quotation_version` / `proposal_sent_version` rows whose parent never led to an issued invoice, plus their `document_artifact` rows and files. Issued documents are retained. Reason: PDPA purge vs append-only tables.
 4. **Better Auth tables get no RLS**: reached only through the allow-listed system module, guarded by the lint rule. Workspace config (bank details, DuitNow QR, own tax IDs, branding, country/currency/tax defaults) moves off Better Auth's `organization` into a new **`workspace_settings`** table under RLS, so sensitive data never sits in a table without RLS.
-5. **Events → jobs**: pg-boss job enqueued in the same transaction as the change (`send` with a `db` executor), if Spike 2 passes; fallback is the v4.4 outbox + relay. `domain_event` stays as append-only history. Job payloads carry IDs only (the `pgboss` tables have no RLS).
+5. **Events → jobs**: pg-boss job enqueued in the same transaction as the change (`send` with a `db` executor), replacing the v4.4 outbox + relay (Spike 2 passed; the fallback is dropped in revision 2). `domain_event` stays as append-only history. Job payloads carry IDs only (the `pgboss` tables have no RLS).
 6. **Extension system moved to Part 3 (SaaS)**: contract, `ctx`, `workspace_extension`, fan-out dispatcher, `_fixture` extension and Settings → Extensions page are no longer built in Part 1. The v4.4 text is kept as design in **Appendix A**. Part 1 keeps domain events and the e-invoice stub columns. Adds the three-test extension rule and the payments split (recording payments, receipts and refunds is core; collecting money is an extension).
 7. **Hosting staged**: laptop (Phases 0–3) → one Singapore VPS behind Cloudflare Tunnel, nightly encrypted backups to R2 (Phase 4 on) → DigitalOcean Managed PostgreSQL, Singapore (at first sale). Replaces v4.4's "Fly.io / Railway / Hetzner, Neon allowed". Cloudflare Workers/Pages, Cloudflare Containers, Neon free and Supabase free listed as rejected with reasons.
 8. **PostgreSQL 17** (18 allowed), was "16+". Dev and tests pin 17.
-9. **Agreements reduced to three types**: Service Agreement, Change order, Sign-off. **Removed from Part 1**: NDA, MSA, SOW templates; v4.4 flow **step 2 (NDA)**; the **"MSA-if-missing + SOW" option in v4.4 step 7**; `agreement.parent_msa_id`. They become later templates. The flow is renumbered to **13 steps**; the full E2E is now the 13-step flow.
+9. **Agreements** (corrected in revision 2): **NDA deferred** to a later template; **MSA and SOW kept**; v4.4 flow **step 2 (NDA) removed**, so the flow is **13 steps** and the full E2E is the 13-step flow; the approval transaction is simplified and the agreement pattern is per customer (see revision 2, items 1–4). The first draft's cut of MSA, SOW and `parent_msa_id` is withdrawn.
 10. **New "Business and sequencing" section**: own use first, Gates A–D with measurable exit criteria, demo rounds instead of design partners, Sdn Bhd at first sale, part order 1 → 3 → 2 → 4, "quote-to-cash for agencies" positioning.
-11. **Checks before the Phase 1 plan**: Spike 1 (RLS + `set_config` through a transaction-mode pool), Spike 2 (pg-boss `send` inside the Drizzle transaction; fallback outbox + relay), and "host/provider chosen". Phase 0 done-when adds "spikes pass or fallback chosen".
+11. **Checks before the Phase 1 plan**: Spike 1 (RLS + `set_config` through a transaction-mode pool), Spike 2 (pg-boss `send` inside the Drizzle transaction), and "host/provider chosen". Both spikes passed on 2026-09-29 (revision 2); Phase 0 done-when records "spikes passed".
 12. **Phase scope merged**: the other draft's phase scope with v4.4's done-when tests kept; target dates added as estimates only.
 13. **Phase 5 trimmed**: adds **recurring invoices** and **manual refunds**. **Removed from Part 1 phases**: customer credit balance and statement of account (never in v4.4; proposed by the other draft) → "after Gate A, only if own use needs them, as derived views". Reason: closest to building an accounting system.
 14. **Malaysian market**: Share to WhatsApp (`wa.me`, OTP still required) on client links; after a Resend the UI offers "Share new link to WhatsApp" as well as the email. DuitNow QR on invoices, stored content-addressed and never deleted; the invoice snapshot references its hash key. CSV import of customers and contacts (Phase 3).
@@ -30,7 +47,7 @@ All v4.1–v4.4 fixes are kept: `document_artifact` (no `pdf_key` anywhere), Res
 
 ### Open questions for Charlie
 
-1. **`pg` driver.** pg-boss depends on `pg` and runs its own node-postgres pool; the Phase 0 plan says "`postgres` driver only, never `pg`". Accept pg-boss's internal `pg` pool in the worker (app code still `postgres` only), or give pg-boss a postgres.js-backed `db` adapter (loses LISTEN and transactional workers)? Not decided here.
+1. **`pg` driver.** pg-boss depends on `pg` (8.23.0 with pg-boss 12.35.0) and always opens its own node-postgres pool — in the worker **and** in the web-side instance used only for `send` (a small pool, `max: 2`, that reads `pgboss.version` / `pgboss.queue`; Spike 2). The transactional `send` itself runs through the app's postgres.js transaction. The Phase 0 plan says "`postgres` driver only, never `pg`". Accept `pg` only as pg-boss's transitive dependency (the spike note recommends this; app code stays on `postgres`), or give pg-boss a postgres.js-backed `db` adapter (loses LISTEN and transactional workers)? Not decided here.
 2. **WhatsApp for invoices in Phase 4.** The other draft puts "send by email + Share to WhatsApp" in Phase 4, but share links and `resolve_share_link()` arrive in Phase 7. This draft puts Share to WhatsApp in Phase 7 for all client links; Phase 4 invoices go by email with the PDF. Alternative: pull a minimal invoice link page (and the resolver) into Phase 4.
 3. **Part 2 scope.** The other draft cuts the Gantt editor permanently (Part 2 = milestone tracker + read-only timeline + one-way `projects-sync` extension). Not among the relayed picks, so v4.4's Part 2 text is kept with a note.
 4. **VPS provider for Phase 4** (host/provider chosen line): which Singapore VPS (e.g. a DigitalOcean Droplet, to ease the later move to DO Managed PG, or another provider)?
@@ -147,14 +164,14 @@ Folder: `/Users/charlie/Documents/Projects/Personal/CRM`.
 | Boundaries | `core` imports no framework, DB or extension code. Extensions (Part 3) import only `core` types and use the `ctx` handed to them. Enforced by ESLint boundary rules + package `exports`; CI fails on violation. |
 | Runtime | **One Docker image, two commands**: `web` (`next start`) and `worker` (pg-boss consumer). Identical image for SaaS and self-host. `DEPLOYMENT_MODE=saas\|selfhost` env flag. |
 | Hosting (own SaaS) | Staged (see "Runtime and hosting"): laptop dev compose (Phases 0–3) → one Singapore VPS behind Cloudflare Tunnel, nightly encrypted backups to R2 (Phase 4 → first sale) → DigitalOcean Managed PostgreSQL, Singapore (from first sale). Cloudflare R2 for files. Resend for email. Rejected: Cloudflare Workers/Pages for the app, Cloudflare Containers, Neon free, Supabase free. |
-| Database | PostgreSQL 17 (18 allowed; dev and tests pin 17), Drizzle ORM, plain TCP driver (`postgres`), never a provider-specific HTTP driver (pg-boss's internal `pg` pool: open question 1). **Four roles, none with `BYPASSRLS`**: `crm_migrator` (owns schema, runs migrations, connects directly), `crm_app` (runtime; on `audit_log`, `domain_event`, `document_artifact` and the version tables it may INSERT and SELECT but never UPDATE or DELETE), `crm_link_resolver` (`NOLOGIN`, owns `resolve_share_link()` only) and `crm_purge` (PDPA purge only; see "Audit, logging, privacy"). |
+| Database | PostgreSQL 17 (18 allowed; dev and tests pin 17), Drizzle ORM, plain TCP driver (`postgres`), never a provider-specific HTTP driver (pg-boss's internal `pg` pool: open question 1). postgres.js runs with **`prepare: false`** (Spike 1). **Five roles, none with `BYPASSRLS`**: `crm_migrator` (owns schema, runs migrations, installs and upgrades pg-boss, connects directly), `crm_app` (runtime; on `audit_log`, `domain_event`, `document_artifact` and the version tables it may INSERT and SELECT but never UPDATE or DELETE; minimal enqueue-only grants on `pgboss`), `crm_link_resolver` (`NOLOGIN`, owns `resolve_share_link()` only), `crm_purge` (PDPA purge only; see "Audit, logging, privacy") and `crm_worker` (the worker's pg-boss instance: fetch, complete and maintenance rights on `pgboss.*`; exact grants set in Phase 1). |
 | Tenancy | `billing_account` (billing owner) → `organization` (= workspace, Better Auth) → tenant data. Workspace configuration lives in `workspace_settings` (RLS), not on `organization`. One login, many workspaces, switcher in header. Zero data shared across workspaces. RLS on every tenant table; Better Auth tables carry no RLS and are reached only through the system module. |
 | Auth | Better Auth: email + password (Argon2id), TOTP 2FA with recovery codes, organization plugin, rate limiting with `storage: "database"`. Passkeys in Phase 9. Google login in Part 3. |
 | Money | `bigint` minor units + per-currency exponent. Multi-currency per document. Workspace base currency; `fx_rate` (manual, default = last rate used for the pair) and base totals frozen on issue. Tax **off unless the workspace is registered**; when on, workspace default tax name/rate, per-line taxable flag and rate override. Exact rules in "Money rules". **No accounting features.** |
 | Approval / signature | Link issued to a named contact → email OTP → typed name + "I agree" → signature record with verified email, IP, UA, timestamp, document hash → audit certificate page in PDF. |
-| Agreements | Template engine; editable starter templates with `{{field}}` placeholders; single-pass substitution, no code execution; drafted for Malaysia with `{{governing_law}}`. **Part 1 types: Service Agreement (default), Change order, Sign-off.** NDA, MSA, SOW are later templates. Lawyer reviews final text. |
+| Agreements | Template engine; editable starter templates with `{{field}}` placeholders; single-pass substitution, no code execution; drafted for Malaysia with `{{governing_law}}`. **Part 1 types: Service Agreement (default), MSA, SOW, Change order, Sign-off.** Pattern per customer (`service_agreement` or `msa_sow`), defaulted from the workspace setting. NDA is a later template on the same engine. Lawyer reviews final text. |
 | PDF | `@react-pdf/renderer`, rendered in the worker. Canonical artifact is the frozen JSON snapshot; hash = SHA-256 of canonical JSON. PDF rendered once at first send (see PDF timing), stored, never regenerated; recorded only in `document_artifact`. Merged PDFs via `pdf-lib`. |
-| Jobs / events | pg-boss in the `worker`: retries with backoff, dead-letter, cron schedules. **Domain events** written to `domain_event` (append-only history) and their pg-boss job enqueued **in the same transaction** (`send` with a `db` executor), subject to Spike 2; fallback = outbox + relay. Dispatched to core handlers; extension fan-out arrives in Part 3. |
+| Jobs / events | pg-boss in the `worker`: retries with backoff, dead-letter, cron schedules. **Domain events** written to `domain_event` (append-only history) and their pg-boss job enqueued **in the same transaction** (`send` with `{ db: fromDrizzle(tx, sql), id: event.id }`; proven by Spike 2). No outbox relay. Dispatched to core handlers; extension fan-out arrives in Part 3. |
 | Extensions | **Deferred to Part 3** (Appendix A kept as design). Extension rule (three tests): it talks to an external system; it is country- or customer-specific; some workspaces must be unable to use it. Anything failing the tests is core, optionally behind a per-workspace setting. Payments split: recording payments, receipts and refunds is core; collecting money (checkout, webhooks) is an extension. |
 | E-invoice | Stub only in Part 1: customer TIN/BRN/SST, `einvoice_*` fields, PDF gate, `EInvoiceProvider` interface type. `einvoice-my` is a future extension. |
 | Email | Adapter: SMTP (nodemailer) or Resend, chosen by env. React Email templates. |
@@ -163,7 +180,7 @@ Folder: `/Users/charlie/Documents/Projects/Personal/CRM`.
 | UI | Tailwind + shadcn/ui (vendored), TanStack Table + Form, dnd-kit (block reorder), Tiptap (rich-text blocks). Client link pages mobile-first. |
 | Testing | Vitest, Testcontainers Postgres, Playwright, adapter contract tests. |
 | Observability | Pino JSON logs (no PII, no tokens), Sentry with scrubbing on SaaS; opt-in on self-host. `/api/health` returns DB + queue status. |
-| Migrations | Run by the image entrypoint before `web` starts, as `crm_migrator` over a **direct** (not pooled) connection (the runner holds a session-level advisory lock). Additive / expand-contract only. |
+| Migrations | Run by the image entrypoint before `web` starts, as `crm_migrator` over a **direct** (not pooled) connection (the runner holds a session-level advisory lock). Migrations also install/upgrade the `pgboss` schema, create queues and apply its grants. Additive / expand-contract only. |
 | Secrets at rest | Stored credentials (extension settings from Part 3) encrypted with AES-256-GCM under `APP_ENCRYPTION_KEY`; key rotation procedure documented (re-encrypt job). |
 
 ## Threat model
@@ -178,9 +195,9 @@ Folder: `/Users/charlie/Documents/Projects/Personal/CRM`.
 
 ## Scope — Part 1
 
-Documents: Customer, Quote, Proposal, Invoice, Receipt, Credit note, Refund, Service Agreement, Change order, Sign-off.
+Documents: Customer, Quote, Proposal, Invoice, Receipt, Credit note, Refund, Service Agreement, MSA, SOW, Change order, Sign-off.
 
-Also: recurring invoices, CSV import of customers and contacts, pipeline board, owner notifications, dashboard v1, accounting-period export, full workspace export, workspace offboarding, customer purge. **Not in Part 1**: extension contract (Part 3, Appendix A), NDA / MSA / SOW templates, customer credit balance and statement of account (after Gate A, only if own use needs them, as derived views over documents and payments, never stored balances).
+Also: recurring invoices, CSV import of customers and contacts, pipeline board, owner notifications, dashboard v1, accounting-period export, full workspace export, workspace offboarding, customer purge. **Not in Part 1**: extension contract (Part 3, Appendix A), NDA template, customer credit balance and statement of account (after Gate A, only if own use needs them, as derived views over documents and payments, never stored balances).
 
 ## Data model (main tables)
 
@@ -191,13 +208,13 @@ Every tenant table carries `workspace_id` + RLS policy. Every user-editable draf
 - `billing_account` (billing owner; named to avoid Better Auth's own `account` table): owner_user_id, name, plan (`free` only in Part 1), status, `stripe_customer_id` (nullable, Part 3), limits JSON. System table, reached only through the system module.
 - `organization` (= workspace; Better Auth organization plugin): Better Auth's own columns (name, slug, …) + `billing_account_id`. **No workspace settings here and no RLS** (see Tenancy).
 - `member` (role: owner / admin / staff), `invitation` (email, role, token hash, expires_at): Better Auth organization plugin tables, no RLS, system module only.
-- **`workspace_settings`** (tenant table, RLS; one row per workspace, `workspace_id` primary key): short code, logo key, branding (brand colour, proposal cover options), address, **country (ISO 3166-1 alpha-2)**, timezone, locale, date format, base_currency, default_currency, tax_registered (bool, default false), tax_registration_no (own SST/GST no.), own_tin, own_brn, default tax name/rate (used only when tax_registered), tax_rounding (`rate_group`), bank details, `duitnow_qr_key` (content-addressed, see Files), email settings (from name, reply-to, bcc_self), auto_send default, require_2fa, version.
+- **`workspace_settings`** (tenant table, RLS; one row per workspace, `workspace_id` primary key): short code, logo key, branding (brand colour, proposal cover options), address, **country (ISO 3166-1 alpha-2)**, timezone, locale, date format, base_currency, default_currency, tax_registered (bool, default false), tax_registration_no (own SST/GST no.), own_tin, own_brn, default tax name/rate (used only when tax_registered), tax_rounding (`rate_group`), bank details, `duitnow_qr_key` (content-addressed, see Files), email settings (from name, reply-to, bcc_self), auto_send default, `default_agreement_pattern` (`service_agreement` default | `msa_sow`; applied to new customers), require_2fa, version.
 - `email_template`: event, subject, body, version.
 - `notification`: user_id, kind, target_type, target_id, created_at, read_at. IDs only, no personal data; read and marked per user under `withWorkspace()`.
 
 **Customers**
 
-- `customer`: name, address (structured), currency default, tax_identification_no (TIN), business_reg_no, sst_reg_no, po_required, archived_at. Cannot be deleted once it has issued documents (archive only).
+- `customer`: name, address (structured), currency default, tax_identification_no (TIN), business_reg_no, sst_reg_no, po_required, `agreement_pattern` (`service_agreement` | `msa_sow`; set from `workspace_settings.default_agreement_pattern` on creation, editable per customer), archived_at. Cannot be deleted once it has issued documents (archive only).
 - `contact`: customer_id, name, email, phone, role, is_primary.
 - CSV import (customers + contacts): upload → validate every row with Zod → preview with errors → commit in one transaction; duplicate detection by customer name and contact email.
 
@@ -226,8 +243,10 @@ Every tenant table carries `workspace_id` + RLS policy. Every user-editable draf
 
 **Agreements**
 
-- `agreement_template`: type (service_agreement / change_order / sign_off), version, body with `{{fields}}`, governing_law default, is_default.
-- `agreement`: type, customer, optional proposal, frozen rendered body, body_hash, status (draft / sent / signed), number.
+- `agreement_template`: type (service_agreement / msa / sow / change_order / sign_off), version, body with `{{fields}}`, governing_law default, is_default. (`nda` is added later on the same engine.)
+- `agreement`: type, customer, optional proposal, `parent_msa_id` (SOW only: the customer's MSA; null until one is linked), `parent_agreement_id` (change order and sign-off: the SOW for `msa_sow` customers, otherwise the Service Agreement), frozen rendered body, body_hash, status (draft / sent / signed / void), signed_at, number. A signed agreement never changes; corrections are a new agreement (the old one voided).
+- **One open MSA per customer**: unique partial index `agreement (workspace_id, customer_id) WHERE type = 'msa' AND status IN ('draft', 'sent')` (open = unsigned and not void).
+- Agreement creation, MSA linking and signing order: see "Agreements: creation and signing".
 
 **Client links and signatures**
 
@@ -240,10 +259,17 @@ Every tenant table carries `workspace_id` + RLS policy. Every user-editable draf
 - `doc_sequence`: per workspace per doc type: pattern, reset rule, counter, last_reset_period.
 - `idempotency_key`: key, action, workspace, response hash, expires_at.
 - `audit_log` (append-only): actor, workspace, action, target, before/after JSON (personal-data fields stored as `"[pii]"`), ip, created_at.
-- **`domain_event`** (append-only history): name, version, workspace_id, payload JSON (IDs and amounts only), created_at. `relayed_at` exists only if the outbox fallback is used (Spike 2 fails).
+- **`domain_event`** (append-only history and replay record): name, version, workspace_id, payload JSON (IDs and amounts only), created_at. No `relayed_at`: the job is enqueued in the same transaction.
 - `workspace_export`: kind (`full` | `accounting_period`), period, requested_by, status, file_key, expires_at.
 - **`document_artifact`** (append-only: `crm_app` writes by INSERT only and may SELECT; no UPDATE or DELETE; DELETE only by `crm_purge` for artifacts of purgeable versions): workspace_id, target_type (`quotation_version` / `proposal_sent_version` / `invoice` / `credit_note` / `receipt` / `agreement` / `signature`), target_id, kind (`pdf` / `merged_pdf` / `certificate_pdf`), storage_key, file_sha256, renderer_version, created_at. Unique (target_type, target_id, kind). **The only place a stored PDF is recorded**; no document or version table has a `pdf_key` column.
-- pg-boss owns its own `pgboss` schema. Its tables have **no RLS**, so job payloads hold IDs only; `crm_app` gets the minimum grants Spike 2 proves necessary.
+- pg-boss owns its own `pgboss` schema (installed and upgraded by `crm_migrator` in migrations; owner = `crm_migrator`). Its tables have **no RLS** and one shared `job_common` table holds every workspace's jobs, so job payloads hold IDs only. `crm_app` gets exactly the enqueue grants proven by Spike 2 and **cannot read job payloads** (`SELECT` on `pgboss.job` / `job_common` payload columns stays denied):
+  ```sql
+  GRANT USAGE ON SCHEMA pgboss TO crm_app;
+  GRANT SELECT ON pgboss.version, pgboss.queue TO crm_app;                -- web instance start() + queue cache
+  GRANT INSERT, SELECT (id, start_after) ON pgboss.job_common TO crm_app; -- RETURNING id; start_after only if a queue has notify on
+  -- pgboss.job_now() is executable through the PUBLIC default.
+  ```
+  Grants are **per queue table**: a queue created with its own partition gets a new table, so migrations use `ALTER DEFAULT PRIVILEGES` for `crm_migrator` or re-grant in the migration that creates the queue. `crm_worker` gets the fetch/complete/maintenance rights (measured in Phase 1).
 - `workspace_extension` is **not** in Part 1 (Appendix A, Part 3).
 
 ### Numbering
@@ -316,11 +342,11 @@ This example is a required unit-test fixture.
 
 Emitted by core, written to `domain_event` (append-only history) in the **same transaction** as the change. Payloads carry `version`, IDs and amounts only; handlers ignore unknown fields.
 
-**Enqueue (subject to Spike 2):** in the same transaction, the pg-boss job is enqueued with `boss.send('domain_event', { eventId }, { db: fromDrizzle(tx, sql), id: eventId })` (or `singletonKey`), so a rolled-back change leaves neither event nor job, and a repeat send creates one job. **Fallback if Spike 2 fails:** the v4.4 transactional outbox — `domain_event.relayed_at`, a single-instance relay job (pg-boss singleton) moving unrelayed rows to pg-boss jobs, idempotent by event id.
+**Enqueue:** in the same transaction, the pg-boss job is enqueued with `boss.send('domain_event', { eventId }, { db: fromDrizzle(tx, sql), id: eventId })`, so a rolled-back change leaves neither event nor job, the job is invisible to other connections until commit, and a repeat send with the same event id creates one job (all proven by Spike 2 on drizzle-orm 0.45.3). The web process holds a send-only `PgBoss` instance as `crm_app` with `migrate`, `supervise`, `schedule` and `createSchema` all `false` and `max: 2`; the worker holds its own instance as `crm_worker`. Queue `notify` stays **off** in Phase 1 (polling); turning it on changes the SQL `send` emits and the grants it needs, so it is only changed in a migration. *(History: v3–v4.4 used a transactional outbox + relay job; dropped in v4.5 after Spike 2.)*
 
-Part 1 event set: `customer.created`, `quotation.sent`, `quotation.accepted`, `quotation.expired`, `proposal.sent`, `proposal.approved`, `proposal.declined`, `invoice.issued`, `invoice.sent`, `invoice.paid`, `invoice.overdue`, `invoice.voided`, `payment.recorded`, `refund.recorded`, `credit_note.issued`, `agreement.sent`, `agreement.signed`. Reserved for the e-invoice extension (Part 3 onward): `einvoice.validated`, `einvoice.rejected`.
+Part 1 event set: `customer.created`, `quotation.sent`, `quotation.accepted`, `quotation.expired`, `proposal.sent`, `proposal.approved`, `proposal.declined`, `invoice.issued`, `invoice.sent`, `invoice.paid`, `invoice.overdue`, `invoice.voided`, `payment.recorded`, `refund.recorded`, `credit_note.issued`, `agreement.created`, `agreement.sent`, `agreement.signed`. Reserved for the e-invoice extension (Part 3 onward): `einvoice.validated`, `einvoice.rejected`.
 
-**Dispatch (in the worker):** core handlers only in Part 1 (e.g. `invoice.issued` → set `einvoice_status` → enqueue `pdf.render`; `proposal.approved` → owner notification). Per-workspace fan-out to extensions is added in Part 3 (Appendix A). Failures retry with backoff and dead-letter; a "failed, retry" badge shows in the UI.
+**Dispatch (in the worker):** core handlers only in Part 1 (e.g. `invoice.issued` → set `einvoice_status` → enqueue `pdf.render`; `proposal.approved` → owner notification; `agreement.created` → MSA provisioning for a SOW, see "Agreements: creation and signing"). Per-workspace fan-out to extensions is added in Part 3 (Appendix A). Failures retry with backoff and dead-letter; a "failed, retry" badge shows in the UI.
 
 ## Dashboard v1
 
@@ -348,14 +374,14 @@ No aging buckets beyond "overdue", no P&L, no tax reports, no customer balances 
 | 3 | You | Create proposal; while it is a draft, the pricing block shows the linked quote live ("Add pricing" makes a new linked quote) | Proposal |
 | 4 | You → Client | Send one link issued to a specific contact, by email and optionally **Share to WhatsApp** (`wa.me` with the link prefilled; OTP still required). Sending freezes a **sent version** (proposal + quote snapshot + hash); the link shows only that version. Single **Download ▾** button (hover + click/tap + keyboard): *Proposal + Quote (merged PDF)*, *Proposal*, *Quote* | Proposal + Quote |
 | 5 | Client | Enters OTP sent to their email; approves (typed name + "I agree") or declines with reason | — |
-| 6 | App | One transaction (see "Approval and Resend concurrency"): lock the proposal, then the link; recheck the link is live and names `current_sent_version_id` (else the generic page), then set `proposal.approved_sent_version_id` (that sent version's snapshot + hash are the record), set `quotation.accepted_version_id` = the `quotation_version_id` inside that sent version and quote → accepted, move any unsent quote edits to a new draft quote, record signature, create the **Service Agreement**; write events and enqueue jobs; owner notified; enqueue emails if auto-send | Agreement |
-| 7 | Client | Signs the agreement by link (OTP), downloads PDFs with certificate page | — |
+| 6 | App | One transaction (see "Approval and Resend concurrency"): lock the proposal, then the link; recheck the link is live and names `current_sent_version_id` (else the generic page), then set `proposal.approved_sent_version_id` (that sent version's snapshot + hash are the record), set `quotation.accepted_version_id` = the `quotation_version_id` inside that sent version and quote → accepted, move any unsent quote edits to a new draft quote, record signature, create **exactly one** agreement per the customer's pattern (**Service Agreement**, or a **SOW** pointing at the customer's signed MSA or at none); write events (incl. `agreement.created`) and enqueue jobs; owner notified; enqueue emails if auto-send. After commit, a job creates a draft **MSA** if the SOW has no signed one (see "Agreements: creation and signing") | Agreement (+ MSA by job) |
+| 7 | Client | Signs by link (OTP): an unsigned MSA first, then the SOW, in the same OTP session; or the Service Agreement. Downloads PDFs with certificate page | — |
 | 8 | You | "Create invoices from payment schedule" (e.g. 50% deposit) as drafts. PO number + PO file if the client requires it. DuitNow QR and bank details printed from the frozen snapshot | Invoice |
 | 9 | You | Record payment (full/part) — or, with a payments extension (Part 3), the client pays via link and the payment is recorded from the webhook event | — |
 | 10 | App | Auto-create + send receipt (job) | Receipt |
-| 11 | You → Client | Change order for extra work → client signs → invoice it | Change order |
+| 11 | You → Client | Change order for extra work (references the SOW, or the Service Agreement) → client signs → invoice it | Change order |
 | 12 | You | Final invoice → payment → receipt | Invoice + Receipt |
-| 13 | You → Client | Sign-off: client accepts work; IP transfers after final payment | Sign-off |
+| 13 | You → Client | Sign-off (references the SOW, or the Service Agreement): client accepts work; IP transfers after final payment | Sign-off |
 
 Any time: quick invoice; quote → invoice in one click; credit note (and manual refund if money goes back); recurring invoices for retainers. Scheduled jobs mark overdue invoices and expired quotes daily, run recurring invoices, and send reminders (+3, +7 days, configurable).
 
@@ -404,10 +430,10 @@ If the client approves a sent version while the owner has **unsent** edits to th
 
 ### Tenancy
 
-- RLS on all tenant tables with `ENABLE` + `FORCE ROW LEVEL SECURITY`; workspace policies are `TO crm_app` (and `TO crm_purge` for the purge tables) and define `USING` and `WITH CHECK` as `workspace_id = (select nullif(current_setting('app.workspace_id', true), '')::uuid)`. The sub-select evaluates the setting once per query; `nullif` turns the empty string a reused connection returns after a transaction into NULL, so a stray query sees 0 rows instead of failing on `''::uuid`.
-- Runtime connects as `crm_app`; migrations as `crm_migrator`. **No role in the system has `BYPASSRLS`** (checked by a test on `pg_roles`).
-- `crm_link_resolver` (`NOLOGIN`, no `BYPASSRLS`) exists only to own `resolve_share_link()` — see "Anonymous access". `crm_purge` (no `BYPASSRLS`) exists only for the purge path — see "Audit, logging, privacy".
-- Every request and every job runs `withWorkspace(workspaceId, tx => …)`: transaction, `select set_config('app.workspace_id', $1, true)` (bound parameter, transaction-local), work, commit. `SET` and `SET LOCAL` for the workspace context are banned (`SET LOCAL` cannot take a bind parameter).
+- RLS on all tenant tables with `ENABLE` + `FORCE ROW LEVEL SECURITY`; workspace policies are `TO crm_app` (and `TO crm_purge` for the purge tables) and define `USING` and `WITH CHECK` as `workspace_id = (select nullif(current_setting('app.workspace_id', true), '')::uuid)`. The sub-select evaluates the setting once per query. **`nullif` is required** (Spike 1): a fresh connection returns NULL for the setting, but once a transaction-local `set_config` has run on a server connection it returns `''` afterwards (directly and through PgBouncer), and `''::uuid` fails with `22P02`. The failure only shows when the table has rows (on an empty table the sub-select is never evaluated), so a policy lint/test fails any policy that casts `current_setting` without `nullif`, and **RLS tests always seed rows in other workspaces**, including a bare query on a reused connection.
+- Runtime connects as `crm_app`; migrations as `crm_migrator`; the worker's pg-boss instance as `crm_worker`. **No role in the system has `BYPASSRLS`** (checked by a test on `pg_roles`).
+- `crm_link_resolver` (`NOLOGIN`, no `BYPASSRLS`) exists only to own `resolve_share_link()` — see "Anonymous access". `crm_purge` (no `BYPASSRLS`) exists only for the purge path — see "Audit, logging, privacy". `crm_worker` (no `BYPASSRLS`) has rights on `pgboss.*` only; job handlers do their tenant work through `withWorkspace()` as `crm_app`.
+- Every request and every job runs `withWorkspace(workspaceId, tx => …)`: transaction, `select set_config('app.workspace_id', $1, true)` (bound parameter, transaction-local), work, commit. `SET` and `SET LOCAL` for the workspace context are banned (`SET LOCAL app.workspace_id = $1` fails with `42601` in both postgres.js and Drizzle; `set_config` works — Spike 1).
 - **Better Auth tables** (`user`, `session`, `account`, `verification`, `organization`, `member`, `invitation`, two-factor and rate-limit tables) and `billing_account` carry **no RLS**: they are read before any workspace is chosen (sign-in lookups by email). They are reached only through the allow-listed system module; the lint rule forbids access from anywhere else. No workspace settings or other sensitive tenant data live in them (hence `workspace_settings`).
 - Lint rule: no `db.` access outside `withWorkspace` except the allow-listed system module. Integration test proves workspace A cannot read or write workspace B via every tenant table. A schema test asserts that the set of tables without RLS equals the allow-list (Better Auth tables, `billing_account`, `pgboss.*`) exactly.
 
@@ -470,7 +496,7 @@ Tests (Testcontainers, connecting with the **real** `crm_app` and `crm_migrator`
 
 ## Reliability
 
-- Money, approval and event writes (and, subject to Spike 2, job enqueue) in single DB transactions.
+- Money, approval and event writes, and their job enqueue, in single DB transactions.
 - Idempotency keys on issue / approve / pay / refund / convert / sign; recurring invoice creation idempotent by (recurring_invoice_id, period).
 
 ### Approval and Resend concurrency
@@ -483,22 +509,37 @@ Approve, decline, Resend, revoke and proposal edits all run in one transaction u
 2. `SELECT … FROM proposal WHERE id = target_id FOR UPDATE`.
 3. `SELECT … FROM share_link WHERE id = share_link_id FOR UPDATE`.
 4. Recheck **inside the lock**: `revoked_at IS NULL`, `expires_at > clock_timestamp()` (wall-clock time read **after** the locks are held — never `now()`, which is frozen at transaction start), `share_link.document_version = proposal.current_sent_version_id`, `proposal.approved_sent_version_id IS NULL`, status ∈ {sent, viewed}, OTP verified for this link within 10 minutes of `clock_timestamp()`. Any failure → roll back, show the generic "link not available" page (or "already approved" for a repeat by the same verified signer, via the idempotency key).
-5. `SELECT … FROM quotation … FOR UPDATE`; write approval, acceptance, signature, agreement, `domain_event` rows (and their jobs); commit.
+5. `SELECT … FROM quotation … FOR UPDATE`; write approval, acceptance, signature, **exactly one** agreement (Service Agreement, or SOW with `parent_msa_id` = the customer's signed MSA or null; no MSA is created or locked here), `domain_event` rows (incl. `agreement.created`) and their jobs; commit.
 
 **Resend / revoke** (owner): lock `proposal FOR UPDATE`, then the current `share_link FOR UPDATE`; refuse if `approved_sent_version_id IS NOT NULL` ("Already approved — create a new quote or change order"); then lock `quotation FOR UPDATE`; otherwise insert the new quote version (if changed) and the new sent version, set `current_sent_version_id`, revoke the old link, insert the new link; commit. The UI then offers email (sent automatically) and "Share new link to WhatsApp".
 
-The same pattern applies to agreement signing (lock `agreement` → `share_link`) and to direct quote acceptance (lock `quotation` → `share_link`).
+The same pattern applies to agreement signing (lock `agreement` → `share_link`; see "Agreements: creation and signing" for MSA + SOW) and to direct quote acceptance (lock `quotation` → `share_link`).
 
-**Race test (required, Testcontainers, two real connections as `crm_app`):** start approve and Resend on the same proposal concurrently, many iterations with randomised delays. Exactly one wins every time. If Resend wins: approve fails with the generic page, no signature or acceptance row exists. If approve wins: Resend is refused, the old link stays the approved version, no new sent version exists. Also: two concurrent approvals of the same link → one signature row. **Expiry-under-lock test:** hold the proposal lock in one connection, let the link's `expires_at` pass, then release; the waiting approval must fail with the generic page.
-- pg-boss: retries with exponential backoff, dead-letter; "failed, retry" badge in UI; enqueue idempotent by event id (job `id` / `singletonKey`; or the relay in the fallback).
+**Race test (required, Testcontainers, two real connections as `crm_app`):** start approve and Resend on the same proposal concurrently, many iterations with randomised delays. Exactly one wins every time. If Resend wins: approve fails with the generic page, no signature or acceptance row exists. If approve wins: Resend is refused, the old link stays the approved version, no new sent version exists. Also: two concurrent approvals of the same link → one signature row. **Expiry-under-lock test:** hold the proposal lock in one connection, let the link's `expires_at` pass, then release; the waiting approval must fail with the generic page. The race test runs against the simplified approval transaction (one agreement, no MSA work) and must still pass.
+
+### Agreements: creation and signing
+
+Each customer has `agreement_pattern` (`service_agreement` | `msa_sow`), defaulted from `workspace_settings.default_agreement_pattern`.
+
+1. **In the approval transaction** (lock order unchanged: `proposal` → `share_link` → `quotation`): create exactly one agreement. `service_agreement` → a Service Agreement. `msa_sow` → a SOW whose `parent_msa_id` is the customer's signed MSA (latest signed, if several), or null if none is signed. The transaction never creates, locks or branches on an unsigned MSA. It commits and emits `agreement.created`.
+2. **Post-commit job on `agreement.created`** (worker, under `withWorkspace()`, idempotent by event id), only for a SOW with `parent_msa_id IS NULL`:
+   - If the customer now has a signed MSA, use it. Otherwise `INSERT` a draft MSA for the customer `ON CONFLICT DO NOTHING` against the unique partial index "one open MSA per customer" (open = unsigned and not void), then select the customer's open MSA. Two concurrent jobs for the same customer therefore end with one MSA.
+   - Link without a race: `SELECT … FROM agreement WHERE id = sow_id FOR UPDATE`, then `UPDATE agreement SET parent_msa_id = $msa WHERE id = sow_id AND parent_msa_id IS NULL AND status <> 'signed'`. A SOW already linked or already signed is left alone. Auto-send of a `msa_sow` pair happens after this link is set.
+3. **Signing link** (`share_link` targets the SOW; the public read model includes its parent MSA): if the MSA is unsigned, the client signs the MSA first, then the SOW, in the same OTP session. Signing the MSA locks `agreement` (SOW) → `share_link` → `agreement` (MSA), in that order. **A SOW signature is refused unless its parent MSA is signed.** Signing the SOW locks the SOW row (then `share_link`) and checks that `parent_msa_id` is set and that MSA's status is `signed`. Holding the SOW's lock is sufficient: the SOW's `parent_msa_id` cannot change while it is locked (the linking job takes the same lock), and a signed MSA is immutable — it can never become unsigned, voided or edited — so the check cannot be invalidated before commit.
+4. **Change orders and sign-offs** reference, via `parent_agreement_id`, the SOW for `msa_sow` customers and the Service Agreement otherwise.
+
+### Jobs and errors
+
+- pg-boss: retries with exponential backoff, dead-letter; "failed, retry" badge in UI; enqueue idempotent by event id (job `id` = `domain_event.id`).
 - Friendly user messages; details in logs and Sentry.
 - `/api/health` checks DB and queue.
 
 ## Scalability
 
-- `web` stateless → N replicas; `worker` scales independently; in the outbox fallback the relay job is single-instance (pg-boss singleton) to keep ordering simple.
-- App connections go through the pooled connection string (transaction mode), small per-process pool; `prepare` setting chosen by Spike 1. Migrations and pg-boss's LISTEN/worker connections go **direct** (session features). PgBouncer on self-host when needed.
-- Composite indexes: `(workspace_id, created_at)`, `(workspace_id, status)`, `(workspace_id, customer_id)`; in the outbox fallback, `domain_event (relayed_at) WHERE relayed_at IS NULL`.
+- `web` stateless → N replicas; `worker` scales independently.
+- App connections go through the pooled connection string; the pooler **must be transaction mode**, and postgres.js runs with `prepare: false` (non-overridable when `DATABASE_URL` points at a pooler). Spike 1: only `prepare: true` with a pooler that has `max_prepared_statements=0` broke (~60% of transactions failed with `26000`, no leak); Drizzle already runs unprepared, so the flag only affects raw tagged calls, and DO's pooler settings are not under our control. Migrations always go **direct** (session-level advisory lock, DDL). pg-boss uses advisory *transaction* locks, so it works through the pooler with polling; LISTEN/NOTIFY needs a **direct** connection (through the pooler the channel registration is lost and it falls back to polling). PgBouncer on self-host when needed.
+- Starting pool sizes per process (Spike 1/2; correctness was proven at 2, throughput is not): web postgres.js `max` 5–10 via the pooler; web pg-boss `max: 2`; worker pg-boss `max` 3–5; PgBouncer `default_pool_size` sized to the DB plan.
+- Composite indexes: `(workspace_id, created_at)`, `(workspace_id, status)`, `(workspace_id, customer_id)`.
 - Numbering lock serialises only one workspace.
 - `audit_log`, `domain_event`, share-link views: monthly archive job when they grow.
 - Plan limits become columns on `billing_account` in Part 3.
@@ -506,11 +547,13 @@ The same pattern applies to agreement signing (lock `agreement` → `share_link`
 
 ## Known risks
 
-- **R1 empty-string setting.** After `app.workspace_id` has been set on a server connection, `current_setting('app.workspace_id', true)` returns `''` (not NULL) once the transaction ends. Without `nullif` a stray query on a reused pooled connection errors instead of returning 0 rows. Fixed by the policy form above; Spike 1 proves it.
-- **R2 `pg` driver.** pg-boss depends on `pg` and runs its own node-postgres pool, which conflicts with the "`postgres` driver only" rule in the Phase 0 plan. **Open question 1 for Charlie**; not decided here.
-- **R3 `pgboss` tables have no RLS.** Job rows from every workspace share one table. Payloads hold IDs only; `crm_app` gets the minimum grants (ideally no `SELECT` on `pgboss.job`); Spike 2 records the exact grants.
-- **R4 connection budget.** Each process opens the app pool (postgres.js) and pg-boss's pool; Better Auth uses the app pool. Small DO Managed PG plans allow a few tens of connections, and migrations plus pg-boss LISTEN need direct connections. Pool sizes are set deliberately in the Phase 1 plan.
-- **R5 pins.** pg-boss releases often and its Drizzle adapter targets drizzle 1.0 RC; pin pg-boss exactly and keep drizzle-orm 0.45.3 until a planned upgrade (Spike 2 proves `fromDrizzle` on 0.45.3).
+- **R1 empty-string setting — confirmed and fixed.** Spike 1 reproduced it (`22P02` without `nullif`, 0 rows with it). Guarded by the required `nullif`, the policy lint/test and RLS tests that seed rows in other workspaces.
+- **R2 `pg` driver.** pg-boss depends on `pg` and opens its own node-postgres pool in the worker and, small (`max: 2`), in the web-side send-only instance; this conflicts with the "`postgres` driver only" rule in the Phase 0 plan. **Open question 1 for Charlie**; not decided here.
+- **R3 `pgboss` tables have no RLS — mitigated.** Job rows from every workspace share `job_common`. Payloads hold IDs only; `crm_app` has enqueue-only grants and cannot read payloads (Spike 2). Grants are per queue table, so a new partitioned queue needs `ALTER DEFAULT PRIVILEGES` or a re-grant in its migration.
+- **R4 connection budget.** Each process opens the app pool (postgres.js) and pg-boss's pool; Better Auth uses the app pool. Small DO Managed PG plans allow a few tens of connections, and migrations (and LISTEN, if ever enabled) need direct connections. Starting sizes are under Scalability; final sizes in the Phase 1 plan.
+- **R5 pins.** pg-boss releases often and its Drizzle adapter targets drizzle 1.0 RC; pin pg-boss 12.35.0 exactly and keep drizzle-orm 0.45.3 until a planned upgrade (Spike 2 proved `fromDrizzle` on 0.45.3).
+- **R6 untested by the spikes:** pg-boss maintenance/supervise through the pooler over a full cycle (60 s+); the exact grants of `crm_worker` (the spike used the schema owner as worker); a run against the DO Managed PG pooler. Each is checked in Phase 1 before the worker role is fixed.
+- **R7 web queue cache lag.** The web pg-boss instance caches queue options for up to 60 s (`queueCacheIntervalSeconds`); a queue option changed after start is not seen until refresh. Queue options (including `notify`) change only in migrations, followed by a restart. With `notify` on, a backlog tail can wait for the 30 s backstop poll; `notify` stays off in Phase 1.
 
 ## Runtime and hosting
 
@@ -518,14 +561,14 @@ The same pattern applies to agreement signing (lock `agreement` → `share_link`
 - Dev compose: `web`, `worker`, `postgres`, `minio`, `mailpit`.
 - **Stage 1 — Phases 0–3: laptop.** Dev compose only; no hosting.
 - **Stage 2 — Phase 4 → first sale: one Singapore VPS** running prod compose (`web`, `worker`, `postgres`, `cloudflared`), files on R2, email via Resend. Cloudflare in front (DNS + proxy, Tunnel so the VPS exposes no inbound ports, R2, Turnstile). Nightly encrypted backups to R2. VPS provider: Open question 4.
-- **Stage 3 — from first sale: DigitalOcean Managed PostgreSQL, Singapore** (PITR, pool port in transaction mode for the app, direct port for migrations and pg-boss). App containers stay on the VPS (or move later) behind the Tunnel.
+- **Stage 3 — from first sale: DigitalOcean Managed PostgreSQL, Singapore** (PITR, pool port in transaction mode for the app with `prepare: false`, direct port for migrations and for any LISTEN/NOTIFY user). App containers stay on the VPS (or move later) behind the Tunnel.
 - **Rejected, with reasons:**
   - *Cloudflare Workers / Pages for the app*: not a long-running Node process; the pg-boss worker, TCP Postgres and the one-image rule (same image for SaaS and self-host) don't fit.
   - *Cloudflare Containers*: would split SaaS from the self-host deployment model and doesn't give an always-on worker as simply as a VPS.
   - *Neon (free)*: compute suspends when idle, and pg-boss's polling and maintenance fight scale-to-zero; the free tier is not a place for real financial records.
   - *Supabase (free)*: pauses inactive projects; its platform auth and RLS conventions would sit alongside Better Auth unused.
 - Prod compose (self-host, Part 4): `caddy`, `web`, `worker`, `postgres`, `minio` (or buyer's S3), optional `clamav`.
-- Env: `DATABASE_URL` (pooled), `DATABASE_MIGRATOR_URL` (**direct**, not pooled), `DEPLOYMENT_MODE`, `APP_URL`, `AUTH_SECRET`, `APP_ENCRYPTION_KEY`, `EMAIL_PROVIDER=smtp|resend` + keys, `STORAGE_*`, `TURNSTILE_*` (optional on self-host), `SENTRY_DSN` (optional), `ERROR_REPORTING_OPTIN` (self-host).
+- Env: `DATABASE_URL` (pooled, `crm_app`), `DATABASE_MIGRATOR_URL` (**direct**, not pooled, `crm_migrator`), a worker connection for `crm_worker` (pooled with polling; direct if LISTEN/NOTIFY is ever turned on; exact variable name set in the Phase 0 plan patch), `DEPLOYMENT_MODE`, `APP_URL`, `AUTH_SECRET`, `APP_ENCRYPTION_KEY`, `EMAIL_PROVIDER=smtp|resend` + keys, `STORAGE_*`, `TURNSTILE_*` (optional on self-host), `SENTRY_DSN` (optional), `ERROR_REPORTING_OPTIN` (self-host).
 
 ## Planned structure
 
@@ -543,17 +586,19 @@ apps/
 packages/
   core/                  # money, numbering, documents, agreements, signatures, events
   # extensions/*         # Part 3 (Appendix A), with apps/web/src/extensions/
-templates/agreements/    # Service Agreement (default), change order, sign-off — Malaysia
+templates/agreements/    # Service Agreement (default), MSA, SOW, change order, sign-off — Malaysia (NDA later)
 docker/                  # Dockerfile, compose.dev.yml, compose.prod.yml (completed in Part 4)
 docs/superpowers/specs/2026-09-27-core-sales-design.md
 ```
 
 ## Checks before the Phase 1 plan is written
 
-These run in Phase 0 (throwaway code in a folder **outside the repo**; only a short result note is kept, folded into the Decisions or a docs commit). They gate the **Phase 1 plan**, not the Phase 0 build. Pin the versions the app will use.
+These ran in Phase 0 as throwaway code in a folder outside the repo (`CRM-spikes/`, deleted afterwards; only `CRM-spikes/RESULTS.md` is kept). They gate the **Phase 1 plan**, not the Phase 0 build.
 
-1. **Spike 1 — RLS + `set_config` through a transaction-mode pool.** Postgres 17 + PgBouncer (`pool_mode=transaction`, small server pool) as the real `crm_app` role. Must show: `rolbypassrls = false` for every app role and `FORCE ROW LEVEL SECURITY` on; rows written under workspace A invisible under B and `WITH CHECK` refusing B's ID inside A; ≥ 1,000 concurrent alternating `withWorkspace` calls with zero cross-workspace reads or writes while server connections are demonstrably reused; a bare query on a reused connection returns 0 rows (the `nullif` case); `SET LOCAL app.workspace_id = $1` with a bind parameter errors; which postgres.js `prepare` setting works through the pooler. Optionally repeated against a DO Managed PG trial pool (Charlie's call; costs money). **Fail = any leak → stop; Bob reviews before Phase 1.**
-2. **Spike 2 — pg-boss `send` inside the Drizzle transaction.** `boss.send(..., { db: fromDrizzle(tx, sql) })` as `crm_app` under `withWorkspace()`, through the Spike 1 pooler: a rolled-back transaction leaves neither the `domain_event` row nor the job (100/100); a committed one leaves exactly one job, invisible to a second connection before commit, received by a worker; a repeat send with the event id gives one job; works on drizzle-orm 0.45.3 + postgres.js; records the minimum `pgboss` grants and that pg-boss's own connections must be direct. **Fail → v4.4 outbox + relay fallback** (see Domain events and jobs).
+**Run 2026-09-29. Versions:** Node 24.21.0, PostgreSQL 17.11 (`postgres:17-alpine`), PgBouncer 1.25.2 (`edoburu/pgbouncer`, pinned by digest), postgres.js 3.4.9, drizzle-orm 0.45.3, pg-boss 12.35.0 (pulls `pg` 8.23.0).
+
+1. **Spike 1 — RLS + `set_config` through a transaction-mode pool: PASSED.** Two PgBouncers in transaction mode (`default_pool_size=2`; `max_prepared_statements` 0 and 200), real `crm_migrator` / `crm_app` roles (NOSUPERUSER, NOBYPASSRLS), `FORCE ROW LEVEL SECURITY`. 18,000 postgres.js + 5,400 Drizzle concurrent transactions over 3 workspaces (direct / both poolers × `prepare` true/false, 3 runs each), multiplexed over 2 reused server connections: **0 leaked rows, 0 setting mismatches, every cross-workspace INSERT refused (`42501`), 0 cross-workspace UPDATE rows**; bare queries on reused connections returned 0 rows and bare inserts failed. **Decisions:** `nullif` in every policy is **required** (without it `22P02` on `''`, and only when rows exist — see Tenancy); postgres.js uses **`prepare: false`** (only `prepare: true` + `max_prepared_statements=0` failed, ~60% `26000` errors, no leak); `SET LOCAL … = $1` fails with `42601`, `set_config` works; migrator and any LISTEN user connect **direct**. Not run: the optional DO Managed PG trial (R6).
+2. **Spike 2 — pg-boss `send` inside the Drizzle transaction: PASSED.** `send(name, data, { db: fromDrizzle(tx, sql), id })` as `crm_app` under `withWorkspace()` (set_config + RLS on `domain_event`), app direct and via the pooler, worker direct and via the pooler, LISTEN off and on: 100/100 commits → event + job, received by the worker; **100/100 rollbacks → neither event nor job**; job invisible to other connections and the worker before commit; same `id` sent twice → one job; `fromDrizzle` works unchanged on drizzle-orm 0.45.3 + postgres.js. `crm_app` needed only the grants listed under Data model → System, and `SELECT` on job payloads stayed denied. LISTEN/NOTIFY through the pooler loses its channel and falls back to polling (no jobs lost). **Decision:** transactional enqueue is the design; the outbox + relay fallback is dropped.
 3. **Host/provider chosen.** The Phase 4 VPS provider (Open question 4) and the Phase 4 file/email providers (R2, Resend) are confirmed by Charlie and recorded in Decisions, so no hosting item is left uncovered.
 
 ## Build phases for Part 1
@@ -562,15 +607,15 @@ Target dates are **estimates only**, counted from 5 Oct 2026.
 
 | Phase | Deliverable | Done when | Target (estimate) |
 |---|---|---|---|
-| 0. Foundation | Monorepo (pnpm workspaces), Next.js + TS + Drizzle + Postgres + Better Auth, Docker image (`web`/`worker`), dev compose, CI (typecheck, lint + boundaries, tests, `pnpm audit`, secret scan, Trivy). **Both spikes** (see "Checks before the Phase 1 plan") | Sign up, 2FA, create 2 workspaces, switch; `docker compose up` runs web + worker + migrations; **spikes pass or fallback chosen** | mid Oct |
-| 1. Tenancy, security, jobs | `billing_account` / `organization` / `member` (Better Auth system module, no RLS) + `workspace_settings` (RLS), four DB roles (`crm_migrator`, `crm_app`, `crm_link_resolver`, `crm_purge`), RLS + `withWorkspace()` (`set_config`) + lint rule, `action()`, audit log (PII-redacted), nonce CSP + headers, DB-backed rate limits, pg-boss worker, `domain_event` + transactional enqueue (or outbox fallback), `notification` table, email adapter + React Email, `/api/health` | Isolation test passes on every tenant table; no-RLS allow-list test passes; rolled-back transaction leaves no event and no job; test email flows web → job → Mailpit | early Nov |
+| 0. Foundation | Monorepo (pnpm workspaces), Next.js + TS + Drizzle + Postgres + Better Auth, Docker image (`web`/`worker`), dev compose, CI (typecheck, lint + boundaries, tests, `pnpm audit`, secret scan, Trivy). **Both spikes** (see "Checks before the Phase 1 plan"); postgres.js `prepare: false`; migrator on a direct connection | Sign up, 2FA, create 2 workspaces, switch; `docker compose up` runs web + worker + migrations; **spikes passed (2026-09-29)** | mid Oct |
+| 1. Tenancy, security, jobs | `billing_account` / `organization` / `member` (Better Auth system module, no RLS) + `workspace_settings` (RLS), five DB roles (`crm_migrator`, `crm_app`, `crm_link_resolver`, `crm_purge`, `crm_worker`), RLS with `nullif` policies + `withWorkspace()` (`set_config`) + lint rule + policy lint, `action()`, audit log (PII-redacted), nonce CSP + headers, DB-backed rate limits, pg-boss installed by migrations with `pgboss` grants, web send-only instance + worker, `domain_event` + transactional enqueue, `notification` table, email adapter + React Email, `/api/health` | Isolation test (rows seeded in other workspaces) passes on every tenant table; no-RLS allow-list test passes; rolled-back transaction leaves no event and no job; `crm_app` cannot read job payloads; `crm_worker` grants measured and pg-boss maintenance runs a full cycle through the pooler; test email flows web → job → Mailpit | early Nov |
 | 2. Workspace settings + onboarding defaults | Branding, country defaults, SST/GST question, own SST/GST no., TIN, BRN, timezone/locale, bank details + DuitNow QR (step-up + notification, content-addressed QR), currency/tax, numbering + preview, catalog, email templates | Pattern preview matches issued numbers; concurrency test passes; MY and SG defaults applied on sign-up; replacing the QR leaves the old file in place | mid Nov |
 | 3. Customers + team | Customer (incl. TIN/BRN/SST) + contact CRUD, search, archive rules, CSV import, invitations | CRUD E2E; CSV import rejects invalid rows with a preview and commits valid ones atomically; invited admin sees permission matrix enforced | late Nov |
 | 4. **Vertical slice: real invoice + onboarding** | Money core (all money rules + worked example), onboarding tax question, quick invoice (line items, discounts, tax, PO, bank + DuitNow snapshot), issue/lock, `einvoice_status = not_required`, PDF at send via worker, send by email, record payment, auto receipt. **Deployed to the Singapore VPS behind Cloudflare Tunnel; nightly backup to R2; one restore tested.** | Charlie issues a real invoice, gets paid, receipt sent; worked money example passes as a fixture; new-user **invoice**-in-5-minutes E2E passes; **Gate A** | mid Dec |
 | 5. Quotes, conversions, jobs, dashboard | Quotes, versions, quote → invoice, credit notes, manual refunds, recurring invoices, overdue/expiry scans, reminders, dashboard v1, period export | Status transitions unit-tested; recurring job creates exactly one invoice per period under retries; refunds capped and voidable; reminders fire in staging; dashboard totals match a hand-computed fixture; new-user **quote**-in-5-minutes E2E passes; **Gate B** | mid Jan 2027 |
 | 6. Proposals | Block editor (8 types, reorder), proposal branding, linked live quote in the editor, "Add pricing", payment schedule → draft invoices, sent versions + "changed since sent", pipeline board | Draft proposal reflects quote changes live; sending creates an immutable sent version; board totals match document statuses | mid Feb |
 | 7. Client link pages | `resolve_share_link()`, public read models, share links to named contacts, Share to WhatsApp (incl. after Resend), Turnstile, OTP, view tracking, Download ▾, approve/decline on current sent version only, resend revokes old link, owner notifications, mobile-first pages | Client approves via OTP; hash on page matches PDF; anonymous-access tests pass (other document, other workspace, tampered IDs, revoked, expired, superseded); approve-vs-Resend race test passes; owner notified on view/approve/decline | early Mar |
-| 8. Agreements | Template engine + Malaysia starter templates (Service Agreement default, change order, sign-off), auto-create on approval, auto-send, sign by link, certificate page | Full 13-step E2E passes; **Gate C** | late Mar |
+| 8. Agreements | Template engine + Malaysia starter templates (Service Agreement default, MSA, SOW, change order, sign-off), per-customer agreement pattern, one agreement created on approval, MSA provisioning job + one-open-MSA index, MSA-before-SOW signing, auto-send, sign by link, certificate page | Full 13-step E2E passes (Service Agreement and MSA + SOW customers); two concurrent approvals for one `msa_sow` customer create exactly one MSA; SOW signing is refused until its MSA is signed; approve-vs-Resend race test still passes with the shorter transaction; **Gate C** | late Mar |
 | 9. Hardening | Security review against this spec, a11y, performance, backup + restore drill, passkeys, full workspace export + re-import, workspace offboarding, customer purge (`crm_purge`), SaaS deploy docs | Restore drill passes; export re-imports into a fresh workspace in a test; purge test passes (never-invoiced versions, their artifacts and files deleted; issued documents untouched; `crm_purge` refused on anything else) | mid Apr |
 | Own-use period | Studio runs on the product | **Gate D** | ≥ 8 weeks after Phase 4 |
 
@@ -584,7 +629,7 @@ Order: Part 1 → Part 3 → Part 2 → Part 4.
 
 **Part 4 — Self-host product** (only with 3 prepaid buyers): same image; prod compose with Caddy; Ed25519-signed license file verified offline, carrying **extension entitlements**; private registry gated by support subscription; backup/restore + upgrade scripts; buyer setup guide (DNS/DMARC, restore drill). *Re-confirm the buyer segment before building.*
 
-**Later extensions**: `einvoice-my` (manual / middleware / intermediary modes; triggered by a customer above the exemption threshold or a threshold change), `einvoice-sg`, `accounting-*`. **Later features**: NDA / MSA / SOW templates, bilingual PDFs, `/api/v1` + Expo app. **After Gate A, only if own use needs them**: customer credit balance and statement of account, as derived views over documents and payments.
+**Later extensions**: `einvoice-my` (manual / middleware / intermediary modes; triggered by a customer above the exemption threshold or a threshold change), `einvoice-sg`, `accounting-*`. **Later features**: NDA template (same engine, no redesign), bilingual PDFs, `/api/v1` + Expo app. **After Gate A, only if own use needs them**: customer credit balance and statement of account, as derived views over documents and payments.
 
 ## Decided points
 
@@ -596,28 +641,29 @@ Order: Part 1 → Part 3 → Part 2 → Part 4.
 - Node 24 LTS (Charlie, 2026-09-29).
 - E-invoice: stub only; extension when needed.
 - UI direction: decide before Phase 3; prototype the block editor before Phase 6.
-- **Charlie's scope picks (relayed 2026-09-30; confirmed when he approves v4.5):** extensions deferred to Part 3; hosting laptop → Singapore VPS + Cloudflare → DigitalOcean; Part 1 agreements = Service Agreement, change order, sign-off; Gates A–D and the business section merged; Phase 5 adds recurring invoices and refunds, credit balance and statements deferred to after Gate A; `crm_purge` rule; content-addressed DuitNow QR; WhatsApp after Resend; no RLS on Better Auth tables with `workspace_settings` under RLS.
+- **Charlie's scope picks (relayed 2026-09-30; confirmed when he approves v4.5):** extensions deferred to Part 3; hosting laptop → Singapore VPS + Cloudflare → DigitalOcean; Part 1 agreements = Service Agreement, MSA, SOW, change order, sign-off, NDA deferred (revised by Charlie 2026-09-30, reversing the earlier 3-type pick), agreement pattern per customer; Gates A–D and the business section merged; Phase 5 adds recurring invoices and refunds, credit balance and statements deferred to after Gate A; `crm_purge` rule; content-addressed DuitNow QR; WhatsApp after Resend; no RLS on Better Auth tables with `workspace_settings` under RLS.
 
 ## Verify with professionals before Phase 4 goes live
 
 - **Accountant**: confirm the studio is exempt under the current threshold (RM3M, Guideline v4.8) and that **none of the §1.6.10 exceptions** apply: (a) non-individual shareholders, (b) a qualifying holding company, (c) related companies or joint ventures at or above the threshold. Also confirm whether the RM10,000 single-transaction rule applies to exempt taxpayers, and whether the studio is liable to register for SST (this sets the studio's own onboarding answer; book this week). Also the statutory retention period for issued documents (~7 years).
-- **Lawyer**: OTP + typed name + certificate page satisfies Electronic Commerce Act 2006 reliability for agreements; review starter templates (Service Agreement, change order, sign-off).
+- **Lawyer**: OTP + typed name + certificate page satisfies Electronic Commerce Act 2006 reliability for agreements; review starter templates (Service Agreement, MSA, SOW, change order, sign-off).
 - **SST**: current service-tax rates and exempt line types (defaults only; model supports per-line rates).
 - **PDPA**: retention statement, purge path and offboarding wording.
 
 ## Next steps after approval
 
-1. Bob reviews v4.5 (merged sections, roles, `workspace_settings`, purge rule); Charlie approves.
-2. Run Spike 1 and Spike 2 outside the repo; record results. Charlie confirms host/provider.
-3. Patch the Phase 0 plan (Task 7 `prepare` option, Task 9 direct migrator connection, spike rows, done-when) and update `init_andy.md` and `CLAUDE.md` to v4.5 (four roles, `set_config`, `billing_account`, extensions in Part 3).
+1. Bob reviews v4.5 (merged sections, roles incl. `crm_worker`, `workspace_settings`, purge rule, MSA + SOW design, spike decisions); Charlie approves.
+2. ~~Run Spike 1 and Spike 2~~ — done, both passed 2026-09-29. Charlie confirms host/provider.
+3. Patch the Phase 0 plan (Task 7 `prepare: false` default, Task 9 direct migrator connection and pg-boss install there, pooled vs direct URLs, spike rows, done-when) and update `init_andy.md` and `CLAUDE.md` to v4.5 (five roles, `set_config` + `nullif`, `billing_account`, extensions in Part 3, transactional enqueue).
 4. Invoke `superpowers:writing-plans` for the Phase 1 plan, only after steps 1–2.
 
 ## Verification (for the build)
 
 - Vitest: money (incl. the worked mixed-rate example, the cross-exponent FX fixtures, allocation tie-breaks, qty precision rejection, percentage-only line discounts, tax-off workspaces, `fx_rate` default from last used pair), numbering (workspace tz, concurrency), status transitions, sent-version rules, recurring schedule periods, refund caps, template substitution, event payload versioning, CSV row validation.
 - Anonymous access: `resolve_share_link()` grants, one-document scope, tampered IDs, revoked / expired / superseded links, cross-workspace attempts.
-- Concurrency: approve-vs-Resend race, double approval, sign-vs-revoke; `document_artifact` insert-once under retried `pdf.render` jobs (no UPDATE on version or signature rows); recurring invoice idempotency per period.
-- Testcontainers Postgres: RLS isolation on every tenant table (read/write), no-RLS allow-list test, `set_config` + `nullif` bare-query test, `withWorkspace` lint rule, transactional approval + event + job atomicity (or outbox in the fallback), idempotency replay, pg-boss retry and dead-letter, `crm_purge` limited to never-invoiced versions and their artifacts, DuitNow QR files never deleted on replacement.
+- Concurrency: approve-vs-Resend race (with the simplified one-agreement approval transaction), double approval, sign-vs-revoke; two concurrent approvals for one `msa_sow` customer create exactly one MSA (unique partial index + `ON CONFLICT DO NOTHING`); MSA-link job vs SOW signing; `document_artifact` insert-once under retried `pdf.render` jobs (no UPDATE on version or signature rows); recurring invoice idempotency per period.
+- Agreements: SOW signature refused until its parent MSA is signed; MSA then SOW signed in one OTP session; change order and sign-off reference the SOW or the Service Agreement per customer pattern.
+- Testcontainers Postgres: RLS isolation on every tenant table (read/write) with rows seeded in other workspaces, policy lint (no `current_setting` cast without `nullif`), no-RLS allow-list test, `set_config` + `nullif` bare-query test on a reused connection, `withWorkspace` lint rule, transactional approval + event + job atomicity (rollback leaves no job), `crm_app` denied `SELECT` on job payloads, idempotency replay, pg-boss retry and dead-letter, `crm_purge` limited to never-invoiced versions and their artifacts, DuitNow QR files never deleted on replacement.
 - Adapter contract tests: SMTP vs Resend, S3 vs MinIO.
 - Playwright: full 13-step flow incl. OTP, Share to WhatsApp link (and after Resend), Download ▾ (mouse, tap, keyboard), mobile viewport for client pages, certificate page, bank-details and DuitNow step-up, onboarding invoice-in-5-minutes (Phase 4) and quote-in-5-minutes (Phase 5), dashboard totals, pipeline board, CSV import.
 - Run via `pnpm dev` and `docker compose up`; PDFs and emails (Mailpit) verified in both.
