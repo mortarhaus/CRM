@@ -6,6 +6,34 @@ import { defineConfig } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+const coreFiles = ["packages/core/**/*.{ts,tsx,mts,cts,js,mjs}"];
+
+const frameworkPackages = ["next", "react", "react-dom", "@next/*"];
+const dbAuthPackages = [
+  "drizzle-orm",
+  "drizzle-kit",
+  "postgres",
+  "pg",
+  "pg-*",
+  "better-auth",
+  "@better-auth/*",
+  "@neondatabase/*",
+  "@vercel/postgres",
+];
+const appPackages = ["@crm/web", "@crm/ext-*"];
+
+const withSubpaths = (names) => names.flatMap((name) => (name.endsWith("/*") ? [name] : [name, `${name}/*`]));
+
+const restrictedSourceRegex = (names) =>
+  `^(${withSubpaths(names)
+    .map((name) => name.replace(/[.+?^${}()|[\]\\/]/g, "\\$&").replace("*", ".*"))
+    .join("|")})$`;
+
+const restrictedDynamicImport = (names, message) => ({
+  selector: `ImportExpression[source.value=/${restrictedSourceRegex(names)}/]`,
+  message,
+});
+
 export default defineConfig(
   {
     ignores: [
@@ -40,7 +68,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["apps/**/*.{ts,tsx}", "packages/**/*.ts"],
+    files: ["apps/**/*.{ts,tsx,mts,cts,js,mjs}", "packages/**/*.{ts,tsx,mts,cts,js,mjs}"],
     plugins: { boundaries },
     settings: {
       "boundaries/elements": [
@@ -63,23 +91,36 @@ export default defineConfig(
     },
   },
   {
-    files: ["packages/core/**/*.ts"],
+    files: coreFiles,
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: withSubpaths(frameworkPackages), message: "packages/core must not import framework code." },
+            { group: withSubpaths(dbAuthPackages), message: "packages/core must not import database or auth code." },
+            { group: withSubpaths(appPackages), message: "packages/core must not import app or extension code." },
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        restrictedDynamicImport(frameworkPackages, "packages/core must not import framework code."),
+        restrictedDynamicImport(dbAuthPackages, "packages/core must not import database or auth code."),
+        restrictedDynamicImport(appPackages, "packages/core must not import app or extension code."),
+      ],
+    },
+  },
+  {
+    files: ["apps/web/**/*.{ts,tsx,mts,cts,js,mjs}"],
     rules: {
       "no-restricted-imports": [
         "error",
         {
           patterns: [
             {
-              group: ["next", "next/*", "react", "react/*", "react-dom", "react-dom/*", "@next/*"],
-              message: "packages/core must not import framework code.",
-            },
-            {
-              group: ["drizzle-orm", "drizzle-orm/*", "drizzle-kit", "postgres", "pg", "pg-boss", "better-auth", "better-auth/*"],
-              message: "packages/core must not import database or auth code.",
-            },
-            {
-              group: ["@crm/web", "@crm/web/*", "@crm/ext-*"],
-              message: "packages/core must not import app or extension code.",
+              group: ["**/packages/*/src/**"],
+              message: "Import core through its package exports (for example @crm/core/password), not its source files.",
             },
           ],
         },
