@@ -1,12 +1,13 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light dark;
   --background: hsl(0 0% 100%);
   --foreground: hsl(222 47% 11%);
   --muted: hsl(210 40% 96%);
   --muted-foreground: hsl(215 16% 35%);
   --border: hsl(214 32% 88%);
-  --input: hsl(214 32% 70%);
+  --input: hsl(215 16% 47%);
   --ring: hsl(222 84% 45%);
   --primary: hsl(222 47% 11%);
   --primary-foreground: hsl(210 40% 98%);
@@ -20,7 +21,7 @@
     --muted: hsl(217 33% 15%);
     --muted-foreground: hsl(215 20% 70%);
     --border: hsl(217 33% 22%);
-    --input: hsl(217 33% 35%);
+    --input: hsl(217 20% 52%);
     --ring: hsl(213 94% 68%);
     --primary: hsl(210 40% 96%);
     --primary-foreground: hsl(222 47% 11%);
