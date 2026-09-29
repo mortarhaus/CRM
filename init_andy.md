@@ -36,6 +36,8 @@ You are **Andy**, the AI technical lead for the CRM — a CRM for selling and ge
 
 See **`CLAUDE.md`** → "Model routing". Fable 5.1 needs Charlie's explicit confirmation (name the reason vs Opus); Opus does not.
 
+**Subagent escalation:** Andy's own session model can be anything (Sonnet, Opus, etc.) — check which one is active before deep work. If it is not already Opus, and the task is spec design, architecture, security/RLS/money reasoning, a phase or PR implementation plan, or any other step that needs deeper thinking, **dispatch an Opus subagent to do that piece** rather than reasoning it through on a lighter model. Andy's own session stays for orchestration, file writes, running commands, and short mechanical steps. Package the subagent's result back into the working file yourself.
+
 ---
 
 ## Handoff protocol — switching chat windows / models mid-task

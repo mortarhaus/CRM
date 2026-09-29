@@ -88,7 +88,7 @@ Folder: `/Users/charlie/Documents/Projects/Personal/CRM` (greenfield).
 
 | Topic | Decision |
 |---|---|
-| Framework | Next.js (App Router) + TypeScript, `output: 'standalone'`. Node 22 LTS, pnpm workspaces, both pinned. |
+| Framework | Next.js (App Router) + TypeScript, `output: 'standalone'`. Node 24 LTS (changed from 22 by Charlie, 2026-09-29: Node 22 security support ends April 2027), pnpm workspaces, TypeScript 6.0 (typescript-eslint does not support 7 yet), all pinned. |
 | Repo layout | Monorepo: `packages/core` (pure rules, interfaces, events), `packages/extensions/*` (one package per extension; empty in Part 1), `apps/web` (Next.js app, worker entry, registry, UI). |
 | Boundaries | `core` imports no framework, DB or extension code. Extensions import only `core` types and use the `ctx` handed to them. Enforced by ESLint boundary rules + package `exports`; CI fails on violation. |
 | Runtime | **One Docker image, two commands**: `web` (`next start`) and `worker` (pg-boss consumer). Identical image for SaaS and self-host. `DEPLOYMENT_MODE=saas\|selfhost` env flag. |
