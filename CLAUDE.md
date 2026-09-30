@@ -13,7 +13,7 @@ medium creative agencies. Dogfooded by Charlie's studio. Sold as hosted SaaS and
 
 - Spec v4.5 approved by Charlie on 2026-09-30 at `8989d59` (PR #2). Both Phase 1 spikes passed on 2026-09-29.
 - Phase 0 PR 1 (Tasks 1-5, tooling) merged on 2026-09-30 (`97cfaab`).
-- Next: patch the Phase 0 plan for v4.5 (`docs/superpowers/plans/2026-09-29-phase-0-foundation.md`), then PR 2 (Tasks 6-10), then PRs 3-4. The Phase 1 plan is written only after Charlie picks the VPS provider.
+- The Phase 0 plan (`docs/superpowers/plans/2026-09-29-phase-0-foundation.md`) is patched for v4.5. Next: Phase 0 PR 2 (Tasks 6-10), then PRs 3-4. The Phase 1 plan is written only after Charlie picks the VPS provider.
 
 ## Commands
 

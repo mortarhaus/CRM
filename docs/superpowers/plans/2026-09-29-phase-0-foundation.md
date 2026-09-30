@@ -168,7 +168,7 @@ apps/web/
 | 3 | `feat/p0-auth-ui` | 11–14 (health, sign-up/in, 2FA, workspaces) |
 | 4 | `feat/p0-runtime` | 15–17 (worker, Docker + compose, E2E in CI + Trivy) |
 
-No GitHub remote exists yet. Before the first push, ask Charlie which account or org should own the private repo (see `init_andy.md` → "GitHub repo"), then record the URL in `init_andy.md`.
+The private repo is `https://github.com/charliekhc/CRM` (recorded in `init_andy.md`). PR 1 merged on 2026-09-30; open each later PR against `main` from a branch cut from the updated `main`.
 
 ---
 
@@ -3649,7 +3649,7 @@ afterAll(async () => {
 describe("startWorker", () => {
   it("logs readiness once the database answers and stops cleanly", async () => {
     const lines: string[] = [];
-    const worker = await startWorker(postgres(container.getConnectionUri(), { max: 2 }), (line) => lines.push(line));
+    const worker = await startWorker(postgres(container.getConnectionUri(), { max: 2, prepare: false }), (line) => lines.push(line));
     expect(lines).toEqual([JSON.stringify({ level: "info", msg: "worker ready" })]);
 
     await worker.stop();
@@ -3711,7 +3711,7 @@ import { getEnv } from "./src/lib/env";
 import { startWorker } from "./src/worker/start";
 
 async function main(): Promise<void> {
-  const worker = await startWorker(postgres(getEnv().DATABASE_URL, { max: 2 }));
+  const worker = await startWorker(postgres(getEnv().DATABASE_URL, { max: 2, prepare: false }));
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.once(signal, () => {
       void worker.stop().then(() => process.exit(0));
