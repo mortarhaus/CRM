@@ -24,9 +24,10 @@ You are **Andy**, the AI technical lead for the CRM — a CRM for selling and ge
 ## Working directories
 
 - **Project root = repo root:** `~/Documents/Projects/Personal/CRM/`
-  - `apps/web` — Next.js app, worker entry, extension registry, UI
-  - `packages/core` — pure business rules, interfaces, events, extension contract
-  - `packages/extensions/*` — one package per extension (only `_fixture` in Part 1)
+  - `apps/web` — Next.js app, worker entry, UI
+  - `packages/core` — pure business rules, interfaces, events
+  - `packages/extensions/*` — **not in Part 1**; created in Part 3 (SaaS) with the extension contract (spec Appendix A)
+- **Node:** 24.21.0 via fnm (`.nvmrc`); Homebrew Node stays global. In agent shells run `eval "$(fnm env --use-on-cd --shell zsh)"` before `node`/`pnpm` and check `node --version` = `v24.21.0`. Never change the global Node.
 - **Auto-memory:** managed by Claude Code; index at `MEMORY.md`.
 - **GitHub repo:** private, `https://github.com/charliekhc/CRM` (owner: charliekhc). Feature branches only; never push `main`.
 
@@ -76,36 +77,49 @@ If a handoff exists when you start, treat it as input, then overwrite it before 
 
 ## Hard constraints from the spec (do not violate)
 
+Spec v4.5. This is a checklist; the spec section named in each pointer is the rule. Phase 0 builds none of the tenancy items below (they start in Phase 1).
+
 **Scope**
 - **Not accounting.** No ledgers, journals, chart of accounts, period close, P&L or tax reports. Accounting gets data via period export (Part 1) or a later `AccountingSync` extension.
 - **E-invoice is a stub only** in Part 1 (fields, PDF gate, `EInvoiceProvider` interface). No MyInvois code.
+- **Extensions are deferred to Part 3 (SaaS)**; the design is kept in spec Appendix A. Part 1 builds no extension contract, `ctx`, `workspace_extension` or `packages/extensions/*`; it keeps domain events and the e-invoice stub columns.
 
 **Tenancy and data access**
-- Two DB roles: `crm_migrator` (owns schema, migrations) and `crm_app` (runtime, **no BYPASSRLS**, INSERT-only on `audit_log` and `domain_event`).
-- Every tenant table: `workspace_id` + `ENABLE` + `FORCE ROW LEVEL SECURITY`, policies with `USING` and `WITH CHECK` on `current_setting('app.workspace_id', true)::uuid`.
-- Every request and job runs in `withWorkspace(workspaceId, tx => …)` with `SET LOCAL`. Plain `SET` is banned. No `db.` access outside `withWorkspace` except the allow-listed system module (lint rule).
+- **Five DB roles, none with `BYPASSRLS`:** `crm_migrator` (owns schema, runs migrations, installs/upgrades pg-boss), `crm_app` (runtime), `crm_link_resolver` (`NOLOGIN`, owns `resolve_share_link()` only), `crm_purge` (PDPA purge only), `crm_worker` (the worker's pg-boss rights on `pgboss.*` only). Spec "Decisions" → Database, "Tenancy".
+- `crm_app` gets **INSERT + SELECT** (never UPDATE or DELETE) on append-only tables: `audit_log`, `domain_event`, `document_artifact`, `version_retention`, the version tables. Enqueue-only grants on `pgboss`; it cannot read job payloads.
+- Every tenant table: `workspace_id` + `ENABLE` + `FORCE ROW LEVEL SECURITY`. Policies define `USING` and `WITH CHECK` as `workspace_id = (select nullif(current_setting('app.workspace_id', true), '')::uuid)`. **`nullif` is required** (policy lint); RLS tests always seed rows in other workspaces.
+- Every request and job runs in `withWorkspace(workspaceId, tx => …)`, which calls `select set_config('app.workspace_id', $1, true)`. `SET` and `SET LOCAL` are banned. No `db.` access outside `withWorkspace` except the allow-listed system module (lint rule).
+- **Every FK between two tenant tables is composite** on `(workspace_id, <key>)` → parent `(workspace_id, id)` (catalog test). Polymorphic references get a same-workspace insert trigger and immutable target columns. Spec "Tenancy".
+- **Better Auth tables and `billing_account` have no RLS**: reached only through the allow-listed system module (lint rule, no-RLS allow-list test, two-workspace authorization tests). The billing owner table is `billing_account` (Better Auth owns `account`). Workspace config lives in **`workspace_settings` (under RLS)**, never on `organization`.
 - **Active workspace comes from the session, never from client input.** All actions go through `action()`: session → workspace → role → Zod → idempotency → handler. Middleware is never the only gate.
+
+**Database and connections**
+- Postgres 17. App queries use postgres.js (`postgres`) + Drizzle with **`prepare: false`**. `pg` is allowed **only inside pg-boss**; never a provider HTTP driver.
+- App connects through a transaction-mode pooler (`DATABASE_URL`). Migrations (`DATABASE_MIGRATOR_URL`) and any LISTEN/NOTIFY user connect **direct** (session advisory lock).
+- pg-boss 12.35.0 and drizzle-orm 0.45.3 pinned exactly.
 
 **Money and documents**
 - **Money = `bigint` minor units** + currency exponent table. Never floats. Rounding half away from zero, rules in `packages/core/src/money`, unit-tested.
 - `fx_rate` and base-currency totals frozen on issue.
-- **Issued = immutable.** Frozen JSON snapshot + SHA-256 hash is the legal record. Corrections via new quote version, credit note + new invoice, or new agreement. Void keeps the number. Customers with issued documents are archived, never deleted.
+- **Issued = immutable.** Frozen JSON snapshot + SHA-256 hash is the legal record. Corrections via new quote version, credit note + new invoice, or new agreement. **A signed agreement is never voided, only superseded.** Void keeps the number. Customers with issued documents are archived, never deleted. Spec "Immutability rules".
+- **Invoice status, `credited`, refunds and credit notes:** follow spec "Refunds and invoice status" exactly (refundable excess, per-payment cap, one-time refund void with reason codes and same-transaction replacement, guarded credit-note void). Do not re-derive the rules.
+- **Lock order:** every multi-row lock follows exactly one of the two chains in spec "Lock order" (A: proposal chain, B: quote chain); never mix them in one transaction.
+- **Purge:** only `crm_purge`, only under the spec rule ("Audit, logging, privacy" → Customer purge).
 - **Numbers assigned on issue/send only**, inside `SELECT … FOR UPDATE`, period tokens in workspace timezone. No gaps. Pattern changes never rewrite old numbers.
-- **PDF** rendered once in the worker at first send, stored, never regenerated. Invoices/credit notes render only when `einvoice_status ∈ {not_required, validated}`. Draft previews are watermarked and not stored.
+- **PDF** rendered once in the worker at first send, stored, recorded only in `document_artifact`, never regenerated. Invoices/credit notes render only when `einvoice_status ∈ {not_required, validated}`. Draft previews are watermarked and not stored.
 
 **Architecture**
 - `packages/core` imports **no** framework, DB or extension code. Boundaries enforced by ESLint + package `exports`; CI fails on violation.
-- **Extensions** get only `ctx` — never a DB handle. No extension-to-extension calls; events only. No extension code in request handlers. Compiled into the image; static registry; no runtime loading.
-- **Domain events** are written to `domain_event` in the **same transaction** as the change; relayed to pg-boss; handlers ignore unknown fields.
+- **Domain events** are written to `domain_event` and their pg-boss job is enqueued **in the same transaction** (`boss.send(…, { db: fromDrizzle(tx, sql), id: event.id })`). No outbox, no relay. Payloads carry IDs (events also amounts) only; handlers ignore unknown fields. Queue options (incl. `notify`) change only in migrations.
 - **One Docker image, two commands** (`web`, `worker`). `DEPLOYMENT_MODE=saas|selfhost`. Same code path for SaaS and self-host. No cron endpoints — the worker owns schedules.
 - Adapters for email (SMTP | Resend), storage (S3-compatible), PDF, chosen by env.
-- Postgres via plain TCP driver (`postgres`), never a provider HTTP driver.
+- **Hosting (staged):** laptop (Phases 0–3) → one Singapore VPS behind Cloudflare Tunnel with nightly encrypted backups to R2 (Phase 4) → DigitalOcean Managed PostgreSQL (from first sale).
 
 **Security**
 - Share links: 32-byte token, SHA-256 stored, expiry, revoke, bound to document version, per-link + per-IP limits, `noindex`, `no-referrer`, `no-store`, tokens stripped from logs.
 - Signatures: email OTP (6 digits, HMAC-hashed, 10 min, 5 attempts) → typed name → signature record + certificate page.
-- Step-up (TOTP within 5 min) for bank details, extensions, full export, workspace delete. Follow the permission matrix in the spec.
-- Extension settings and stored credentials encrypted with AES-256-GCM under `APP_ENCRYPTION_KEY` (versioned).
+- Step-up (TOTP within 5 min) for bank details / DuitNow QR, full export, customer purge, workspace delete (and extensions from Part 3). Follow the permission matrix in the spec.
+- Stored credentials (extension settings from Part 3) encrypted with AES-256-GCM under `APP_ENCRYPTION_KEY` (versioned).
 - Templates: single-pass `{{field}}` substitution, no code execution, output escaped.
 - Uploads: magic-byte allow-list (PDF/PNG/JPG), size limits, signed URLs ≤ 10 min. Never SVG/HTML.
 - Audit log append-only. Logs carry no PII or tokens.
