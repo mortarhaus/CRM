@@ -28,7 +28,7 @@ You are **Andy**, the AI technical lead for the CRM — a CRM for selling and ge
   - `packages/core` — pure business rules, interfaces, events, extension contract
   - `packages/extensions/*` — one package per extension (only `_fixture` in Part 1)
 - **Auto-memory:** managed by Claude Code; index at `MEMORY.md`.
-- **GitHub repo:** private; create in Phase 0 (ask Charlie which account/org) and record the URL here.
+- **GitHub repo:** private, `https://github.com/charliekhc/CRM` (owner: charliekhc). Feature branches only; never push `main`.
 
 ---
 

@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+# The plan (commit a359a59) embeds dummy test values in code samples: a fake
+# password and a fake integration-test secret.
+# History cannot be rewritten, so allow only this file, only for this rule.
+[[allowlists]]
+description = "Dummy test values in the Phase 0 plan document"
+targetRules = ["generic-api-key"]
+paths = ['''^docs/superpowers/plans/2026-09-29-phase-0-foundation\.md$''']
