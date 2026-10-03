@@ -5,3 +5,8 @@ savePrefix: ""
 engineStrict: true
 allowBuilds:
   esbuild: true
+auditConfig:
+  # Time-limited exception, see docs/DECISIONS.md "braces audit exception".
+  # No patched braces exists (CVE-2026-93687); dev-tooling chain only. Remove when a patch ships.
+  ignoreGhsas:
+    - GHSA-vfj7-8cjw-p6xm
