@@ -2,16 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Patched for spec v4.5 (2026-09-30).** Phase 0 does not build RLS/roles (Phase 1); spikes passed 2026-09-29; see spec v4.5 "Checks before the Phase 1 plan". Tasks 1–5 are DONE (PR #1, merged 2026-09-30). The patch applies the v4.5 connection rules (Task 7 `prepare: false`, Task 9 direct migrator connection) and the preflight rulings for Tasks 6–13, 15.
+
 **Goal:** Stand up the CRM monorepo so that a person can sign up, turn on TOTP 2FA, create two workspaces and switch between them, and so that `docker compose -f docker/compose.dev.yml up` runs migrations, `web` and `worker` from one image. CI must gate every PR on typecheck, lint + boundaries, tests, `pnpm audit`, secret scan and Trivy.
 
 **Architecture:** This is a pnpm-workspaces monorepo. `packages/core` holds pure TypeScript rules and has no framework or DB imports. In Phase 0 it holds Argon2id password hashing and workspace-slug generation. `apps/web` holds the Next.js 16 App Router app, a Drizzle + `postgres` (TCP) DB client, Better Auth (email + password with an Argon2id override, the `twoFactor` plugin and the `organization` plugin), `/api/health`, and two Node entries (`migrate.ts`, `worker.ts`). esbuild bundles both entries into `dist/*.mjs`. One multi-stage Docker image runs `web` or `worker`. Its entrypoint applies migrations under a Postgres advisory lock before either command starts.
 
 **Deliberate sequencing — read before reviewing (Charlie, Bob):** The spec's phase table puts the tenancy and security spine in **Phase 1**, and Phase 0's deliverable line does not mention it. So Phase 0 does **not** build any of the following:
-- the three DB roles (`crm_migrator` / `crm_app` / `crm_link_resolver`)
+- the five DB roles (`crm_migrator` / `crm_app` / `crm_link_resolver` / `crm_purge` / `crm_worker`)
 - RLS, `withWorkspace()` and the `db.` lint rule
 - `action()` and `requireWorkspaceMember`
-- the `account` table and the custom `organization` / `member` columns (country, currency, tax, bank details, …)
-- audit log, domain events and the extension contract
+- the `billing_account` table and `workspace_settings` (country, currency, tax, bank details, …)
+- audit log and domain events (the extension contract moved to Part 3 in spec v4.5)
 - pg-boss and Pino
 - the email adapter and Mailpit, and MinIO
 - nonce CSP and security headers
@@ -21,9 +23,9 @@ Instead, Phase 0 uses Better Auth's **unmodified** `organization` / `member` / `
 
 **Tech Stack:** Node 24.21.0 · pnpm 11.6.0 · TypeScript 6.0.3 · Next.js 16.3.6 / React 19.3.0 · Tailwind CSS 4.3.3 (CSS-first) · Better Auth 1.7.6 (+ `auth` CLI 1.7.6) · Drizzle ORM 0.45.3 / drizzle-kit 0.31.11 · `postgres` 3.4.9 · Zod 4.6.5 · @node-rs/argon2 2.2.1 · Vitest 5.0.2 · Testcontainers 12.2.0 · Playwright 1.63.0 · ESLint 10.11.0 + typescript-eslint 8.71.0 + eslint-plugin-boundaries 7.2.0 · esbuild 0.28.2 · tsx 4.23.15 · Postgres 17 · GitHub Actions · Trivy · gitleaks.
 
-**Spec:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.4, approved). The Phase 0 row of "Build phases for Part 1":
-> **Deliverable:** Monorepo (pnpm workspaces), Next.js + TS + Drizzle + Postgres + Better Auth, Docker image (`web`/`worker`), dev compose, CI (typecheck, lint + boundaries, tests, `pnpm audit`, secret scan, Trivy)
-> **Done when:** Sign up, 2FA, create 2 workspaces, switch; `docker compose up` runs web + worker + migrations
+**Spec:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` (written against v4.4; patched for v4.5, approved 2026-09-30). The Phase 0 row of "Build phases for Part 1" (v4.5):
+> **Deliverable:** Monorepo (pnpm workspaces), Next.js + TS + Drizzle + Postgres + Better Auth, Docker image (`web`/`worker`), dev compose, CI (typecheck, lint + boundaries, tests, `pnpm audit`, secret scan, Trivy). Both spikes; postgres.js `prepare: false`; migrator on a direct connection
+> **Done when:** Sign up, 2FA, create 2 workspaces, switch; `docker compose up` runs web + worker + migrations; spikes passed (2026-09-29)
 
 **Facts verified on 2026-09-29 against the published tarballs** (Task 8 re-checks them in the installed tree):
 - `emailAndPassword.password.verify` is typed `(data: { hash: string; password: string }) => Promise<boolean>`, and `hash` is `(password: string) => Promise<string>`.
@@ -49,7 +51,7 @@ Instead, Phase 0 uses Better Auth's **unmodified** `organization` / `member` / `
   - Lint and types: eslint 10.11.0, @eslint/js 10.0.1, typescript-eslint 8.71.0, eslint-plugin-boundaries 7.2.0, @next/eslint-plugin-next 16.3.6, eslint-plugin-react-hooks 7.1.1, globals 17.12.0, @types/node 24.19.0, @types/react 19.3.0, @types/react-dom 19.3.0.
 - **Not in Phase 0:** pg-boss, pino, nodemailer, Resend, AWS SDK, Sentry. Their phase adds them.
 - **`packages/core` imports no framework, DB, auth or extension code** (spec, "Boundaries"). ESLint `boundaries/dependencies` + `no-restricted-imports` enforce this, and CI fails on violation.
-- **Postgres only through the `postgres` TCP driver** (spec, "Database"). Never `pg`, never a provider HTTP driver.
+- **Postgres only through the `postgres` TCP driver** (spec, "Database"). Never `pg`, never a provider HTTP driver. (Spec v4.5 allows `pg` only inside pg-boss, from Phase 1; nothing in Phase 0 uses it.)
 - **One Docker image, two commands** (`web`, `worker`). Migrations run from the image entrypoint before either command starts (spec, "Runtime", "Migrations").
 - **No secrets in the repo.** Only `.env.example` is committed. The dev compose uses fixed, dev-only DB credentials bound to `127.0.0.1`.
 - **Logs carry no PII or tokens.** The Better Auth logger stays at `warn`, and `/api/health` never echoes DB errors.
@@ -57,7 +59,7 @@ Instead, Phase 0 uses Better Auth's **unmodified** `organization` / `member` / `
 - **UI follows `FRONTEND_STANDARDS.md`**: semantic HTML, one `<h1>`, labelled controls, keyboard operable, Tailwind utilities, `cn()`, `cva()` for variants, and semantic tokens only. Tailwind v4 is CSS-first, so tokens live in `apps/web/src/app/globals.css` (`@theme inline`). There is **no `tailwind.config.ts`**, which is a stack-version difference from the standards doc's wording.
 - **Import style:** `src/lib/**`, `src/db/**`, `src/worker/**`, `src/test/**`, `scripts/**`, `worker.ts` and `migrate.ts` use **relative** imports, because they are loaded by tsx, esbuild and the `auth` CLI. The `@/` alias is used only under `src/app/**` and `src/components/**`.
 - **Comments:** none by default. Add one only where the *why* is non-obvious.
-- **Git:** Conventional Commits with one logical change each. Every commit ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`; use the executing model's name if different. Never commit to `main`, never `--no-verify`, never force-push.
+- **Git:** Conventional Commits with one logical change each. Every commit ends with `Co-Authored-By: Claude <model> <noreply@anthropic.com>`, where `<model>` is the executing model's name (e.g. `Claude Sonnet 5.5` when Sonnet does the work); the `Claude Opus 5.5` text in the commit steps below is an example. Never commit to `main`, never `--no-verify`, never force-push.
 - **Commands:**
   - Unit and integration tests: `pnpm test` (Vitest projects; integration tests need Docker running).
   - Single file: `pnpm vitest run <path>`.
@@ -81,7 +83,7 @@ package.json                             root scripts, root dev deps (TS, Vitest
 pnpm-workspace.yaml                      workspaces + pnpm 11 settings (savePrefix, engineStrict, allowBuilds)
 pnpm-lock.yaml                           generated
 tsconfig.base.json                       shared strict compiler options
-vitest.config.ts                         Vitest projects (packages/*/vitest.config.ts, apps/*/vitest.config.ts)
+vitest.config.mts                        Vitest projects (packages/*/vitest.config.{ts,mts}, apps/*/vitest.config.{ts,mts})
 eslint.config.mjs                        flat config: TS strict, Next, react-hooks, boundaries, core import ban
 .env.example                             every env var, no real values
 .dockerignore                            keeps secrets / build output out of the build context
@@ -104,7 +106,7 @@ apps/web/
   tsconfig.json
   next.config.ts                         standalone output, monorepo tracing root, root .env loading
   postcss.config.mjs                     Tailwind v4 PostCSS plugin
-  vitest.config.ts
+  vitest.config.mts                      .mts: apps/web is not "type": "module" (next.config.ts uses CJS __dirname)
   playwright.config.ts
   drizzle.config.ts
   drizzle/                               generated SQL migrations (committed)
@@ -166,11 +168,13 @@ apps/web/
 | 3 | `feat/p0-auth-ui` | 11–14 (health, sign-up/in, 2FA, workspaces) |
 | 4 | `feat/p0-runtime` | 15–17 (worker, Docker + compose, E2E in CI + Trivy) |
 
-No GitHub remote exists yet. Before the first push, ask Charlie which account or org should own the private repo (see `init_andy.md` → "GitHub repo"), then record the URL in `init_andy.md`.
+The private repo is `https://github.com/charliekhc/CRM` (recorded in `init_andy.md`). PR 1 merged on 2026-09-30; open each later PR against `main` from a branch cut from the updated `main`.
 
 ---
 
 ### Task 1: Root workspace and toolchain
+
+> **DONE** (PR #1, merged 2026-09-30). Branch already existed, so no `switch -c`; Node 24.21.0 via fnm instead of `pnpm env use --global`; the `minimumReleaseAgeExclude` entries were removed before push (`8a70d62`).
 
 **Files:**
 - Create: `.nvmrc`, `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`
@@ -288,6 +292,8 @@ git commit -m "chore: add pnpm workspace root with pinned Node 24 and TypeScript
 ---
 
 ### Task 2: `@crm/core` — Argon2id password hashing
+
+> **DONE** (PR #1, merged 2026-09-30). The root config is `vitest.config.mts` (ESM without a root `"type": "module"`); the fix wave widened the project globs to `vitest.config.{ts,mts}`.
 
 **Files:**
 - Create: `packages/core/package.json`, `packages/core/tsconfig.json`, `packages/core/vitest.config.ts`, `packages/core/src/password/index.ts`, `vitest.config.ts` (root)
@@ -452,6 +458,8 @@ git commit -m "feat(core): add Argon2id password hashing" -m "Co-Authored-By: Cl
 ---
 
 ### Task 3: `apps/web` — Next.js shell, Tailwind v4 tokens, UI primitives
+
+> **DONE** (PR #1, merged 2026-09-30). `@node-rs/argon2` 2.2.1 is also an `apps/web` dependency (a server-external package must resolve from the app); the fix wave raised `--input` border contrast to ≥ 3:1, kept a forced-colors focus outline (`outline-hidden`), added the Input ring offset and set `color-scheme`.
 
 **Files:**
 - Create: `apps/web/package.json`, `apps/web/tsconfig.json`, `apps/web/next.config.ts`, `apps/web/postcss.config.mjs`, `apps/web/src/types/css.d.ts`, `apps/web/src/app/globals.css`, `apps/web/src/app/layout.tsx`, `apps/web/src/app/page.tsx`, `apps/web/src/lib/utils.ts`, `apps/web/src/components/ui/button.tsx`, `apps/web/src/components/ui/input.tsx`, `apps/web/src/components/ui/label.tsx`
@@ -756,6 +764,8 @@ git commit -m "feat(web): scaffold Next.js 16 app with Tailwind v4 tokens and UI
 
 ### Task 4: Lint and architecture boundaries
 
+> **DONE** (PR #1, merged 2026-09-30). The fix wave widened the core globs to `{ts,tsx,mts,cts,js,mjs}`, added restricted names (`@better-auth/*`, `drizzle-kit/*`, `pg-*`, `@neondatabase/*`, `@vercel/postgres`), banned dynamic `import()` of restricted modules in core and banned web deep imports into `packages/*/src`.
+
 **Files:**
 - Create: `eslint.config.mjs`
 - Modify: `package.json` (root devDependencies)
@@ -916,6 +926,8 @@ git commit -m "chore: add ESLint with boundary rules keeping packages/core frame
 
 ### Task 5: CI — checks, audit, secret scan
 
+> **DONE** (PR #1, merged 2026-09-30). A committed `.gitleaks.toml` allowlists this plan's dummy test values (exact path, `generic-api-key` only); the fix wave pinned gitleaks by digest, mounted the checkout read-only, added 15-minute job timeouts and PR-only cancellation.
+
 **Files:**
 - Create: `.github/workflows/ci.yml`
 
@@ -1009,9 +1021,13 @@ Push `feat/p0-tooling` (once Charlie has provided the remote), open PR 1 with `g
 ### Task 6: Environment validation
 
 **Files:**
-- Create: `apps/web/src/lib/env.ts`, `apps/web/vitest.config.ts`, `.env.example`
+- Create: `apps/web/src/lib/env.ts`, `apps/web/vitest.config.mts`, `.env.example`
 - Modify: `apps/web/package.json` (add `zod`, `vitest`)
 - Test: `apps/web/src/lib/env.test.ts`
+
+The Vitest config is `.mts` because `apps/web/package.json` must not become `"type": "module"` (`next.config.ts` relies on CJS `__dirname`); the root `vitest.config.mts` already picks up `apps/*/vitest.config.{ts,mts}`.
+
+Test values must not look like keys, so gitleaks (full-history scan in CI) does not flag them. The values in this task (`"k".repeat(32)`, `short-secret-value`, the `hunter2` URL) were checked against gitleaks 8.30.1 and pass. If gitleaks still flags a new file, add an exact-path, rule-scoped allowlist entry to `.gitleaks.toml` in the same commit (never a wildcard); the reviewer checks it.
 
 **Interfaces:**
 - Consumes: nothing.
@@ -1023,6 +1039,18 @@ Push `feat/p0-tooling` (once Charlie has provided the remote), open PR 1 with `g
 
 `APP_ENCRYPTION_KEY`, `EMAIL_PROVIDER`, `STORAGE_*`, `SENTRY_DSN` and `ERROR_REPORTING_OPTIN` are listed in the spec's env section but have no consumer in Phase 0. Each arrives with its adapter in Phase 1.
 
+- [ ] **Step 0: Start the PR 2 branch**
+
+The PR-checkpoint table creates one branch per PR from the updated `main`. Use `git switch -c` only if the branch does not exist yet:
+
+```bash
+git switch main && git pull --ff-only
+git switch feat/p0-auth-db 2>/dev/null || git switch -c feat/p0-auth-db
+git merge-base --is-ancestor main HEAD
+```
+
+Expected: the last command exits 0 (the branch contains the updated `main`). If not, **stop and ask Charlie**.
+
 - [ ] **Step 1: Add dependencies and the Vitest project**
 
 In `apps/web/package.json`:
@@ -1030,7 +1058,7 @@ In `apps/web/package.json`:
 - add `"vitest": "5.0.2"` to `devDependencies`
 - add the script `"test": "vitest run"`
 
-`apps/web/vitest.config.ts`:
+`apps/web/vitest.config.mts`:
 
 ```ts
 import { defineConfig } from "vitest/config";
@@ -1187,6 +1215,8 @@ AUTH_SECRET=
 # Host-side URLs for `pnpm dev` / `pnpm db:migrate` against the compose Postgres on 127.0.0.1:5433.
 # docker/compose.dev.yml overrides both inside containers. Phase 0 uses one dev user for both;
 # Phase 1 splits them into crm_app (runtime) and crm_migrator (migrations).
+# DATABASE_URL may go through a transaction-mode pooler (Phase 1+). DATABASE_MIGRATOR_URL must be a
+# DIRECT connection, never pooled: the migration runner holds a session-level advisory lock.
 DATABASE_URL=postgres://crm:crm@localhost:5433/crm
 DATABASE_MIGRATOR_URL=postgres://crm:crm@localhost:5433/crm
 ```
@@ -1199,7 +1229,7 @@ Expected: `git status` prints nothing for `.env`, because it is ignored.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/web/src/lib/env.ts apps/web/src/lib/env.test.ts apps/web/vitest.config.ts apps/web/package.json pnpm-lock.yaml .env.example
+git add apps/web/src/lib/env.ts apps/web/src/lib/env.test.ts apps/web/vitest.config.mts apps/web/package.json pnpm-lock.yaml .env.example
 git commit -m "feat(web): validate environment with Zod and fail fast without echoing values" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1215,7 +1245,7 @@ git commit -m "feat(web): validate environment with Zod and fail fast without ec
 **Interfaces:**
 - Consumes: `getEnv()` (Task 6).
 - Produces:
-  - `createDb(url: string, options?: { max?: number }): { sql: postgres.Sql; db: PostgresJsDatabase<typeof schema> }`
+  - `createDb(url: string, options?: { max?: number }): { sql: postgres.Sql; db: PostgresJsDatabase<typeof schema> }`, always with `prepare: false` (not overridable; spec v4.5 "Scalability")
   - `type DbHandle = ReturnType<typeof createDb>` and `type Database = DbHandle["db"]`
   - `getDb(): DbHandle` (a process singleton reading `DATABASE_URL`)
   - `startPostgres(): Promise<StartedPostgreSqlContainer>` (Postgres 17)
@@ -1293,8 +1323,10 @@ describe("createDb", () => {
   });
 
   it("exposes a Drizzle instance on the same pool", async () => {
-    const rows = await handle.db.execute<{ now: Date }>(sql`select now() as now`);
-    expect(rows[0]?.now).toBeInstanceOf(Date);
+    // drizzle-orm 0.45.3's postgres-js driver leaves timestamptz unparsed in raw execute(), so now() is a string.
+    const rows = await handle.db.execute<{ now: string }>(sql`select now() as now`);
+    expect(typeof rows[0]?.now).toBe("string");
+    expect(rows[0]?.now).toMatch(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/);
   });
 });
 ```
@@ -1316,7 +1348,8 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 export function createDb(url: string, options: { max?: number } = {}) {
-  const sql = postgres(url, { max: options.max ?? 10 });
+  // Phase 1+ connects through a transaction-mode pooler, where server-side prepared statements break (spec v4.5, Spike 1).
+  const sql = postgres(url, { max: options.max ?? 10, prepare: false });
   const db = drizzle({ client: sql, schema });
   return { sql, db };
 }
@@ -1404,6 +1437,8 @@ git commit -m "feat(web): add Postgres client over the postgres TCP driver with 
   - `GET` and `POST` on `/api/auth/*`
 
 There are no behaviour tests in this task because the schema does not exist until Task 9. Task 10 pins the behaviour, and it also drives the `autoSignIn: false` change through a failing test. The checks here are the installed-type verification and typecheck.
+
+**Decide here (deferred from PR 1 review):** the maximum password length (unbounded input to Argon2id is a DoS lever), set via Better Auth `emailAndPassword.maxPasswordLength` or in `@crm/core/password`; record the value and why in the PR description.
 
 - [ ] **Step 1: Add dependencies**
 
@@ -1560,6 +1595,8 @@ git commit -m "feat(web): configure Better Auth with Argon2id, TOTP 2FA and orga
   - `runMigrations(url: string, migrationsFolder: string): Promise<void>`, which is safe to run concurrently because it serialises on `pg_advisory_lock(hashtext('crm:migrations'))`
   - `apps/web/migrate.ts` (entry)
   - the scripts `auth:generate`, `db:generate` and `db:migrate`
+
+**Direct connection only.** `runMigrations` takes a **session-level** advisory lock, which does not hold across a transaction-mode pooler. So `migrate.ts` always uses `DATABASE_MIGRATOR_URL`, and that URL must be a **direct** (non-pooled) connection: on DigitalOcean the direct port, never the pool port (spec v4.5, "Decisions" → Migrations). The code does not change; the rule is stated in `.env.example` (Task 6) and must hold in every deployment.
 
 - [ ] **Step 1: Add tooling dependencies and scripts**
 
@@ -1825,6 +1862,8 @@ git commit -m "feat(web): generate Better Auth schema with timestamptz and add a
 - Modify: `apps/web/src/lib/auth/config.ts` (add `autoSignIn: false`), `apps/web/package.json` (add `otpauth`)
 - Test: `apps/web/src/lib/auth/auth.test.ts`
 
+Test values must not look like keys (gitleaks scans full history in CI). `PASSWORD` and the test `secret` below use space-separated values, which gitleaks 8.30.1 does not flag (the earlier hyphenated values were flagged as `generic-api-key`). If gitleaks still flags the file, add an exact-path, rule-scoped allowlist entry to `.gitleaks.toml` in the same commit (never a wildcard); the reviewer checks it.
+
 **Interfaces:**
 - Consumes: `createAuth` (Task 8), `runMigrations` and the schema tables (Task 9), `startPostgres` and `MIGRATIONS_DIR` (Task 7).
 - Produces:
@@ -1872,7 +1911,7 @@ import { MIGRATIONS_DIR, startPostgres } from "../../test/postgres";
 import { totpFromUri, wrongTotpCode } from "../../test/totp";
 import { createAuth, type Auth } from "./config";
 
-const PASSWORD = "correct-horse-battery-staple-42";
+const PASSWORD = "correct horse battery staple 42";
 
 let container: StartedPostgreSqlContainer;
 let handle: DbHandle;
@@ -1884,7 +1923,7 @@ beforeAll(async () => {
   handle = createDb(container.getConnectionUri());
   auth = createAuth({
     db: handle.db,
-    secret: "integration-test-secret-0123456789abcdef",
+    secret: "integration test secret, not a real key",
     baseURL: "http://localhost:3000",
   });
 });
@@ -2073,7 +2112,7 @@ git commit -m "fix(web): make duplicate-email sign-up indistinguishable and pin 
 
 - [ ] **Step 7: PR 2 checkpoint**
 
-Run the full gate with `pnpm typecheck && pnpm lint && pnpm test`, then push `feat/p0-auth-db`, open PR 2, and **stop for review.** Task 11 starts on `feat/p0-auth-ui` from the updated `main`.
+Run the full gate with `pnpm typecheck && pnpm lint && pnpm test`, then push `feat/p0-auth-db`, open PR 2, and **stop for review.** Task 11 starts on `feat/p0-auth-ui` from the updated `main` (its Step 0 creates the branch).
 
 ---
 
@@ -2091,6 +2130,18 @@ Run the full gate with `pnpm typecheck && pnpm lint && pnpm test`, then push `fe
   - `GET /api/health`, returning `200 {"status":"ok","db":"ok"}` or `503 {"status":"error","db":"error"}` with `Cache-Control: no-store`
 
 The spec says health reports "DB + queue". The queue does not exist until pg-boss arrives in Phase 1, which adds a `queue` field.
+
+- [ ] **Step 0: Start the PR 3 branch**
+
+Use `git switch -c` only if the branch does not exist yet (one branch per PR, from the updated `main`):
+
+```bash
+git switch main && git pull --ff-only
+git switch feat/p0-auth-ui 2>/dev/null || git switch -c feat/p0-auth-ui
+git merge-base --is-ancestor main HEAD
+```
+
+Expected: the last command exits 0. If not, **stop and ask Charlie**.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2190,12 +2241,9 @@ Stop the dev server.
 - [ ] **Step 6: Commit**
 
 ```bash
-git switch -c feat/p0-auth-ui
 git add apps/web/src/lib/health.ts apps/web/src/lib/health.test.ts apps/web/src/app/api/health
 git commit -m "feat(web): add /api/health reporting database status" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
-
-(Create the branch before the first commit if it does not already exist, from the updated `main`.)
 
 ---
 
@@ -2223,6 +2271,12 @@ git commit -m "feat(web): add /api/health reporting database status" -m "Co-Auth
   - the routes `/sign-up`, `/sign-in` (`?registered=1` shows a neutral status) and `/workspaces` (guarded), with `/` redirecting
 
 Before writing any component, re-read `FRONTEND_STANDARDS.md` and run its self-check at Step 8.
+
+**Decide before sign-up ships (deferred from PR 1 review):** the Unicode normalization policy for passwords (e.g. NFC / NFKC before hashing, or none); record the decision in the PR description and apply it consistently in sign-up and sign-in.
+
+**Alert locators:** Next's App Router injects a route announcer with `role="alert"`, so a bare `page.getByRole("alert")` matches two elements (Playwright strict-mode violation). Scope every alert locator to the page's main landmark: `page.getByRole("main").getByRole("alert")`.
+
+**Test values:** `PASSWORD` in `e2e/helpers.ts` is space-separated so gitleaks does not flag it (see Task 10); the same exact-path, rule-scoped allowlist rule applies if it still does.
 
 - [ ] **Step 1: Add Playwright and its config**
 
@@ -2270,7 +2324,7 @@ export default defineConfig({
 ```ts
 import { expect, type Page } from "@playwright/test";
 
-export const PASSWORD = "correct-horse-battery-staple-42";
+export const PASSWORD = "correct horse battery staple 42";
 
 export function uniqueEmail(): string {
   return `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
@@ -2336,7 +2390,7 @@ test("signing up twice with one email reveals nothing and keeps the original pas
   await signUp(page, email, "a-different-password-99", "Impostor");
 
   await signIn(page, email, "a-different-password-99");
-  await expect(page.getByRole("alert")).toHaveText("Email or password is incorrect.");
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText("Email or password is incorrect.");
 
   await signIn(page, email, PASSWORD);
   await expect(page).toHaveURL(/\/workspaces$/);
@@ -2745,7 +2799,7 @@ git commit -m "feat(web): add sign-up, sign-in, session-guarded app shell and si
 - Produces:
   - `/settings/security`: password, then setup key, the full `otpauth://` link in `data-testid="totp-uri"`, and 10 recovery codes, then a code to confirm
   - `/two-factor`: the second step of sign-in, with an authenticator code or a recovery code
-  - the E2E helpers `enrolTotp(page): Promise<TOTP>` and `completeTotpSignIn(page, totp): Promise<void>`
+  - the E2E helpers `startTotpEnrolment(page): Promise<TOTP>`, `submitTotpCode(page, code): Promise<void>`, `enrolTotp(page): Promise<TOTP>` (built from the first two) and `completeTotpSignIn(page, totp): Promise<void>`. The spec reuses the helpers instead of repeating the enrolment steps.
 
 There is no QR code in Phase 0. The user types the setup key, and a QR renderer is a follow-up (see the report to Charlie).
 
@@ -2755,8 +2809,17 @@ There is no QR code in Phase 0. The user types the setup key, and a QR renderer 
 
 ```ts
 import { expect, test } from "@playwright/test";
-import { totpFromUri, wrongTotpCode } from "../src/test/totp";
-import { completeTotpSignIn, PASSWORD, respectRateLimit, signIn, signOut, signUp, uniqueEmail } from "./helpers";
+import { wrongTotpCode } from "../src/test/totp";
+import {
+  completeTotpSignIn,
+  respectRateLimit,
+  signIn,
+  signOut,
+  signUp,
+  startTotpEnrolment,
+  submitTotpCode,
+  uniqueEmail,
+} from "./helpers";
 
 test("2FA: a wrong code is refused, the right code enrols, and sign-in then asks for a code", async ({ page }) => {
   await respectRateLimit(page);
@@ -2765,22 +2828,15 @@ test("2FA: a wrong code is refused, the right code enrols, and sign-in then asks
   await signIn(page, email);
   await expect(page).toHaveURL(/\/workspaces$/);
 
-  await page.getByRole("link", { name: "Security" }).click();
-  await page.getByLabel("Current password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
-
-  const uri = (await page.getByTestId("totp-uri").textContent())?.trim() ?? "";
-  const totp = totpFromUri(uri);
+  const totp = await startTotpEnrolment(page);
   await expect(page.getByRole("list", { name: "recovery codes" }).getByRole("listitem")).toHaveCount(10);
 
-  await page.getByLabel("Authentication code").fill(wrongTotpCode(totp));
-  await page.getByRole("button", { name: "Verify and turn on" }).click();
-  await expect(page.getByRole("alert")).toHaveText(
+  await submitTotpCode(page, wrongTotpCode(totp));
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
     "That code didn't work. Check your authenticator app and try again.",
   );
 
-  await page.getByLabel("Authentication code").fill(totp.generate());
-  await page.getByRole("button", { name: "Verify and turn on" }).click();
+  await submitTotpCode(page, totp.generate());
   await expect(page.getByRole("status")).toHaveText("Two-factor authentication is on.");
 
   await signOut(page);
@@ -2800,14 +2856,22 @@ import { totpFromUri } from "../src/test/totp";
 and these functions at the bottom:
 
 ```ts
-export async function enrolTotp(page: Page): Promise<TOTP> {
+export async function startTotpEnrolment(page: Page): Promise<TOTP> {
   await page.getByRole("link", { name: "Security" }).click();
   await page.getByLabel("Current password").fill(PASSWORD);
   await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
   const uri = (await page.getByTestId("totp-uri").textContent())?.trim() ?? "";
-  const totp = totpFromUri(uri);
-  await page.getByLabel("Authentication code").fill(totp.generate());
+  return totpFromUri(uri);
+}
+
+export async function submitTotpCode(page: Page, code: string): Promise<void> {
+  await page.getByLabel("Authentication code").fill(code);
   await page.getByRole("button", { name: "Verify and turn on" }).click();
+}
+
+export async function enrolTotp(page: Page): Promise<TOTP> {
+  const totp = await startTotpEnrolment(page);
+  await submitTotpCode(page, totp.generate());
   await expect(page.getByRole("status")).toHaveText("Two-factor authentication is on.");
   return totp;
 }
@@ -3549,6 +3613,18 @@ Push `feat/p0-auth-ui`, open PR 3 (include a screenshot or short description of 
 
 This is a deliberate stub. pg-boss job consumption and Pino logging are Phase 1, so neither is a dependency here. Logging is one JSON line per event through `console.log`.
 
+- [ ] **Step 0: Start the PR 4 branch**
+
+Use `git switch -c` only if the branch does not exist yet (one branch per PR, from the updated `main`):
+
+```bash
+git switch main && git pull --ff-only
+git switch feat/p0-runtime 2>/dev/null || git switch -c feat/p0-runtime
+git merge-base --is-ancestor main HEAD
+```
+
+Expected: the last command exits 0. If not, **stop and ask Charlie**.
+
 - [ ] **Step 1: Write the failing test**
 
 `apps/web/src/worker/start.test.ts`:
@@ -3573,7 +3649,7 @@ afterAll(async () => {
 describe("startWorker", () => {
   it("logs readiness once the database answers and stops cleanly", async () => {
     const lines: string[] = [];
-    const worker = await startWorker(postgres(container.getConnectionUri(), { max: 2 }), (line) => lines.push(line));
+    const worker = await startWorker(postgres(container.getConnectionUri(), { max: 2, prepare: false }), (line) => lines.push(line));
     expect(lines).toEqual([JSON.stringify({ level: "info", msg: "worker ready" })]);
 
     await worker.stop();
@@ -3635,7 +3711,7 @@ import { getEnv } from "./src/lib/env";
 import { startWorker } from "./src/worker/start";
 
 async function main(): Promise<void> {
-  const worker = await startWorker(postgres(getEnv().DATABASE_URL, { max: 2 }));
+  const worker = await startWorker(postgres(getEnv().DATABASE_URL, { max: 2, prepare: false }));
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.once(signal, () => {
       void worker.stop().then(() => process.exit(0));
@@ -3705,12 +3781,9 @@ Run: `pnpm --filter @crm/web typecheck && pnpm lint`
 Expected: both exit 0.
 
 ```bash
-git switch -c feat/p0-runtime
 git add apps/web/src/worker apps/web/worker.ts apps/web/scripts/build-node.mjs apps/web/package.json pnpm-lock.yaml
 git commit -m "feat(web): add worker entry stub and esbuild bundles for worker and migrations" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
-
-(Create the branch from the updated `main` before the first commit if it does not already exist.)
 
 ---
 
@@ -4005,10 +4078,10 @@ Append under `jobs:`:
 
 - [ ] **Step 3: Fill in `CLAUDE.md` → "Commands"**
 
-Replace the line `Set in Phase 0 and recorded here (typecheck, lint, test, test:e2e, db:migrate, docker compose).` with:
+Replace the body of the `## Commands` section (the interim text and table added after PR 1) with:
 
 ````markdown
-Node 24.21.0 and pnpm 11.6.0. The single `.env` lives at the repo root (copy `.env.example`; `AUTH_SECRET` via `openssl rand -base64 32`).
+Node 24.21.0 (`.nvmrc`, via fnm; in agent shells run `eval "$(fnm env --use-on-cd --shell zsh)"` first) and pnpm 11.6.0. The single `.env` lives at the repo root (copy `.env.example`; `AUTH_SECRET` via `openssl rand -base64 32`).
 
 | Task | Command |
 |---|---|
@@ -4026,10 +4099,10 @@ Node 24.21.0 and pnpm 11.6.0. The single `.env` lives at the repo root (copy `.e
 | Full stack (migrations → web + worker) | `pnpm stack:up` (= `docker compose -f docker/compose.dev.yml up --build -d --wait`) · stop: `pnpm stack:down` |
 ````
 
-In the `## Status` section, replace the paragraph with:
+In the `## Status` section, replace the bullets with:
 
 ```markdown
-Phase 0 (Foundation) implemented per `docs/superpowers/plans/2026-09-29-phase-0-foundation.md`. Next: Phase 1 plan (tenancy, roles, RLS, events, extension contract).
+Phase 0 (Foundation) implemented per `docs/superpowers/plans/2026-09-29-phase-0-foundation.md`. Next: Phase 1 plan (tenancy, five roles, RLS, pg-boss + transactional events), once Charlie has picked the VPS provider.
 ```
 
 - [ ] **Step 4: Run the full local gate once more**
@@ -4095,7 +4168,7 @@ Spec items deliberately left to Phase 1 are listed under **Architecture**.
 - `totpFromUri` / `wrongTotpCode`
 - `toWorkspaceSlug(name, suffix)`
 - `getCurrentSession` / `listWorkspaces`
-- the E2E helpers `signUp` / `signIn` / `signOut` / `enrolTotp` / `completeTotpSignIn` / `respectRateLimit`
+- the E2E helpers `signUp` / `signIn` / `signOut` / `startTotpEnrolment` / `submitTotpCode` / `enrolTotp` / `completeTotpSignIn` / `respectRateLimit`
 
 **Review Focus:** each of the five items has its test inside the owning task:
 - #1: Task 10 Step 2 and Task 12 Step 3
