@@ -9,7 +9,8 @@ Parameters (from `PROJECT.md` §8): `TENANT_KEY`, `TENANT_SETTING`, `DB_APP_ROLE
 ## Database roles
 - **TEN-01** `DB_MIGRATOR_ROLE` owns the schema and runs migrations.
 - **TEN-02 (hard)** `DB_APP_ROLE` is the only role the running app uses. It has **no** superuser and **no** BYPASSRLS.
-- **TEN-03** Append-only tables (audit log, event outbox): `DB_APP_ROLE` has INSERT only.
+- **TEN-03** Append-only tables (audit log, event or job records): `DB_APP_ROLE` may INSERT, and SELECT where the app
+  must read them. It has no UPDATE, DELETE or TRUNCATE.
 
 ## Every tenant table
 - **TEN-04** Has a non-null `TENANT_KEY` column.
@@ -21,8 +22,9 @@ Parameters (from `PROJECT.md` §8): `TENANT_KEY`, `TENANT_SETTING`, `DB_APP_ROLE
   A new tenant table without its isolation test is a finding.
 
 ## Access
-- **TEN-09 (hard)** Every request and background job runs inside `TENANT_TX_HELPER`, which sets the tenant with
-  `SET LOCAL` in a transaction. Plain `SET` is banned (it leaks across pooled connections).
+- **TEN-09 (hard)** Every request and background job runs inside `TENANT_TX_HELPER`, which sets the tenant
+  transaction-locally: `SET LOCAL`, or `set_config(name, value, true)` (the same thing in function form).
+  Plain `SET` and `set_config(…, false)` are banned (they leak across pooled connections).
 - **TEN-10** No direct DB access outside the helper, except a small, lint-enforced allow-list of system modules.
 - **TEN-11 (hard)** The active tenant comes from the server session. Never from client input (body, query, header, cookie
   the client controls).

@@ -3,6 +3,15 @@
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
 
+## 2026-10-03 — Owner-approved migration: two stale lines in CLAUDE.md
+- **Decision:** `CLAUDE.md` line 7 (builder and reviewer roles) and line 10 (handoff path) are edited to point at `agents/roles/builder.md`, `agents/roles/reviewer.md`, `agents/START.md`, `agents/PROJECT.md` and `.agent/handoff.md`. This is a **separate migration**, not part of setup Part A. Part A only appended the kit block; the migration edits two lines outside the block.
+- **Why:** The old lines named `init_andy.md` and `init_bob.md`, which this PR deletes, and `.andy/handoff.md`, which the kit replaces. Left alone they would send agents to missing or stale rules.
+- **Alternatives rejected:** Restoring the old lines (they would point at deleted files); leaving the files and the lines (stale rules conflict with the kit).
+- **Scope / affects:** `CLAUDE.md` lines 7 and 10; deleted `init_andy.md`, `init_bob.md`.
+- **Versions:** kit 1.7.1
+- **Exception to a rule?** START.md Part A step 1 (text outside the markers stays byte-for-byte unchanged applies to setup, not to this migration). Compensating control: the edit is two lines, listed here and in the PR.
+- **Decided by:** owner (Charlie, 2026-10-03: "I approve the CLAUDE.md two-line edit as a separate migration")
+
 ## 2026-10-03 — Proposed exception to AUTH-01 (hard): anonymous client link actions (PROPOSED, NOT APPROVED — awaiting Bob's ruling)
 - **Decision:** Proposed, not approved — awaiting Bob's ruling. Anonymous client link actions (OTP request/verify, approve, decline, sign, download) do not go through `action()`: they have no session or role. Each request re-resolves the token through `resolve_share_link()`, runs under `withWorkspace(<resolved workspace>)`, acts only on the resolved target and version, validates input with Zod, and uses idempotency keys on approve and sign.
 - **Why:** Spec v4.5 "Anonymous access (client link pages)" and "Reliability" design client links without a session. AUTH-01 (hard) requires every mutating entry point to go through the action wrapper in the order session → tenant → role → schema → idempotency → handler.
@@ -64,13 +73,4 @@
 - **Scope / affects:** `guardrails/tenancy-rls.md` TEN-06, TEN-07; `agents/PROJECT.md` §9; `resolve_share_link()` (Phase 7).
 - **Versions:** spec v4.5
 - **Exception to a rule?** TEN-06, TEN-07. Compensating control: `crm_link_resolver` is `NOLOGIN` with column SELECT on `share_link` only; the function returns one row by token hash; `EXECUTE` granted to `crm_app` only; tests per spec "Anonymous access". Whether this counts as a bypass under TEN-12 is open for Bob. Review date: Phase 7 gate.
-- **Decided by:** owner (Charlie, 2026-10-03)
-
-## 2026-10-03 — Spec exception to TEN-03: app role may SELECT its append-only tables
-- **Decision:** `crm_app` has INSERT and SELECT on append-only tables (`audit_log`, `domain_event`, `version_retention`, `document_artifact`, and the append-only version tables). It never has UPDATE or DELETE. Spec v4.5 is the source for the exact grants.
-- **Why:** The app must read its own rows (audit views, event history, retained versions, stored artifacts). Kit rule TEN-03 says INSERT only. The spec (Bob R4 "grant wording aligned") grants INSERT and SELECT. The spec wins on what to build.
-- **Alternatives rejected:** INSERT-only plus a separate read role (more roles and policies for no isolation gain; RLS still limits every read to the active workspace).
-- **Scope / affects:** `guardrails/tenancy-rls.md` TEN-03, `agents/PROJECT.md` §9, DB grants in Phase 0 PR 2 and Phase 1.
-- **Versions:** spec v4.5
-- **Exception to a rule?** TEN-03. Compensating control: no UPDATE or DELETE grant to `crm_app`; RLS (TEN-05, TEN-06) limits reads to the active workspace; only `crm_purge` may DELETE, and only where the spec's purge rule allows. Review date: at each phase gate that changes grants.
 - **Decided by:** owner (Charlie, 2026-10-03)

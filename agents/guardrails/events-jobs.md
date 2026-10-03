@@ -5,8 +5,10 @@ If this project lacks that mechanism, don't silently waive these rules. Before t
 in `PROJECT.md` §9 the alternative mechanism and how each affected rule's outcome is tested; otherwise
 leave the pack unticked and write replacement rules in §9.
 
-- **EVT-01** Domain events are written to an outbox table in the **same transaction** as the change they describe.
-- **EVT-02** A relay moves them to the queue. The relay runs as a singleton and is idempotent by event id.
+- **EVT-01** Domain events, and any jobs they trigger, are recorded **atomically with the change they describe**: an
+  outbox row, or a queue job enqueued inside the same database transaction. If the change rolls back, no event or job remains.
+- **EVT-02** If events pass through a relay, it runs as a singleton and is idempotent by event id. N/A when jobs are
+  enqueued transactionally; say so in the self-check.
 - **EVT-03** Handlers ignore unknown fields (forward-compatible).
 - **EVT-04** Core handlers run before plugin/extension handlers. Plugin failures never block core.
 - **EVT-05** Retries with backoff, a dead-letter queue, and a way to retry from the UI or an admin command.

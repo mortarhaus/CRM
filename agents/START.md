@@ -20,7 +20,8 @@ loads neither file automatically, the owner starts each session with
 ## Matching the owner's first message
 
 A message is a command only if the **entire** message (ignoring case and surrounding spaces) fits one of
-these forms. Check them **in this order**:
+these forms. Check them **in this order**. The owner may put `Read agents/START.md and run ` in front of
+any form; ignore that one fixed prefix, then match the rest as written. No other prefix or extra text is allowed.
 
 1. `review spec [path]`
 2. `review <number>` · `review pr <number>` · `review pr #<number>`
