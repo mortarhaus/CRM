@@ -3,6 +3,15 @@
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
 
+## 2026-10-03 — Service default price carries its own currency (MON-02)
+- **Decision:** Each catalog `service` stores a `currency` (ISO 4217) with its default unit price, prefilled from `workspace_settings.default_currency` when the service is created. Changing the workspace default later does not change an existing service's currency or price. A quote or invoice line prefills the service default unit price only when the document currency equals the service currency; otherwise the user enters an explicit price in the document currency. No silent conversion: `fx_rate` is never used to convert catalog prices. No fixed currency is chosen. Still open (not decided here, for the spec review): currency on `line_item`, currency on `credit_note`, and the stored currency code for the frozen base totals. Written into spec v4.6, which is a **draft pending Bob's spec review** and Charlie's approval; v4.5 stays the approved spec until then.
+- **Why:** MON-02 requires a currency code next to every amount. Without one, a change to the workspace default currency would silently reinterpret every catalog price, and prefilling across currencies would put a price in the wrong currency on a document.
+- **Alternatives rejected:** a fixed catalog currency (e.g. MYR); reading service prices in the current workspace default; converting catalog prices with `fx_rate`.
+- **Scope / affects:** spec data model `service` (and the `line_item`, proposal scope-of-work, Money rules and Verification text that prefill from it), rule MON-02, `agents/PROJECT.md` §9.
+- **Versions:** spec v4.6 (draft, revision 1)
+- **Exception to a rule?** no (this satisfies MON-02 for `service`)
+- **Decided by:** owner (Charlie, 2026-10-03: "go with bob's suggestion"), adopting Bob's recommendation
+
 ## 2026-10-03 — braces audit exception (GHSA-vfj7-8cjw-p6xm), expiring
 - **Decision:** `pnpm audit --audit-level high` ignores only `GHSA-vfj7-8cjw-p6xm` (`braces` stack-exhaustion DoS, CVE-2026-93687, versions <= 3.0.3). The ignore lives in `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml`. The CI audit job is unchanged: no `--prod`, and every other advisory at high or above still fails the job (checked 2026-10-03: with a different ID in the ignore list the audit exits 1).
 - **Why:** No patched `braces` exists: the advisory lists no first patched version and the npm latest is 3.0.3 (`npm view braces versions --json`, checked 2026-10-03). `main` has failed the audit job since 2026-10-03, so every PR is blocked. `braces` is reached only through dev tooling (`eslint-plugin-boundaries` and `@next/eslint-plugin-next`, both devDependencies); it is not in the production dependency tree (`pnpm why braces --prod` prints nothing).

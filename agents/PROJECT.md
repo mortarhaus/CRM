@@ -201,7 +201,7 @@ Things unique to this product. Generic rules belong in a guardrail pack, not her
 - **AUTH-01 (hard)** — anonymous client link actions (OTP request/verify, approve, decline, sign, download) have no session or role. They re-resolve the token on every request through `resolve_share_link()`, run under `withWorkspace(<resolved workspace>)`, act only on the resolved target and version, validate input with Zod, and use idempotency keys on approve and sign.
 
 **Open for Bob** (one line each; not decided here):
-- MON-02 — ASK: currency of the catalog `service` default price, and whether `line_item` / `credit_note` / base totals carry a currency column; Charlie gives the currency himself, none is assumed.
+- MON-02 — the `service` default price currency is DECIDED (`docs/DECISIONS.md` 2026-10-03 "Service default price carries its own currency (MON-02)", spec v4.6 draft). Still open for the spec review: currency on `line_item`, on `credit_note`, and the stored currency code for frozen base totals.
 - TEN-07 — the spec doesn't say the tenant policy is RESTRICTIVE; how to scope a restrictive policy so it doesn't block `share_link_resolve`.
 - UNI-10 — the spec's monthly archive job for `audit_log` / `domain_event` has no role or mechanism and conflicts with append-only.
 - UNI-19 / AUTH-01 — Better Auth's own `/api/auth/*` endpoints don't go through `action()`, and the spec's unauthenticated-surface list omits them (the Phase 0 plan lists them).
