@@ -4,10 +4,10 @@ Charlie's CRM for selling and getting paid (quotes, invoices, proposals, agreeme
 medium creative agencies. Dogfooded by Charlie's studio. Sold as hosted SaaS and as a self-host product.
 
 - **Source of truth:** `docs/superpowers/specs/2026-09-27-core-sales-design.md`, spec **v4.5** (latest version in its Status line).
-- **Builder role:** `init_andy.md`. **Reviewer role:** `init_bob.md`.
+- **Builder role (Andy):** `agents/roles/builder.md`. **Reviewer role (Bob):** `agents/roles/reviewer.md`. Commands and ground rules: `agents/START.md`. Project facts: `agents/PROJECT.md`.
 - **Repo root = this folder.** Monorepo: `apps/web`, `packages/core`. `packages/extensions/*` is created in the SaaS part (Part 3, spec Appendix A), not in Part 1.
 - **UI work:** follow `FRONTEND_STANDARDS.md` (semantic HTML, WCAG 2.2, Tailwind + shadcn, `cn()`/`cva()`, semantic tokens).
-- **Handoff:** `.andy/handoff.md` (gitignored) holds in-flight task state.
+- **Handoff:** `.agent/handoff.md` (gitignored) holds in-flight task state.
 
 ## Status
 
@@ -35,3 +35,15 @@ Node 24.21.0 (`.nvmrc`) and pnpm 11.6.0. Node is managed per folder with fnm. In
 | Default: design, security, RLS, money, auth, extensions, review gates | Opus 5.5 |
 | Mechanical edits, copy, small UI tweaks, status checks | Sonnet 5 |
 | Only with Charlie's explicit OK (state the reason vs Opus) | Fable 5.1 |
+
+<!-- agent-kit:start -->
+# Agent setup
+
+This project uses the agent kit in `agents/`.
+
+At the start of every session, read `agents/START.md` and follow it: it defines the commands
+(setup, spec, build, review, review spec, fix, approved, merged, handoff, status), the trust boundary, and what
+to do when my message isn't a command.
+
+All project facts are in `agents/PROJECT.md`. Don't restate or change project rules in this file.
+<!-- agent-kit:end -->

@@ -13,3 +13,4 @@ test-results/
 .superpowers/
 next-env.d.ts
 *.tsbuildinfo
+.agent/
