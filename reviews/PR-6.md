@@ -1,5 +1,93 @@
 # Review — PR #6
 
+## Round 3 — 2026-10-04 · scope: slice (v4.6 spec amendment)
+- **Code review:** base (merge base) `8b1795cb3b0ee5b9513186920ec1d2e5ba922730` · head `fcb183ea21eddb325762c33e061adb49bf9b4385` · head re-checked at end: yes
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 3 · hash (`git hash-object`) `b750c9c9fd15612e047528fdef0709feecd0b9c8`
+
+**Verdict:** Revision required
+**Model used:** GPT-6.1-sol · **Switch model next step?** Yes — `agents/PROJECT.md` §6 maps deep money and spec reviews to Opus 5.5; this session cannot select that project model.
+
+### Findings
+
+### [P1] Re-linking a fixed-amount proposal can silently change the milestone currency
+- Category: material risk
+- Rule: MON-02, MON-05; spec Money rules, proposal payment schedule
+- Evidence: `docs/superpowers/specs/2026-09-27-core-sales-design.md:337` says a milestone by amount is read in the linked quote's currency. The guard at lines 427–429 checks a **quote currency change** against currently linked proposals, but the reverse action at lines 429 and 667 only locks the proposal and target quote `FOR SHARE`; it does not check a milestone when setting or changing `proposal.quotation_id`. The PR body lists this gap. Verification line 872(h) claims that a link-vs-currency-change race can never let both transactions commit, although the link can proceed after the currency change commits.
+- Failure scenario: a proposal has a `500000` fixed milestone linked to a MYR quote. An owner links it to an otherwise eligible USD quote, or a quote changes to USD before the proposal link transaction obtains its quote lock. The same stored number is then displayed as USD without repricing.
+- Why it matters: this is the same silent reinterpretation that the owner-approved currency-change refusal is intended to prevent; the new locks alone do not enforce the invariant.
+- Required correction: define and enforce the inverse guard when a proposal with a current fixed-amount milestone is linked or re-linked to a quote, including a currency compatibility rule or an explicit repricing flow chosen by the owner. Keep the proposal-to-quote lock order. Correct line 872(h) and add sequential re-link and forced interleaving tests that prove no amount is reinterpreted.
+- Owner: builder; owner for any product choice beyond the existing refusal policy
+- Verification: trace a MYR fixed milestone through a link to a USD quote, then force both orders of link versus quote currency change under the specified locks; the system must refuse or explicitly reprice rather than silently keep `500000`.
+- Status: open
+
+### [P1] Fully settled invoices can show a false base-currency outstanding amount
+- Category: spec/guardrail mismatch
+- Rule: MON-04, MON-06; spec Dashboard v1 and Open question 16
+- Evidence: `docs/superpowers/specs/2026-09-27-core-sales-design.md:441` says each payment is independently converted and rounded, with no reconciliation. Dashboard line 472 defines outstanding and overdue as frozen invoice base total less stored base credit and net-payment amounts. Verification line 872(n) gives an invoice base total of `4457` and four payments totalling `4456` in base units, yet asserts the paid invoice is excluded from outstanding by status. The dashboard rule only explicitly excludes `credited` invoices (line 474); Open question 16 at line 154 says the independent-rounding policy is still pending Charlie.
+- Failure scenario: a USD $10 invoice is fully paid in four $2.50 payments. Its status is `paid`, but the stated dashboard subtraction reports MYR `0.01` outstanding or overdue. The implementing team could instead follow the fixture and report zero, producing two valid readings of the draft.
+- Why it matters: the dashboard and export are financial handoff surfaces; a settled invoice must not appear collectible because per-row FX rounding differs from the frozen invoice total.
+- Required correction: get Charlie's choice on Open question 16 before treating this money behavior as approved. If independent rounding is chosen, explicitly exclude `paid`, `credited` and `void` invoices from outstanding/overdue and define the calculation for genuinely open invoices; retain the disclosed base paid-versus-invoiced difference. If reconciliation is chosen, specify its payment/credit/refund behavior. Make the dashboard prose and fixture agree.
+- Owner: owner for the rounding choice; builder for the spec and tests
+- Verification: the four-payment fixture yields `paid = 4456`, `invoiced = 4457` and `outstanding = overdue = 0` if independent rounding is selected; partial-payment and fully credited cases follow the same stated status rule.
+- Status: open
+
+### [P3] Handoff still points to the old spec hash and open question
+- Category: quality
+- Rule: `agents/roles/reviewer.md` §2 (report handoff drift)
+- Evidence: `.agent/handoff.md:50` calls `ace92c176a337a3b0309644fd959a7a9e8daf840` the current spec hash, while the pinned head hashes to `b750c9c9fd15612e047528fdef0709feecd0b9c8` (also recorded at handoff line 46). Handoff line 57 calls Open question 15 open, while the spec at line 153 and `agents/PROJECT.md:204` mark it resolved. The handoff is git-ignored and outside this PR's three-file diff.
+- Failure scenario: the next builder or spec-review session targets the wrong hash or repeats an answered question.
+- Why it matters: the correct details are elsewhere in the handoff, so impact is limited, but this file is the resumption record.
+- Required correction: builder refreshes handoff §§5–6 after the next spec edit and decision.
+- Owner: builder
+- Verification: compare handoff hash and open items to the new exact PR head, decisions log and spec.
+- Status: open
+
+Round 2 P1 #1 is resolved for **existing links** and the stale FX rate: lines 429–430 now guard current proposal amounts, clear a changed document's rate and require a rate for the new currency pair. The new P1 above covers the inverse link action. Round 2 P1 #2 is resolved for FX source and storage on credit notes, payments and refunds (lines 328–331 and 436–441), with the cross-row rounding/reporting conflict above still open. Round 2 P1 #3 is resolved for grouping by frozen base currency and pipeline drafts (lines 338, 434, 472 and 485). The owner's A/A/B decision is recorded and is not reopened. Round 2 P3 was partly corrected; the remaining handoff drift is above.
+
+### Self-check audit
+
+Independent applicability list, extended from Round 2 for the new milestone and FX/reporting paths: MON-01–07; REC-01; TEN-05/06/09; UNI-02/07/12/13/14; the spec lock-order rule and `PROJECT.md` §9. The builder's PR table contains these entries. No applicable rule was missing. Frontend, auth, public-link, files, events/jobs and payment-provider packs do not apply to this three-file spec amendment. The payment-provider pack is about collection, checkout and webhooks; these changes specify manual payment records.
+
+| Rule | Builder said | Reviewer found | Evidence / disagreement |
+|---|---|---|---|
+| MON-01, MON-03, MON-07 | n-a | No change to amount representation, serialization or server-recompute rule | Money rules; runtime not tested in this docs PR |
+| MON-02, MON-05 | pass | Existing quote links and mixed-currency reporting are specified, but re-linking a fixed-amount proposal can reinterpret its currency | spec lines 337, 427–429, 667; P1 |
+| MON-04, MON-06 | pass, with open item | Per-row formula and frozen rates are specified; outstanding/overdue conflict with the rounding fixture, and the policy awaits Charlie | lines 154, 441, 472, 872(n); P1 |
+| REC-01; TEN-05/06/09 | n-a / spec text | Frozen snapshot fields and equality triggers specified; no direct violation found | data model lines 323–331; implementation unverified |
+| Lock order | pass, unverified at runtime | Proposal-before-quote order retained; the link path lacks a currency invariant, independent of deadlock safety | lines 429, 667; P1 |
+| UNI-02, UNI-07, UNI-12 | pass | No fixed business currency invented, no secret value in changed files, all paths in repo | diff and targeted secret scan |
+| UNI-13 | pass | Exact-head CI green; build is included in its checks workflow | run `37134943217` |
+| UNI-14 | n-a | No dependency, lockfile or workflow change | three-file docs diff |
+| `PROJECT.md` §9 | pass | Owner decisions reflected; Open question 16 is expressly undecided | `agents/PROJECT.md:204`; spec line 154 |
+
+### Verification performed
+
+| Command / check | Result |
+|---|---|
+| `gh pr view 6` at start and end | PR open at exact head `fcb183ea21eddb325762c33e061adb49bf9b4385`; three CI jobs successful |
+| `git fetch origin`, `git cat-file`, `git merge-base` | Exact head available; merge base `8b1795cb3b0ee5b9513186920ec1d2e5ba922730` |
+| Detached checkout `.agent/worktrees/review-6-fcb183ea` | Pinned to head; no tracked or staged changes at end |
+| Effective three-dot diff, `git diff --stat`, `--name-status`, `git log` | Three docs files, +100/−20; revision commits 1–3 examined |
+| `git diff --check` | Pass |
+| `git hash-object` on v4.6 spec | `b750c9c9fd15612e047528fdef0709feecd0b9c8` |
+| Targeted secret scan on changed files | Only instruction/example mentions of secret names; CI secret scan successful |
+| CI run `37134943217` | Typecheck/lint/test, dependency audit and secret scan successful for this head; no local runtime tests for docs-only diff |
+| Data model, Money rules, proposal flows, dashboard, export, verification, decisions and handoff | Cross-section checks found the two money ambiguities above |
+
+### Residual risks and test gaps
+- v4.6 is still a draft; v4.5 remains approved. This PR review is not the separate kit-format `review spec` record required for the later build gate.
+- Runtime concurrency and money calculations cannot be verified from this docs-only PR. The implementing phase needs the real database-role and forced-interleaving tests specified here.
+- The recurring template reuses its confirmed rate for later periods. This is stated in the PR body and spec; Charlie should explicitly accept or change that policy when approving v4.6. No direct guardrail violation is established in this round.
+
+### Required before merge
+- Resolve both P1 findings, update the spec's tests and self-check, and request another review at the new exact head.
+
+### Deferred conditions
+- None.
+
+### Optional improvements
+- Refresh the git-ignored handoff details in the P3 finding.
+
 ## Round 2 — 2026-10-03 · scope: slice (v4.6 spec amendment)
 - **Code review:** base (merge base) `8b1795cb3b0ee5b9513186920ec1d2e5ba922730` · head `c387dde3bb6849130eae0b3c9600b2be5e5ecfe4` · head re-checked at end: yes
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 2 · hash (`git hash-object`) `ace92c176a337a3b0309644fd959a7a9e8daf840`
