@@ -1,5 +1,61 @@
 # Review — PR #6
 
+## Round 4 — 2026-10-05 · scope: slice (v4.6 spec amendment)
+- **Code review:** base (merge base) `8b1795cb3b0ee5b9513186920ec1d2e5ba922730` · head `c811294dea7c080c8464b20307bd8c8b18e3323f` · head re-checked at end: yes
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 4 · hash (`git hash-object`) `c0931c826b302deee1d9d94e584cc5fe18eaa2d6`
+
+**Model used:** GPT-6.1-sol · **Switch model next step?** Yes — `agents/PROJECT.md` §6 maps deep money/spec review to Opus 5.5; this session cannot select that project model.
+
+### Findings
+
+### [P1] Reconciliation can store a negative base amount for a positive transaction
+- Category: material risk
+- Rule: MON-04, MON-06
+- Evidence: `docs/superpowers/specs/2026-09-27-core-sales-design.md:476-485` assigns the settlement row the remaining base balance; line 494 explicitly permits a zero or negative result and says no CHECK forbids it. The spec permits any confirmed FX rate greater than zero at line 457.
+- Failure scenario: with a USD invoice of $0.10 at `fx_rate = 0.51` MYR/USD, its frozen base total is 5 sen. Nine sequential $0.01 payments each convert to 1 sen (0.51 sen rounded half away from zero); the final $0.01 payment settles the document but receives `5 − 9 = −4` sen as its base amount. A positive payment is therefore exported and reported as a negative invoice-rate equivalent.
+- Why it matters: the stored payment amount no longer represents a valid nonnegative allocation of the transaction, and an arbitrarily long sequence can make the discrepancy grow. The exact-reconciliation choice cannot make negative payment/credit/refund rows safe to report.
+- Required correction: define and test a rule that prevents a positive payment, credit note, or refund from receiving a negative base amount while preserving a coherent dashboard/export total; add this concrete rate and split-payment fixture. If the invariant cannot be met with immutable earlier rows, specify and obtain owner approval for the alternative reporting/allocation behavior rather than permitting negative rows silently.
+- Owner: builder
+- Verification: exact-rational fixture for the stated ten-cent invoice and nine one-cent payments, plus equivalent settling credit-note/refund boundary cases; assert stored rows and dashboard/export amounts are nonnegative and totals follow the documented rule.
+- Status: open
+
+### [P2] Quote unlink and hard-delete policy exceeds the recorded owner decision
+- Category: spec/guardrail mismatch
+- Rule: owner decision 2026-10-05, Decision 1; MON-02
+- Evidence: `docs/superpowers/specs/2026-09-27-core-sales-design.md:445-456` makes unlinking and deleting a quote with a fixed-amount milestone refuse, while line 456 itself says those refusals await Charlie's confirmation. The recorded choice in `docs/DECISIONS.md` covers refusing a link to a quote of another currency; it does not choose what unlink/delete should do.
+- Failure scenario: a user must remove or convert every amount milestone before unlinking a proposal or deleting its draft quote, even when the user intends to discard the proposal/quote; that extra restriction has not been approved.
+- Why it matters: this adds product behavior and blocks draft cleanup beyond the explicit owner decision. The spec also labels this as awaiting confirmation, so the intended behavior is unresolved.
+- Required correction: obtain Charlie's explicit choice for unlinking and quote deletion, then align the spec, decision record and verification cases with that choice.
+- Owner: owner
+- Disposition: before merge
+- Status: open
+
+### [P3] PR description still documents revision 3
+- Category: quality
+- Rule: `agents/roles/reviewer.md` §2 (report handoff drift)
+- Evidence: PR #6 description says the spec is “draft, revision 3” and describes Open question 16 as pending, while pinned head `c811294` is revision 4 and resolves it. Its change list and self-check also omit the revision 4 proposal-link guard and reconciliation rules.
+- Failure scenario: readers use the PR description to review or resume work and rely on superseded requirements and tests.
+- Why it matters: the description is materially stale, though the source spec is current.
+- Required correction: refresh the PR title/body to identify revision 4, Charlie's two choices, the reconciliation behavior and its remaining edge case; update the self-check against the current diff.
+- Owner: builder
+- Status: open
+
+### Applicability and self-check audit
+
+Applicable: MON-02, MON-04, MON-05, MON-06; REC-01 and the proposal/quote lock-order constraints in `agents/PROJECT.md` §9; UNI-02, UNI-07, UNI-12 and UNI-13. Frontend, auth, public-links, files/templates, events/jobs and payments packs do not apply to this docs-only diff.
+
+The PR body contains a self-check table, but it is stale for this head: it identifies revision 3 as current, marks Open question 16 pending, and has no row/evidence for the new settlement remainders or proposal link/relink/unlink rules. Re-read the applicable money and lock-order requirements above; this audit does not rely on that prior self-check as evidence.
+
+### Verification and residual risks
+- Exact-head diff reviewed in detached checkout `.agent/worktrees/review-6-c811294d`; merge base `8b1795cb3b0ee5b9513186920ec1d2e5ba922730`.
+- `git diff --check 8b1795cb3b0ee5b9513186920ec1d2e5ba922730...c811294dea7c080c8464b20307bd8c8b18e3323f` — passed.
+- GitHub CI at exact head `c811294dea7c080c8464b20307bd8c8b18e3323f`: typecheck/lint/test, dependency audit and secret scan all passed (run `37277742485`). These checks validate the repository state, not the proposed financial semantics.
+- PR head re-read at end: still `c811294dea7c080c8464b20307bd8c8b18e3323f`. Detached checkout tracked status is clean.
+- Runtime behavior was not exercised; this PR changes documentation only. The negative-row example is specification arithmetic and must be covered in the implementing phase.
+- Model used: GPT-6.1-sol. Switch model next step: Yes — use the project's deep tier (Opus 5.5) for money/spec review.
+
+**Verdict:** Revision required
+
 ## Round 3 — 2026-10-04 · scope: slice (v4.6 spec amendment)
 - **Code review:** base (merge base) `8b1795cb3b0ee5b9513186920ec1d2e5ba922730` · head `fcb183ea21eddb325762c33e061adb49bf9b4385` · head re-checked at end: yes
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 3 · hash (`git hash-object`) `b750c9c9fd15612e047528fdef0709feecd0b9c8`
