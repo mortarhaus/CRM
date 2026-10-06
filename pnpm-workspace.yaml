@@ -5,6 +5,9 @@ savePrefix: ""
 engineStrict: true
 allowBuilds:
   esbuild: true
+overrides:
+  # GHSA-68fv-2mgg-jv7q (source-map-js < 1.2.2, high); transitive via postcss. See docs/DECISIONS.md.
+  source-map-js: 1.2.2
 auditConfig:
   # Time-limited exception, see docs/DECISIONS.md "braces audit exception".
   # No patched braces exists (CVE-2026-93687); dev-tooling chain only. Remove when a patch ships.
