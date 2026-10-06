@@ -94,6 +94,15 @@
 - **Versions:** spec v4.6 (draft, revision 1)
 - **Exception to a rule?** no (this satisfies MON-02 for `service`)
 - **Decided by:** owner (Charlie, 2026-10-03: "go with bob's suggestion"), adopting Bob's recommendation
+## 2026-10-06 — Pin transitive source-map-js to 1.2.2 (GHSA-68fv-2mgg-jv7q) (UNI-13, UNI-14)
+- **Decision:** `pnpm-workspace.yaml` gets `overrides: source-map-js: 1.2.2`. The advisory (source-map-js `>=1.0.0 <1.2.2`, high, event-loop denial of service through indexed source-map section offsets) was published after the 2026-10-03 audit run; `pnpm audit --audit-level high` then failed on `main` and on every PR. `source-map-js` is a transitive dependency (via `postcss`, reached from `next` and from `vitest`/`vite`); the override moves its single resolution from 1.2.1 to the patched 1.2.2. The lockfile changes only that resolution (`pnpm-lock.yaml`: 1.2.1 → 1.2.2 and its seven references).
+- **Why:** UNI-13 requires a passing dependency audit; the failing check blocks merge (found by Bob in his review R6 of PR #6, whose diff changes no dependency). A patched version exists (`npm view source-map-js versions --json`: 1.2.2, checked 2026-10-06).
+- **Alternatives rejected:** an audit ignore for the new advisory (a patched version exists, so an exception is unneeded); waiting for `postcss` / `next` to bump it (no timeline); fixing it inside the docs-only PR #6 (one logical change per PR; Charlie chose a separate PR on 2026-10-06).
+- **Scope / affects:** `pnpm-workspace.yaml`, `pnpm-lock.yaml`, rules UNI-13, UNI-14. No application code.
+- **Versions:** source-map-js 1.2.2 (was 1.2.1); pnpm 11.6.0; Node 24.21.0.
+- **Exception to a rule?** no
+- **Expiry / recheck:** Remove the override once every dependent (`postcss`) resolves `source-map-js >= 1.2.2` on its own; recheck at every phase gate with the `braces` exception.
+- **Decided by:** owner (Charlie, 2026-10-06: "X A" on Bob review R6 of PR #6: fix as a separate PR).
 
 ## 2026-10-03 — braces audit exception (GHSA-vfj7-8cjw-p6xm), expiring
 - **Decision:** `pnpm audit --audit-level high` ignores only `GHSA-vfj7-8cjw-p6xm` (`braces` stack-exhaustion DoS, CVE-2026-93687, versions <= 3.0.3). The ignore lives in `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml`. The CI audit job is unchanged: no `--prod`, and every other advisory at high or above still fails the job (checked 2026-10-03: with a different ID in the ignore list the audit exits 1).
