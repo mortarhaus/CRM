@@ -1,5 +1,72 @@
 # Review — PR #6
 
+## Round 5 — 2026-10-06 · scope: slice (v4.6 spec amendment)
+- **Code review:** base (merge base) `8b1795cb3b0ee5b9513186920ec1d2e5ba922730` · head `a8078a50d618b5253b69bbf221da2b11dde84f08` · head re-checked at end: yes
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 5 · hash (`git hash-object`) `3dc9dd59d4012eabba449735968928e9955326f3`
+
+**Model used:** GPT-6.1-sol · **Switch model next step?** Yes — `agents/PROJECT.md` §6 maps deep money/spec review to Opus 5.5; this session cannot select that project model.
+
+### Findings
+
+### [P2] Post-void rounding can leave the receivable one minor unit wrong
+- Category: material risk
+- Rule: MON-04, MON-06; Charlie's Decision B on Bob R4
+- Evidence: `docs/superpowers/specs/2026-09-27-core-sales-design.md:503-509` permits a series to remain off target after a void. Verification (q)4 at line 977 gives a concrete state: on a $0.10 invoice at 0.51 MYR/USD, credit notes A and B are each $0.01; A stores 0, B stores 1 sen; voiding A leaves the $0.09 receivable at base outstanding `5 − 1 = 4` sen, while `conv($0.09) = 5` sen. The decision record says this gap rule is Andy's specification, pending Charlie's confirmation.
+- Failure scenario: an owner voids an earlier credit note after a later credit note has been issued. Until a later row in that series moves the cumulative target enough, dashboard and export understate the open base receivable by one sen; multiple non-latest voids can accumulate the difference.
+- Why it matters: Charlie chose cumulative rounding with rows summing to the invoice base total. This documented exception means the totals do not always reconcile after voids, and the owner has not accepted that limit.
+- Required correction: obtain Charlie's explicit acceptance of the per-void discrepancy and its possible accumulation, or specify a reconciliation rule that preserves the chosen invariant without changing frozen rows; keep a test for the voided-row case and dashboard/export result.
+- Owner: owner
+- Disposition: before merge
+- Status: open
+
+### [P2] Credit-note component amounts may exceed its cumulative base total
+- Category: material risk
+- Rule: MON-04, MON-06; Charlie's Decision B on Bob R4
+- Evidence: `docs/superpowers/specs/2026-09-27-core-sales-design.md:488` says credit-note subtotal, discount and tax-group base amounts are converted on their own while only the total follows cumulative rounding. Verification (q)2 at line 975 says a $0.01 note at 0.51 can have a one-sen base subtotal and a zero-sen base total.
+- Failure scenario: a credit-note snapshot or any consumer of its base detail shows subtotal `1` and total `0`; the component values do not reconcile to the row amount used by the dashboard and period export.
+- Why it matters: the owner approved cumulative row allocation, but this separate treatment of the credit note's component amounts was not part of that choice. It leaves different base representations of the same finalized credit note.
+- Required correction: get Charlie's explicit choice on whether this component/total mismatch is acceptable. If not, define cumulative allocation for the base components too, with a fixture proving they reconcile to the credit-note base total.
+- Owner: owner
+- Disposition: before merge
+- Status: open
+
+### [P2] Recurring invoices reuse a confirmed FX rate indefinitely
+- Category: material risk
+- Rule: MON-06; Money rules, "Draft currency change"
+- Evidence: `docs/superpowers/specs/2026-09-27-core-sales-design.md:355` stores a confirmed `fx_rate` on the recurring template and says each run takes it; lines 457 and 479 require a valid confirmed rate for issue, but no expiry, refresh or per-run confirmation is defined. The PR description lists reuse of the template's confirmed rate as an assumption.
+- Failure scenario: a recurring template confirmed at 4.4567 continues issuing invoices at that rate after the workspace's current USD/MYR rate has materially changed; with `auto_send`, a due run can issue and send without another confirmation.
+- Why it matters: the rate is frozen onto each invoice and used for base-currency reporting, so a stale template value creates a sequence of finalized documents with base totals based on a rate the owner may no longer intend.
+- Required correction: Charlie must decide whether a recurring template intentionally fixes one rate for all periods or whether each run must obtain a current user-confirmed rate (with a draft-only outcome when none is confirmed); write that rule and tests into the spec.
+- Owner: owner
+- Disposition: before merge
+- Status: open
+
+### [P3] Handoff still reports the old spec revision and review state
+- Category: quality
+- Rule: `agents/roles/reviewer.md` §2 (report handoff drift)
+- Evidence: `.agent/handoff.md:11` calls the active spec revision 3, and line 16 still says head `fcb183e`, Round 3 findings unresolved and Charlie's choices pending; pinned PR #6 is revision 5 at `a8078a50d618b5253b69bbf221da2b11dde84f08`. Later handoff §5 notes revision 5, so the file conflicts with itself.
+- Failure scenario: a resume session can repeat already answered questions or inspect the wrong review head.
+- Why it matters: the file is the next session's in-flight state and currently has contradictory targets.
+- Required correction: builder refreshes the active target, current PR head, last review and next steps consistently throughout the handoff.
+- Owner: builder
+- Status: open
+
+### Applicability and self-check audit
+
+Applicable: MON-02, MON-04, MON-05, MON-06; REC-01 and the proposal/quote lock-order constraints in `agents/PROJECT.md` §9; UNI-02, UNI-07, UNI-12 and UNI-13. Frontend, auth, public-links, files/templates, events/jobs and payments packs do not apply to this docs-only diff.
+
+The current PR self-check includes these applicable money and delivery rules. Its statements about the ordinary cumulative-series identities, nonnegative row CHECKs and lock order match the spec text. The open decisions identified above are not resolved by those self-check rows; no runtime evidence is available in this docs-only PR.
+
+### Verification and residual risks
+- Exact-head diff reviewed in detached checkout `.agent/worktrees/review-6-a8078a50`; merge base `8b1795cb3b0ee5b9513186920ec1d2e5ba922730`.
+- `git diff --check 8b1795cb3b0ee5b9513186920ec1d2e5ba922730...a8078a50d618b5253b69bbf221da2b11dde84f08` — passed.
+- GitHub CI at exact head `a8078a50d618b5253b69bbf221da2b11dde84f08`: typecheck/lint/test, dependency audit and secret scan all passed (run `37303833100`).
+- Runtime money behavior was not exercised; this PR changes documentation only. Builder's random-sequence arithmetic claim in the PR body was not independently reproduced.
+- PR body is now revision 5 and records both owner choices. v4.6 remains a draft; this PR review is not the kit-format spec-review round required by the later `build` gate.
+- Model used: GPT-6.1-sol. Switch model next step: Yes — use the project's deep tier (Opus 5.5) for the remaining money/spec decisions.
+
+**Verdict:** Revision required
+
 ## Round 4 — 2026-10-05 · scope: slice (v4.6 spec amendment)
 - **Code review:** base (merge base) `8b1795cb3b0ee5b9513186920ec1d2e5ba922730` · head `c811294dea7c080c8464b20307bd8c8b18e3323f` · head re-checked at end: yes
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 4 · hash (`git hash-object`) `c0931c826b302deee1d9d94e584cc5fe18eaa2d6`
