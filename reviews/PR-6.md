@@ -1,5 +1,49 @@
 # Review — PR #6
 
+## Round 6 — 2026-10-06 · scope: slice (v4.6 spec amendment)
+- **Code review:** base (merge base) `8b1795cb3b0ee5b9513186920ec1d2e5ba922730` · head `d888cc8adf1716d743e80c1666f2f45b06c2b11f` · head re-checked at end: yes
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 6 · hash (`git hash-object`) `1185ad44b2aeae5731207f8f8389302f1c5059bc`
+
+**Model used:** GPT-6.1-sol · **Switch model next step?** Yes — `agents/PROJECT.md` §6 maps deep money/spec review to Opus 5.5; this session cannot select that project model.
+
+### Findings
+
+### [P1] Required dependency audit fails on a high severity advisory
+- Category: guardrail mismatch
+- Rule: UNI-13
+- Evidence: exact-head CI run `37424639003`, job `112141411729` (`Dependency audit`) fails at `pnpm audit --audit-level high`: `source-map-js@1.2.1` is affected by GHSA-68fv-2mgg-jv7q (event-loop denial of service through indexed source-map section offsets; affected `<1.2.2`, patched `>=1.2.2`), with seven dependency paths including `apps__web>next>postcss>source-map-js`. The lockfile pins `source-map-js@1.2.1` at `pnpm-lock.yaml:1606,3157`. CI reports two high advisories, one ignored; the remaining unignored advisory makes the required job fail. The PR diff does not modify dependencies, but the required check fails at this head.
+- Failure scenario: PR #6 cannot pass its required CI checks while this vulnerable resolution remains in the dependency tree.
+- Why it matters: project rule UNI-13 requires a passing dependency audit; failing CI blocks merge. The flagged package also has a high severity denial-of-service advisory.
+- Required correction: update the affected transitive resolution to a patched version (`>=1.2.2`) through a compatible dependency or override, then rerun the audit and exact-head CI. If the project intends an exception instead, record the narrowly scoped owner-approved exception and its evidence before treating this check as passing.
+- Owner: builder
+- Verification: exact-head `pnpm audit --audit-level high` and CI dependency-audit job pass with no unapproved high advisory.
+- Status: open
+
+### [P2] The no-notification choice for waiting recurring invoices is unapproved
+- Category: material risk
+- Rule: MON-06; recurring-run behavior (revision 6)
+- Evidence: `docs/superpowers/specs/2026-09-27-core-sales-design.md:484-487` says a foreign-currency `auto_send` run remains an unsent draft, adds no event or notification, and appears in the invoice list. The PR description and decision record identify the no-notification behavior as Andy's detailed specification of Charlie's D3 choice, not a separate owner decision.
+- Failure scenario: a recurring period becomes due in a foreign currency; the worker creates a draft and sends nothing, but no notification tells the owner that automatic billing is waiting for a rate confirmation.
+- Why it matters: this changes an `auto_send` workflow into a manual follow-up. A draft's presence in the ordinary invoice list may not alert the owner that a recurring invoice was missed.
+- Required correction: Charlie should explicitly accept no notification or choose an owner notification/in-app signal for a recurring invoice waiting for a confirmed rate; update the spec and verification cases to match.
+- Owner: owner
+- Disposition: before merge
+- Status: open
+
+### Applicability and self-check audit
+
+Applicable: MON-02, MON-04, MON-05, MON-06; REC-01 and REC-06; EVT-01 and EVT-06; proposal/quote lock-order constraints in `agents/PROJECT.md` §9; UNI-02, UNI-07, UNI-12 and UNI-13. Frontend, auth, public-links, files/templates and payment-provider packs do not apply to this docs-only diff. The current PR self-check covers the applicable money, finalized-record, event/job, lock-order and universal rules; however, its `UNI-13 pass` conflicts with the failed dependency-audit job above. Its no-notification behavior is described as an assumption rather than an owner decision.
+
+### Verification and residual risks
+- Exact-head diff reviewed in detached checkout `.agent/worktrees/review-6-d888cc8a`; merge base `8b1795cb3b0ee5b9513186920ec1d2e5ba922730`.
+- `git diff --check 8b1795cb3b0ee5b9513186920ec1d2e5ba922730...d888cc8adf1716d743e80c1666f2f45b06c2b11f` — passed.
+- GitHub CI at the start of review: typecheck/lint/test passed; secret scan passed; dependency audit failed (run `37424639003`). Audit log inspected to identify `source-map-js@1.2.1` and GHSA-68fv-2mgg-jv7q.
+- Runtime behavior was not exercised; this PR changes documentation only. Builder's 30,000-sequence arithmetic claim in the PR body was not independently reproduced.
+- R5 decisions are reflected in the revision 6 spec and decision log. The handoff and PR body are current. v4.6 remains a draft; this PR review is not the kit-format spec-review round required by the later `build` gate.
+- Model used: GPT-6.1-sol. Switch model next step: Yes — use the project's deep tier (Opus 5.5) for remaining money/spec review.
+
+**Verdict:** Revision required
+
 ## Round 5 — 2026-10-06 · scope: slice (v4.6 spec amendment)
 - **Code review:** base (merge base) `8b1795cb3b0ee5b9513186920ec1d2e5ba922730` · head `a8078a50d618b5253b69bbf221da2b11dde84f08` · head re-checked at end: yes
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 5 · hash (`git hash-object`) `3dc9dd59d4012eabba449735968928e9955326f3`
