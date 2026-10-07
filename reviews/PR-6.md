@@ -1,5 +1,54 @@
 # Review — PR #6
 
+## Round 7 — 2026-10-07 · scope: slice (v4.6 spec amendment)
+- **Code review:** base (merge base) `908093c125aefd5bc9374f50687f8d4a34ff0116` · head `f53d41c24ddd7b53f9a074866963f6c9e62abbe7` · head re-checked at end: yes
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 7 · hash (`git hash-object`) `583533732daa8ac9634374514bc664c9bc73dcaa`
+
+**Verdict:** Approved
+**Model used:** GPT-6.1-sol · **Switch model next step?** Yes — the project maps formal money/spec review to its deep tier (Opus 5.5); this is a PR slice review, not that separate spec approval.
+
+### Findings
+No blocking findings.
+
+### Self-check audit
+Applicable rules were determined from the currency, rounding, recurring-run and in-app signal changes before comparing the PR self-check.
+
+| Rule | Applies? (why / n-a reason) | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| MON-02 / MON-04 / MON-05 / MON-06 | yes — currency rules, cumulative rounding, reporting and recurring FX behavior are the substance of v4.6 | pass | pass | Spec defines each rule and carries the owner choices through dashboard, accounting, and verification cases | no |
+| REC-01 / REC-06 | yes — issued invoice lifecycle stays frozen; recurring linkage distinguishes generated drafts; invoice number remains assigned on issue | pass | pass | Spec data model and Money rules; verification (r) 6, 8, 11 | no |
+| EVT-01 / EVT-06 | yes — feature defines that the signal adds no event or job while preserving normal issue/send events | pass | pass | Spec lines 496 and 1021; no new event or job is proposed | no |
+| AUTH-03 | yes — visibility is restricted by role | pass | pass | Spec lines 495, 572, 633; verification (r) 8 | no |
+| TEN-09 / TEN-11 | yes — count and filtered invoice list must stay within active workspace context | pass | pass | Spec lines 495, 572; verification (r) 12 checks two-workspace isolation and RLS | no |
+| FE-05 / `FRONTEND_STANDARDS.md` §3 | yes — badge and dashboard count/link add UI requirements | pass | pass | Badge is visible text; count label is a link; verification (r) 8–9 covers label, roles and destination | no |
+| UNI-02 | n-a — no business value or threshold is introduced | pass | n-a | Draft state and count are derived without a new threshold or monetary value | no |
+| UNI-07 / UNI-12 | yes — hard secret and repository scope rules apply to all changes | pass | pass | Exact-head Secret scan passed; changed files are in the repository | no |
+| UNI-13 | yes — prior Round 6 audit blocker must be cleared for this head | pass | pass | `main` includes PR #7 merge `908093c`; exact-head dependency audit passed | no |
+| UNI-14 | n-a — no package resolution or lockfile change is introduced by this PR's diff against `main` | n-a | n-a | Three-file docs diff | no |
+| Lock order / `agents/PROJECT.md` §9 | yes — existing proposal and invoice money invariants remain part of the v4.6 spec amendment | pass, unverified at runtime | pass as specification text; runtime unverified | Spec retains the established lock chains and explicitly states no new locks for the derived signal | no |
+
+### Verification performed
+| Command / check | Result |
+|---|---|
+| `git diff --stat` / `git diff --name-status` from merge base to head | 3 files: `agents/PROJECT.md`, `docs/DECISIONS.md`, spec; 320 insertions, 25 deletions |
+| `git diff --check 908093c...f53d41c` | pass |
+| Exact-head CI (`gh pr checks 6`, head `f53d41c…`) | Dependency audit pass; Typecheck, lint, test (workflow also runs build) pass; Secret scan pass (run `37492618922`) |
+| PR head re-read after review | still `f53d41c24ddd7b53f9a074866963f6c9e62abbe7` |
+| Detached checkout tracked status | clean |
+
+### Residual risks and test gaps
+- No application behavior was executed; this PR changes specification and decision records. The specified badge, dashboard count, role behavior, and workspace isolation remain to be verified in the implementing Phase 5 work.
+- This PR review does not replace the separate `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` approval or Charlie's approval of v4.6; v4.5 remains the approved specification until those gates are complete.
+
+### Required before merge
+-
+
+### Deferred conditions
+-
+
+### Optional improvements
+-
+
 ## Round 6 — 2026-10-06 · scope: slice (v4.6 spec amendment)
 - **Code review:** base (merge base) `8b1795cb3b0ee5b9513186920ec1d2e5ba922730` · head `d888cc8adf1716d743e80c1666f2f45b06c2b11f` · head re-checked at end: yes
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 6 · hash (`git hash-object`) `1185ad44b2aeae5731207f8f8389302f1c5059bc`
