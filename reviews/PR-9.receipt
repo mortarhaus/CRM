@@ -1,0 +1,8 @@
+pr: 9
+reviewed_head_sha: 491957eaad01a29c4a1e9836b4b530b3dbf324c1
+review_file: reviews/PR-9.md
+review_file_hash: d1ae763b9b1b05c0b7a0daad81f1676b61181773
+log_branch_commit_with_review: 9f94d3eb75cbf287b14530b640e4ce5314bbd575
+verdict: Approved (Round 1)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-07T13:44:07Z
