@@ -21,7 +21,7 @@
 
 Instead, Phase 0 uses Better Auth's **unmodified** `organization` / `member` / `invitation` tables with **one dev Postgres user**. `DATABASE_URL` and `DATABASE_MIGRATOR_URL` both exist and are validated now, but point at the same user. Phase 1 splits them into `crm_app` and `crm_migrator` with no code-path change. Two Phase 1 changes are prepared here so they do not need a migration later: IDs are generated as Postgres `uuid` (`advanced.database.generateId: "uuid"`) so Phase 1 RLS can use `::uuid`, and all timestamps are `timestamptz`. `worker.ts` is intentionally a stub: it connects, logs readiness and stays alive. pg-boss and Pino are **not** dependencies in Phase 0. `/api/health` reports DB status only, and the queue check arrives with pg-boss in Phase 1.
 
-**Tech Stack:** Node 24.21.0 · pnpm 11.6.0 · TypeScript 6.0.3 · Next.js 16.3.6 / React 19.3.0 · Tailwind CSS 4.3.3 (CSS-first) · Better Auth 1.7.6 (+ `auth` CLI 1.7.6) · Drizzle ORM 0.45.3 / drizzle-kit 0.31.11 · `postgres` 3.4.9 · Zod 4.6.5 · @node-rs/argon2 2.2.1 · Vitest 5.0.2 · Testcontainers 12.2.0 · Playwright 1.63.0 · ESLint 10.11.0 + typescript-eslint 8.71.0 + eslint-plugin-boundaries 7.2.0 · esbuild 0.28.2 · tsx 4.23.15 · Postgres 17 · GitHub Actions · Trivy · gitleaks.
+**Tech Stack:** Node 24.21.0 · pnpm 11.6.0 · TypeScript 6.0.3 · Next.js 16.3.8 / React 19.3.0 · Tailwind CSS 4.3.3 (CSS-first) · Better Auth 1.7.6 (+ `auth` CLI 1.7.6) · Drizzle ORM 0.45.3 / drizzle-kit 0.31.11 · `postgres` 3.4.9 · Zod 4.6.5 · @node-rs/argon2 2.2.1 · Vitest 5.0.2 · Testcontainers 12.2.0 · Playwright 1.63.0 · ESLint 10.11.0 + typescript-eslint 8.71.0 + eslint-plugin-boundaries 7.2.0 · esbuild 0.28.2 · tsx 4.23.15 · Postgres 17 · GitHub Actions · Trivy · gitleaks.
 
 **Spec:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` (written against v4.4; patched for v4.5, approved 2026-09-30). The Phase 0 row of "Build phases for Part 1" (v4.5):
 > **Deliverable:** Monorepo (pnpm workspaces), Next.js + TS + Drizzle + Postgres + Better Auth, Docker image (`web`/`worker`), dev compose, CI (typecheck, lint + boundaries, tests, `pnpm audit`, secret scan, Trivy). Both spikes; postgres.js `prepare: false`; migrator on a direct connection
@@ -46,9 +46,9 @@ Instead, Phase 0 uses Better Auth's **unmodified** `organization` / `member` / `
 - **pnpm 11.6.0** (`"packageManager": "pnpm@11.6.0"`). Every dependency is an **exact** version, with no `^` or `~`. `pnpm-workspace.yaml` sets `savePrefix: ""` and `engineStrict: true`.
 - **TypeScript 6.0.3**, not 7.x, because typescript-eslint 8.71.0 peers `typescript <6.1.0`. `strict` everywhere. No `any` without a justifying comment.
 - **Exact versions (do not change):**
-  - Runtime: next 16.3.6, react 19.3.0, react-dom 19.3.0, better-auth 1.7.6, drizzle-orm 0.45.3, postgres 3.4.9, zod 4.6.5, @node-rs/argon2 2.2.1, clsx 2.1.1, tailwind-merge 3.7.0, class-variance-authority 0.7.1, @next/env 16.3.6.
+  - Runtime: next 16.3.8, react 19.3.0, react-dom 19.3.0, better-auth 1.7.6, drizzle-orm 0.45.3, postgres 3.4.9, zod 4.6.5, @node-rs/argon2 2.2.1, clsx 2.1.1, tailwind-merge 3.7.0, class-variance-authority 0.7.1, @next/env 16.3.8.
   - Dev: auth 1.7.6, drizzle-kit 0.31.11, tailwindcss 4.3.3, @tailwindcss/postcss 4.3.3, vitest 5.0.2, @playwright/test 1.63.0, otpauth 9.5.2, testcontainers 12.2.0, @testcontainers/postgresql 12.2.0, tsx 4.23.15, esbuild 0.28.2.
-  - Lint and types: eslint 10.11.0, @eslint/js 10.0.1, typescript-eslint 8.71.0, eslint-plugin-boundaries 7.2.0, @next/eslint-plugin-next 16.3.6, eslint-plugin-react-hooks 7.1.1, globals 17.12.0, @types/node 24.19.0, @types/react 19.3.0, @types/react-dom 19.3.0.
+  - Lint and types: eslint 10.11.0, @eslint/js 10.0.1, typescript-eslint 8.71.0, eslint-plugin-boundaries 7.2.0, @next/eslint-plugin-next 16.3.8, eslint-plugin-react-hooks 7.1.1, globals 17.12.0, @types/node 24.19.0, @types/react 19.3.0, @types/react-dom 19.3.0.
 - **Not in Phase 0:** pg-boss, pino, nodemailer, Resend, AWS SDK, Sentry. Their phase adds them.
 - **`packages/core` imports no framework, DB, auth or extension code** (spec, "Boundaries"). ESLint `boundaries/dependencies` + `no-restricted-imports` enforce this, and CI fails on violation.
 - **Postgres only through the `postgres` TCP driver** (spec, "Database"). Never `pg`, never a provider HTTP driver. (Spec v4.5 allows `pg` only inside pg-boss, from Phase 1; nothing in Phase 0 uses it.)
@@ -492,10 +492,10 @@ This list includes only what this task needs. Later tasks add their own dependen
   },
   "dependencies": {
     "@crm/core": "workspace:*",
-    "@next/env": "16.3.6",
+    "@next/env": "16.3.8",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
-    "next": "16.3.6",
+    "next": "16.3.8",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "tailwind-merge": "3.7.0"
@@ -783,7 +783,7 @@ Add to the root `package.json` `devDependencies`, keeping keys alphabetical:
 
 ```json
 "@eslint/js": "10.0.1",
-"@next/eslint-plugin-next": "16.3.6",
+"@next/eslint-plugin-next": "16.3.8",
 "eslint": "10.11.0",
 "eslint-plugin-boundaries": "7.2.0",
 "eslint-plugin-react-hooks": "7.1.1",
