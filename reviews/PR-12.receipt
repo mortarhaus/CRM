@@ -1,0 +1,8 @@
+pr: 12
+reviewed_head_sha: 28f05d7321e58956e3d127760c7486afae95cbef
+review_file: reviews/PR-12.md
+review_file_hash: 54fa760a8e545dde601ec9817c517760cece1a1b
+log_branch_commit_with_review: 0c192e39b83e26f4a468628cf97bb120df260e9b
+verdict: Approved (Round 2)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-09T08:00:14Z
