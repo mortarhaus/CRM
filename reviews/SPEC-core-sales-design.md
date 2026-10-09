@@ -1,5 +1,79 @@
 # Review — spec `core-sales-design`
 
+## Round 4 — 2026-10-09 · scope: v4.6 revision 10 follow-up
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 10 · hash (`git hash-object`) `c20d9ffd93eb3cee6051da804acf53ecea26204d` · present on `origin/main` at merge commit `a3a2394bd3fee071165aa848d2f80b69b2b2d22e`
+
+**Verdict:** Revision required
+**Model used:** GPT-6 · **Switch model next step?** Yes — `agents/PROJECT.md` §6 maps spec, money, security and data-isolation reviews to deep tier (Opus 5.5); use that tier for the corrected review before build.
+
+### Findings
+
+### [P2] The agreement-pattern lock during provisioning may not be owner-approved
+- Category: ambiguity
+- Rule: `agents/PROJECT.md` §11; spec Open question 10
+- Evidence: the v4.5 approval record at `docs/superpowers/specs/2026-09-27-core-sales-design.md:7` records item 2 as “a customer agreement-pattern change affects future approvals only.” Open question 10's preserved original text at line 218 also includes a separate behavior: refuse the change while an unfrozen SOW is awaiting provisioning. The live rule at line 829 keeps that refusal and revision 10 marks all of Open question 10 resolved based on approval item 2.
+- Failure scenario: an owner or builder treats the provisioning-time refusal as approved even though the approval record only explicitly names the future-approvals rule.
+- Why it matters: this refusal blocks an owner setting change during a provisioning window; whether that guard is required is a product choice, and `PROJECT.md` §11 requires Charlie's explicit choice for defaults still pending.
+- Required correction: have Charlie confirm whether the pending-provisioning refusal was included in v4.5 approval. If yes, record that scope in the approval/decision record. If no, split the question: leave the future-approvals behavior resolved and keep the provisioning refusal open until chosen.
+- Owner: owner (Charlie)
+- Verification: the spec and its approval record make the status of the provisioning-time refusal unambiguous before v4.6 is approved.
+- Disposition: before v4.6 approval
+- Status: open
+
+### [P3] Handoff still says PR #12 is open
+- Category: material risk
+- Rule: reviewer role §2; handoff current-state accuracy
+- Evidence: `.agent/handoff.md:11,15–16` says PR #12 is open and `main` is at `00cffa1`. GitHub reports PR #12 merged at `a3a2394bd3fee071165aa848d2f80b69b2b2d22e`; `origin/main` is at that merge commit and contains the reviewed spec hash.
+- Failure scenario: a later session follows the handoff and repeats PR #12 review or merge steps instead of resolving the remaining v4.6 decision and review gate.
+- Why it matters: the current next step and active target are misrepresented.
+- Required correction: update the handoff to record PR #12 merged and the current spec review result and next step.
+- Owner: builder
+- Verification: compare the handoff with PR #12's host state, `origin/main`, and this review round.
+- Status: open
+
+### Self-check audit
+
+Applicability was determined from the full v4.6 scope and the revision 10 diff before comparing earlier review notes. Revision 10 only relabels decisions; the existing money, UI, tenancy, authentication, jobs, and finalized-record requirements remain in scope and were previously checked in Rounds 1–3.
+
+| Rule / area | Applies? (why / n-a reason) | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| `MON-01`–`MON-07` | Yes; the spec defines stored and computed money and v4.6 changes FX behavior. | Revision 10 makes no rule or behavior change. | Pass for carried-forward rules; the new decision-status wording does not change calculations. Open question 10 remains ambiguous as described above. | Money rules; revisions 1–7; Open question 10; Rounds 1–3. | None beyond finding above. |
+| `FE-05`, `FE-14`, `FE-70`, `A11Y-01`, `A11Y-06` | Yes; v4.6 specifies the dashboard link and recurring-rate badge. | Revisions 8–10 are test/status clarifications only. | Pass for carried-forward acceptance checks: keyboard access, visible focus, responsive profiles and accessible text were specified in earlier rounds. | Verification (r) 12–14; Round 1 and Round 2 findings resolved in revisions 8–9. | None. |
+| `TEN-02`, `TEN-05`–`TEN-12` | Yes; the product is multi-tenant and the spec defines workspace-scoped reads, writes and purge. | No change to tenancy in revision 10. | Pass for carried-forward controls; revision 10's purge label is consistent with the narrow-scope approval, subject to the separate Q10 finding. | Tenancy; Customer purge; Verification (r) 12; Rounds 1–3. | None. |
+| `REC-01`–`REC-12` | Yes; the spec covers issued invoices, credit notes and signed agreements. | No change to finalized-record behavior in revision 10. | Pass for carried-forward snapshot, immutability, numbering and PDF rules; no revision 10 change. | Immutability rules; Numbering; PDF timing; Rounds 1–3. | None. |
+| Auth and public-link controls | Yes; anonymous customer links and authentication are part of the spec scope. | No change in revision 10. | Pass for carried-forward controls; no new auth/link behavior. | Authentication and sessions; Anonymous access; Client links and signatures; Rounds 1–3. | None. |
+| `PAY-01`, events/jobs | Yes; the spec covers payment records and recurring jobs, but revision 10 changes neither implementation nor behavior. | No change in revision 10. | Pass for carried-forward server-side writes, idempotency and job rules; no new requirement. | Payments and refunds; Domain events and jobs; Rounds 1–3. | None. |
+| `UNI-02`, `UNI-07`, `UNI-12`, `UNI-13`, `UNI-14` | Yes; values, secrets, scope, build gates and pinned dependencies apply to the overall spec. | No new business value, secret or dependency; v4.6 remains a draft. | Pass; no new values/secrets/dependencies in revision 10, and project approval/reconcile gates remain stated. | Revision 10 diff; current status line; `agents/PROJECT.md` §§2, 7, 11. | None. |
+| `agents/PROJECT.md` §11 / owner choices | Yes; unresolved defaults must remain open until Charlie decides. | Six questions are resolved by the v4.5 approval record. | Partial: five resolutions are supported by their cited accepted defaults. For question 10, the approval record does not explicitly mention the separate refusal during pending SOW provisioning. | Approval record line 7; Open question 10 line 218; Money rule line 829; revision 10 line 13. | Yes; P2 finding. |
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| Pin current spec and main | v4.6 draft revision 10; hash `c20d9ffd93eb3cee6051da804acf53ecea26204d`; on `origin/main` at merge commit `a3a2394bd3fee071165aa848d2f80b69b2b2d22e`. |
+| Confirm PR #12 merge state | GitHub reports PR #12 merged at `a3a2394bd3fee071165aa848d2f80b69b2b2d22e`. |
+| Read earlier spec review rounds | R1 and R2's test-clarity findings are resolved in revisions 8–9; R3's status-label finding is addressed in revision 10, except for the Q10 subdecision recorded above. |
+| Compare approval record, question 10 and live rule | Found that the approval record names the future-approvals-only rule but not the separate pending-provisioning refusal. |
+| Review revision 10 history and diff from revision 9 | Status labels and references only; no calculation, security control, test, milestone or scope change. |
+| Review carried-forward consistency, security controls, scope, milestones and test criteria | No additional revision 10 defect found. Existing v4.6 behaviors and earlier resolved test findings are unchanged. |
+| Code tests | Not run; this is a specification review. |
+
+### Residual risks and test gaps
+- v4.6 remains a draft; Charlie's approval and `setup` reconciliation remain gates after the spec review is approved.
+- Accountant, lawyer, SST and PDPA checks remain gated before Phase 4 goes live, as stated in the spec.
+- This review used GPT-6; the project's configured model for deep spec review is Opus 5.5. Use deep tier for the corrected review before build.
+
+### Required before v4.6 approval
+- Resolve whether Charlie accepted the refusal to change `customer.agreement_pattern` while an unfrozen SOW awaits provisioning. Keep that subdecision open unless the approval record confirms it.
+
+### Deferred conditions
+- None.
+
+### Optional improvements
+- None.
+
+**Verdict:** Revision required
+
 ## Round 3 — 2026-10-09 · scope: slice (revision 9 follow-up and carried-forward decision status)
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 9 · hash (`git hash-object`) `19e7241aa37841a617f8c56aad3aede0a4c2666d` · `origin/main` commit `4feac56d6a8e473b63d4e2878641eb5e29ca39bc`
 
