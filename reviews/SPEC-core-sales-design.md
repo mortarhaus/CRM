@@ -1,5 +1,68 @@
 # Review — spec `core-sales-design`
 
+## Round 3 — 2026-10-09 · scope: slice (revision 9 follow-up and carried-forward decision status)
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 9 · hash (`git hash-object`) `19e7241aa37841a617f8c56aad3aede0a4c2666d` · `origin/main` commit `4feac56d6a8e473b63d4e2878641eb5e29ca39bc`
+
+**Verdict:** Revision required
+**Model used:** GPT-6.1-sol · **Switch model next step?** Yes — the project maps spec review, money, security and data isolation to deep (Opus 5.5). Confirm the corrected spec in that tier before build.
+
+### Findings
+
+### [P2] Open questions still mark v4.5-approved defaults as pending
+- Category: spec/guardrail mismatch
+- Rule: `agents/PROJECT.md` §11; spec Open questions 1, 5, 10–13
+- Evidence: The v4.5 approval record at spec line 7 says Charlie accepted the `pg` driver restriction, narrow purge scope, agreement-pattern rule, excess-only refunds, “Credited” label and guarded credit-note void. Open questions at lines 203, 207, and 212–215 still ask Charlie to choose or confirm those same defaults; questions 5 and 10–13 explicitly say “pending Charlie.” `PROJECT.md` §11 says a default still marked pending needs Charlie's explicit choice.
+- Failure scenario: After Charlie approves v4.6, setup/build treats one of these choices as unresolved, or the builder reads the question as permission to change a behavior already accepted with v4.5.
+- Why it matters: The spec presents conflicting decision status at the build gate and risks either blocking authorized work or changing an owner-approved policy.
+- Required correction: Reconcile those question entries with the v4.5 approval record. Mark the accepted decisions resolved and cite the approval, or isolate any genuinely unapproved subdecision precisely. Keep the still-open questions (for example, the Phase 4 VPS provider choice) open.
+- Owner: builder
+- Verification: Re-read the approval record and Open questions; no accepted default is still labeled pending, and any remaining question identifies a specific choice not covered by the approval.
+- Disposition: before merge; resolve before v4.6 approval/build
+- Status: open
+
+### Self-check audit
+| Rule / area | Applies? (why / n-a reason) | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| MON-01–MON-07 | Yes — v4.6 changes currency, FX and stored money behavior | No revision 9 change | Prior v4.6 rules remain explicit about minor units, currency, exact rational conversion, frozen rates/base currency, and separate currency totals; the change under review introduces no new money rule | Spec money rules and revision history; revisions 8–9 are test clarifications | None |
+| FE-14 / FE-70 | Yes — revision 9 defines responsive test profiles | Prior R2 finding addressed | Pass; cases 13–14 and the Playwright plan consistently name `chromium` and `mobile-chrome` | Spec lines 13, 1057, Verification (r) 13–14; Phase 0 plan pins Playwright 1.63.0 | None |
+| FE-05 / A11Y-01 / A11Y-06 | Yes — the recurring-rate count link and badge have keyboard and accessibility acceptance criteria | Prior R1 finding addressed | Pass; tab order, visible focus, Enter activation, accessible badge text, no extra badge tab stop and an automated scan remain specified | Verification (r) 13–14 | None |
+| TEN-02, TEN-05–TEN-12 | Yes — CRM is multi-tenant and the spec defines tenant storage and access | No change in revisions 8–9 | Existing spec requires RLS/default deny, server-derived tenant context and isolation tests; no inconsistency found in this follow-up | Spec “Tenancy”; Verification (r) 12 | None |
+| AUTH / public-link controls | Yes — authentication and anonymous client links are in scope | No change in revisions 8–9 | Existing OTP, expiry, revocation, scoped resolution and concurrency requirements remain testable; no inconsistency found in this follow-up | Spec “Authentication and sessions,” “Anonymous access,” “Client links and signatures,” Verification (a)–(g) | None |
+| UNI-13 | Yes — eventual implementation must pass delivery checks | No change in revisions 8–9 | Not an implementation change; no CI claim is needed for this spec review | Spec “Verification (for the build)” | None |
+| `PROJECT.md` §11 / pending owner choices | Yes — the spec carries defaults that control later plans and implementation | Not included in the revision 9 change summary | Disagreement: the approved v4.5 record and current “pending Charlie” labels conflict (finding above) | Spec lines 7, 203, 207, 212–215; `agents/PROJECT.md` §11 | Yes |
+
+### Verification performed
+| Check | Result |
+|---|---|
+| Pin spec version and hash on current `origin/main` | v4.6 draft revision 9; `19e7241aa37841a617f8c56aad3aede0a4c2666d`; main at `4feac56d6a8e473b63d4e2878641eb5e29ca39bc` |
+| Read previous spec review rounds | R1 fixture-isolation and keyboard/responsive findings are covered in revision 8; R2's undefined mobile-profile finding is covered in revision 9. |
+| Compare v4.5 approval, current decisions, PROJECT gates and Open questions | Found the stale pending labels recorded above. The v4.6 owner choices in revisions 1–7 otherwise match the documented decision history. |
+| Check revision 9 Playwright profile against pinned library | The Phase 0 plan pins Playwright 1.63.0. Its [official device registry](https://github.com/microsoft/playwright/blob/v1.63.0/packages/isomorphic/deviceDescriptorsSource.json) contains both Desktop Chrome and Pixel 5; Pixel 5 is a Chromium mobile profile with touch support and a concrete viewport. |
+| Review spec structure and acceptance criteria | Reviewed money rules and examples, tenancy and access controls, links/signatures, milestones and gates, open questions, and the recurring-signal cases. No other revision 9 defect found. |
+| Code tests / implementation checks | Not run; this is a specification review and no implementation change is under review. |
+
+### Residual risks and test gaps
+- This review uses GPT-6.1-sol rather than the project-mapped Opus 5.5 deep tier. Re-review the corrected revision in deep tier before build.
+- Accountant, lawyer, SST and PDPA checks remain explicitly gated before Phase 4 goes live; they do not block Phase 0 work.
+
+### Required before v4.6 approval/build
+- Resolve the pending-status contradiction in Open questions 1, 5, and 10–13.
+
+### Deferred conditions
+- None.
+
+### Optional improvements
+- None.
+
+### Handoff block
+- **Current objective:** Review v4.6 revision 9 at spec hash `19e7241aa37841a617f8c56aad3aede0a4c2666d`.
+- **Completed checks:** Pinned current `origin/main`; rechecked both earlier spec findings; verified the named Playwright profiles against the pinned 1.63.0 device registry; compared Open questions with the v4.5 approval record and project gates.
+- **Pending checks:** Reconcile Open questions 1, 5, and 10–13 with the approved v4.5 choices; run a fresh spec review on the resulting hash.
+- **Key decisions / assumptions:** Charlie's v4.5 approval remains authoritative for defaults listed in its approval record. Do not infer a new choice from Bob's recommendation.
+- **Open risks:** Current spec repeats “pending Charlie” for decisions the v4.5 approval says Charlie accepted.
+- **Next exact command:** `fix`, then `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md`.
+- **Suggested model tier for next step:** Deep (Opus 5.5), as required for spec, money and security review by `agents/PROJECT.md` §6.
+
 ## Round 2 — 2026-10-08 · scope: spec review
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 8 · hash (`git hash-object`) `de327c9ba836c0d3a01b793d81b8394c9c3fa47e` · matches `origin/main` at `0e11cde7549a6146d0813aa454f03161d131e81c`
 
