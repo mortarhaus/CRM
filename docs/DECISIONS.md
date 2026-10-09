@@ -3,6 +3,13 @@
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
 
+## 2026-10-09 — Spec v4.6 approved by Charlie (revision 11)
+- **Decision:** Charlie approved spec v4.6 (revision 11) in his own words, "approve 4.6" (Andy session, 2026-10-09), after Bob's formal spec review R5 returned Approved for the spec at hash `7d402bb9a79af423daa06c75de86bf2d74857b01` (on `main` at merge `3b0a4bf`) with nothing required before approval. v4.6 supersedes v4.5. It covers the currency rules for money (MON-02, MON-04, MON-05, MON-06) and the in-app "Needs rate" signal, as recorded in the spec's "Changes in v4.6" sections.
+- **Why:** The kit's gate order is Bob's spec review, then the owner's approval, then `setup` (reconcile `agents/PROJECT.md`), then `build`. Bob cannot see the Andy session, so the owner's words are quoted here.
+- **Next:** `setup` reconciles `agents/PROJECT.md` against the approved spec. Bob's R5 recommends an Opus 5.5 confirmation of the review before `build`; that is not yet done.
+- **Scope / affects:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` (Status line only), this log. No rule, code or behaviour change.
+- **Exception to a rule?** no
+
 ## 2026-10-09 — Scope of v4.5 approval item 2: agreement-pattern change is also refused while a SOW awaits provisioning (spec v4.6 revision 11)
 - **Decision:** Charlie confirmed (Andy session, 2026-10-09, answering Bob's spec review R4 P2) in his exact words: "option 1: and approved v4.5 as a whole, and the refusal rule was in the approved spec text. Adding it explicitly to the Approval record would remove the ambiguity." He picked the answer "Yes, it was included" (Andy had marked it recommended). Bob cannot see the Andy session. The refusal in question: a change to `customer.agreement_pattern` is refused while the customer has an unfrozen SOW awaiting provisioning. The spec's Approval record item 2 and Open question 10 now name both parts: future approvals only, and refusal while provisioning is pending.
 - **Why:** The Approval record named only "future approvals only", so a reader could not tell whether the refusal was an approved default or a still-pending choice (`PROJECT.md` §11 says a pending default needs Charlie's explicit choice). Bob blocked spec review R4 on it.
