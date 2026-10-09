@@ -3,6 +3,13 @@
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
 
+## 2026-10-09 — Scope of v4.5 approval item 2: agreement-pattern change is also refused while a SOW awaits provisioning (spec v4.6 revision 11)
+- **Decision:** Charlie confirmed (chat, 2026-10-09, answering Bob's spec review R4 P2): he approved v4.5 as a whole, the refusal to change `customer.agreement_pattern` while the customer has an unfrozen SOW awaiting provisioning was in the approved spec text, and it should be written explicitly in the Approval record. The spec's Approval record item 2 and Open question 10 now name both parts: future approvals only, and refusal while provisioning is pending.
+- **Why:** The Approval record named only "future approvals only", so a reader could not tell whether the refusal was an approved default or a still-pending choice (`PROJECT.md` §11 says a pending default needs Charlie's explicit choice). Bob blocked spec review R4 on it.
+- **Alternatives rejected:** treating the refusal as a new open question (Charlie said it was part of the approved text); leaving it implied (the ambiguity Bob found).
+- **Scope / affects:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.6 draft revision 11: Status, Approval record, Open question 10, new revision 11 section), this log. No rule, code or behaviour change.
+- **Exception to a rule?** no
+
 ## 2026-10-09 — Pin transitive handlebars to 4.7.10 (GHSA-8r5x-fm3f-whwj, GHSA-p8wg-vrv2-v86f) (UNI-13, UNI-14)
 - **Decision:** `pnpm-workspace.yaml` gets `overrides: handlebars: 4.7.10`. Two critical advisories (handlebars `>=4.0.0 <=4.7.9`) were published after the last green audit; `pnpm audit --audit-level high` then failed on `main` and on every PR. `handlebars` is a transitive dev-tooling dependency (`eslint-plugin-boundaries` and `@boundaries/elements`); the override moves its single resolution from 4.7.9 to the patched 4.7.10. The lockfile changes only that resolution.
 - **Why:** UNI-13 requires a passing dependency audit; the failing check blocks merge (found by Bob in his review R1 of PR #12, a docs-only PR). A patched version exists (`npm view handlebars@4.7.10`, checked 2026-10-09). `eslint-plugin-boundaries` 7.2.0 is already the latest release, so no upstream bump is available.
