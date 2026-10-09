@@ -8,6 +8,8 @@ allowBuilds:
 overrides:
   # GHSA-68fv-2mgg-jv7q (source-map-js < 1.2.2, high); transitive via postcss. See docs/DECISIONS.md.
   source-map-js: 1.2.2
+  # GHSA-8r5x-fm3f-whwj and GHSA-p8wg-vrv2-v86f (handlebars <= 4.7.9, critical); transitive via eslint-plugin-boundaries. See docs/DECISIONS.md.
+  handlebars: 4.7.10
 auditConfig:
   # Time-limited exception, see docs/DECISIONS.md "braces audit exception".
   # No patched braces exists (CVE-2026-93687); dev-tooling chain only. Remove when a patch ships.

@@ -3,6 +3,14 @@
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
 
+## 2026-10-09 — Pin transitive handlebars to 4.7.10 (GHSA-8r5x-fm3f-whwj, GHSA-p8wg-vrv2-v86f) (UNI-13, UNI-14)
+- **Decision:** `pnpm-workspace.yaml` gets `overrides: handlebars: 4.7.10`. Two critical advisories (handlebars `>=4.0.0 <=4.7.9`) were published after the last green audit; `pnpm audit --audit-level high` then failed on `main` and on every PR. `handlebars` is a transitive dev-tooling dependency (`eslint-plugin-boundaries` and `@boundaries/elements`); the override moves its single resolution from 4.7.9 to the patched 4.7.10. The lockfile changes only that resolution.
+- **Why:** UNI-13 requires a passing dependency audit; the failing check blocks merge (found by Bob in his review R1 of PR #12, a docs-only PR). A patched version exists (`npm view handlebars@4.7.10`, checked 2026-10-09). `eslint-plugin-boundaries` 7.2.0 is already the latest release, so no upstream bump is available.
+- **Alternatives rejected:** an audit ignore (a patched version exists, so an exception is unneeded); waiting for `eslint-plugin-boundaries` to bump it (no timeline); fixing it inside PR #12 (that PR is spec text only; dependency changes go in their own PR).
+- **Scope / affects:** `pnpm-workspace.yaml`, `pnpm-lock.yaml`, rules UNI-13, UNI-14. No application code.
+- **Versions:** handlebars 4.7.10 (was 4.7.9); pnpm 11.6.0; Node 24.21.0.
+- **Exception to a rule?** no
+
 ## 2026-10-08 — Next.js 16.3.6 → 16.3.8 (GHSA-cjq9-62q9-8jv4) (UNI-13, UNI-14)
 - **Decision:** Bump `next` to the exact version `16.3.8` and keep its companion pins aligned: `@next/env` in `apps/web/package.json` and `@next/eslint-plugin-next` in the root `package.json`, both `16.3.8`. The advisory (Next.js server-side request forgery in image optimization; `next` `>=16.0.0 <16.3.8`, high) was published after the 2026-10-06 audit run; `pnpm audit --audit-level high` then failed on `main` and on every PR. `16.3.8` is a patch release in the same minor line as the old pin; the lockfile moves the `next`, `@next/env`, `@next/eslint-plugin-next` and `@next/swc-*` resolutions to it.
 - **Why:** UNI-13 requires a passing dependency audit; the failing check blocked PR #10 (a docs-only PR). A patched version exists (`npm view next versions`: 16.3.8, checked 2026-10-08). The app is still the Phase 0 scaffold and does not use image optimization, but the audit gate still applies.
