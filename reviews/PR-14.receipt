@@ -1,0 +1,8 @@
+pr: 14
+reviewed_head_sha: f4170bf0d19d077a1c96805c1ea1be8f6659d110
+review_file: reviews/PR-14.md
+review_file_hash: 770b3e9df65749016ef33e1a06453b71ca699fd0
+log_branch_commit_with_review: 14a908e212d946189c65dee835d2dd5c982d0212
+verdict: Approved (Round 4)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-09T14:58:04Z
