@@ -1,5 +1,72 @@
 # Review — spec `core-sales-design`
 
+## Round 5 — 2026-10-09 · scope: v4.6 revision 11 follow-up
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 11 · hash (`git hash-object`) `7d402bb9a79af423daa06c75de86bf2d74857b01` · present on `origin/main` at merge `3b0a4bf9272670243082e04857351f3f3f2992a1`
+
+**Verdict:** Approved
+**Model used:** GPT-6.1 · **Switch model next step?** Yes — the project maps deep spec review to Opus 5.5; use that tier to confirm this review before build.
+
+### Findings
+
+### [P2] The agreement-pattern lock during provisioning may not be owner-approved — resolved
+- Category: ambiguity
+- Rule: `agents/PROJECT.md` §11; spec Open question 10
+- Evidence: Charlie explicitly replied in this conversation: “option 1: and approved v4.5 as a whole, and the refusal rule was in the approved spec text. Adding it explicitly to the Approval record would remove the ambiguity.” Revision 11 records that answer at `docs/superpowers/specs/2026-09-27-core-sales-design.md:13`, and the approval record at line 7 and Open question 10 at line 224 now identify both the future-only behavior and the refusal while an unfrozen SOW awaits provisioning.
+- Failure scenario: without the answer, the provisioning-time refusal could be treated as approved based only on an assistant recommendation.
+- Why it matters: this is an owner-controlled default previously marked “pending Charlie.”
+- Required correction: keep the answer and its scope accurately recorded in the Approval record, Open question 10 and the decision log.
+- Owner: builder (record); owner (decision)
+- Verification: compared Charlie's direct answer with the revision 11 wording and the matching `docs/DECISIONS.md` entry; the P2 condition is satisfied.
+- Disposition: before v4.6 approval
+- Status: resolved by Charlie's explicit answer, verified in this review.
+
+### [P3] Handoff still presents PR #14 as open after it merged
+- Category: quality
+- Rule: reviewer role §2 (report handoff drift)
+- Evidence: `.agent/handoff.md:15–16` says PR #14 is open, while lines 49–53 record it as merged and then repeat pre-merge next steps. GitHub reports PR #14 `MERGED`; `origin/main` is merge `3b0a4bf` and contains this spec hash.
+- Failure scenario: a later session follows the stale active-target lines and repeats PR review, approval or merge steps already completed.
+- Why it matters: the handoff contradicts the repository and its own newer status entry, obscuring the actual next gate.
+- Required correction: reconcile the active-target and current-state sections with the merged PR and preserve older steps only as clearly marked history.
+- Owner: builder
+- Verification: compare the refreshed handoff with PR #14's host state, `origin/main`, and this review.
+- Status: open
+
+### Self-check audit
+
+Applicability was based on the full spec scope and the revision 11 change. Revisions 8–10 were checked against earlier findings; revision 11 changes only the recorded scope of an existing owner-approved default.
+
+| Rule / area | Applies? (why / n-a reason) | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| `MON-01`–`MON-07` | Yes; the spec defines money and FX behavior. | Revision 11 makes no money-rule change. | Pass for carried-forward decisions and rules; the owner-confirmation wording does not change calculations. | Money rules; revisions 1–7; prior review Rounds 1–4. | None. |
+| Frontend and accessibility (`FE-05`, `FE-14`, `FE-70`, `A11Y-01`, `A11Y-06`) | Yes; the spec includes the recurring-rate signal and dashboard link. | Revision 11 makes no UI change. | Pass for the carried-forward keyboard, focus and responsive acceptance checks. | Verification (r) 12–14; prior review Rounds 1–4. | None. |
+| Tenancy/RLS, auth/public links, `REC-01`–`REC-12`, `PAY-01`, events/jobs | Yes; these domains are in the product spec. | Revision 11 makes no runtime-rule change. | Pass for carried-forward controls; no revision 11 change to access, isolation, finalized records, payments or jobs. | Relevant spec sections; prior review Rounds 1–4. | None. |
+| `UNI-02`, `UNI-07`, `UNI-12`, `UNI-13`, `UNI-14` | Yes; product values, secret hygiene, scope, CI and pinned dependencies apply. | No business value, secret, code or dependency change. | Pass; revision 11 is documentation-only and changes no implementation or dependencies. | Revision 11 change record; merged PR #14 CI was green in PR review Round 4. | None. |
+| `PROJECT.md` §11 / owner choices | Yes; Q10 previously had a pending owner default. | Pass; Charlie's exact words and source are recorded. | Pass; Charlie directly confirmed that the v4.5 approval included the provisioning refusal. | Charlie's reply; spec lines 7, 13 and 221; `docs/DECISIONS.md`. | None. |
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| Pin requested spec | v4.6 draft revision 11; hash `7d402bb9a79af423daa06c75de86bf2d74857b01`; exact file is present on `origin/main` at `3b0a4bf`. |
+| Re-read prior spec review rounds | Rounds 1–3 findings are addressed in revisions 8–10. Round 4's Q10 P2 is resolved by Charlie's direct answer and revision 11; handoff status remains inconsistent (P3 above). |
+| Compare revision 11 with prior finding and source decision | Approval record and Q10 now name both parts of the accepted default; no rule or behavior changed. |
+| Verify PR/merge state | PR #14 is merged; merge `3b0a4bf` is `origin/main` and contains the reviewed spec hash. |
+| Code tests | Not run; this is a documentation/spec review. |
+
+### Residual risks and test gaps
+- v4.6 remains a draft until Charlie explicitly approves it. After that, reconcile `agents/PROJECT.md` with `setup` before `build`.
+- Existing accepted money-rounding limits remain as recorded in prior rounds and `docs/DECISIONS.md`.
+- Confirm this review in the project-mapped deep tier (Opus 5.5) before build.
+
+### Required before v4.6 approval/build
+- None.
+
+### Deferred conditions
+- None.
+
+### Optional improvements
+- Refresh the contradictory in-flight handoff state (P3).
+
 ## Round 4 — 2026-10-09 · scope: v4.6 revision 10 follow-up
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 10 · hash (`git hash-object`) `c20d9ffd93eb3cee6051da804acf53ecea26204d` · present on `origin/main` at merge commit `a3a2394bd3fee071165aa848d2f80b69b2b2d22e`
 
