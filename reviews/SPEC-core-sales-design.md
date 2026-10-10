@@ -1,5 +1,188 @@
 # Review — spec `core-sales-design`
 
+## Round 8 — 2026-10-10 · scope: feature-complete spec review (independent deep-tier confirmation)
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 approved revision 11 · hash (`git hash-object`) `3d0d99abce0e07c7e1286f77eafd5a8fbce83791` · matches `agents/PROJECT.md` §2 · `origin/main` at `a347854`
+
+**Verdict:** Revision required
+**Model used:** Opus 5.5 (deep tier, as R5–R7 recommended) · **Switch model next step?** No — the fixes touch money rules; keep the deep tier for the builder's revision and the next spec review.
+
+This round is the deep-tier confirmation that R5–R7 asked for. It read the full spec body (Context through Appendix A heading, lines 289–1169) fresh, not only the diff since R5. R1–R7 focused on the v4.6 currency changes. The findings below are in areas those rounds did not reopen. None of them reopens an owner decision: the excess-only refund rule, the `credited` label, the void guard and the purge scope stay as accepted.
+
+### Findings
+
+### [P1] No way to correct a wrongly recorded payment
+- Category: material risk (money flow)
+- Rule: REC-01 (hard), REC-02, PAY-01; spec "Refunds and invoice status", data model `payment`, "Immutability rules"
+- Evidence: data model `payment` (spec line 404) has no void or correction columns. "Refunds and invoice status" (line 839) defines only recording a payment. "Immutability rules" (line 569) lists corrections for quotes, invoices and agreements, but not payments. A refund record can be voided when it is wrong (lines 845–849); a payment record cannot. The flow auto-sends a receipt for each payment (flow step 10).
+- Failure scenario: Charlie records RM10,000.00 instead of RM1,000.00 on a RM1,000.00 invoice. The invoice becomes `paid`, a receipt for RM10,000.00 is emailed to the client, and the dashboard counts RM10,000.00 paid. The spec gives two ways out, and both are wrong: (a) record a RM9,000.00 "refund", which records money that never left the account and stays in the export; or (b) edit or delete the row in the database, which breaks the audit and REC-01.
+- Why it matters: this happens in normal use from Gate A (Phase 4: "record payment, auto receipt"). Money records and client-facing receipts become false, with no audited fix.
+- Required correction: add a payment-correction rule, in the same style as the refund void. At minimum, state: (1) who may do it (role, step-up or not); (2) the record (a one-time void with reason code and text, `voided_at` / `voided_by`, append-only otherwise, as on `refund`); (3) what happens to its receipt (void the receipt and keep its number, or issue a corrective receipt; what the client is sent); (4) the guard when non-voided refunds exist against the payment (refuse, as for the credit-note void guard); (5) the effect on `B_net` (the void removes the stored `base_amount`, the same as a refund void) and on status recompute; (6) the lock order (`invoice` → `payment`); (7) events (`payment.voided`) and audit; (8) tests. Choosing the policy (void vs reversal record, receipt handling, step-up) is an owner decision.
+- Owner: Charlie (policy), then builder (spec text)
+- Verification: the next spec round finds the rule, its data-model columns, its lock order and its Verification cases.
+- Status: open
+
+### [P1] No limit on credit notes, so the amount owed can go below zero
+- Category: defect (money rule)
+- Rule: MON-04, MON-07, REC-02; spec "Refunds and invoice status", "Base amounts for credit notes, payments and refunds"
+- Evidence: `amount_owed = invoice_total − Σ issued credit notes` (line 842). No rule caps a credit note's total at the amount still owed or at the invoice total; a search of the spec body finds none. Verification (q) 6 says "random sequences of payments, refunds, credit notes and voids **within the caps**", but no credit-note cap is defined.
+- Failure scenario: an invoice of $100.00 is paid in full; a credit note of $150.00 is issued. `amount_owed = −5000`. Status becomes `paid`. `refundable_excess = 10000 − (−5000) = 15000`, so only the per-payment cap stops a refund larger than what was paid. The credit note's base total is `B_inv − conv(−5000) − 0`, which is larger than `B_inv`. So Dashboard v1 shows "credited" above "invoiced" for that invoice. The money-rule identities in "Base amounts…" (lines 544–552) assume `0 ≤ amount_owed ≤ invoice_total`, and that assumption is never stated.
+- Why it matters: a typo in a credit note produces wrong dashboard and export figures and a wrong refundable excess. The spec's own invariants and property test depend on a cap it does not define.
+- Required correction: state the cap, checked under the invoice lock on credit-note issue: `credit_note.total ≤ amount_owed_before` (that is, Σ issued, non-voided credit notes ≤ `invoice_total`). Say whether a credit note on a `void` invoice is refused. Add a CHECK or a server rule, and a Verification case (over-credit refused; exact remaining amount allowed; concurrent credit notes cannot together exceed it). The bound is a business rule; Charlie confirms it.
+- Owner: builder (proposal), Charlie (confirm)
+- Verification: the next spec round finds the cap in "Refunds and invoice status" and a Verification case for it, and (q) 6 names the caps it means.
+- Status: open
+
+### [P2] Status rules do not cover a zero-total invoice or the invoice void itself
+- Category: ambiguity (money and status)
+- Rule: spec "Refunds and invoice status", "Money rules" step 3, "Immutability rules"
+- Evidence: step 3 allows `D = subtotal`, and nothing bounds `line_discount_bps` to `< 10000`, so a total of 0 is possible. Status rule 3 (line 854) then gives `credited` ("only possible when issued credit notes cover the whole total"), which is false here. Status is recomputed only in payment, refund and credit-note transactions, so a zero-total invoice issued as `issued` can go `overdue` and get reminders for 0.00. Separately, `invoice.voided` exists (line 590) and Admin and Owner may "void" (line 662), but no section says when an issued invoice may be voided (with payments? with issued credit notes?), what happens to its reminders and receipts, or which locks it takes.
+- Failure scenario: a fully discounted "complimentary" invoice is emailed, then the overdue scan sends it reminders, or the client sees the label "Credited" on an invoice that was never credited. Two builders write two different invoice-void preconditions.
+- Required correction: either refuse issue of a zero-total invoice, or give it a defined status and no reminders. Bound `line_discount_bps` to 0…10000. Add a short "Voiding an invoice" rule: preconditions, locks (`invoice FOR UPDATE`), effect on reminders, receipts and refunds (refunds up to net paid are already defined), event and audit, and a Verification case.
+- Owner: builder (proposal), Charlie (confirm the zero-total choice)
+- Verification: the next spec round finds both rules and their tests.
+- Disposition: before merge (same revision as the two P1s)
+- Status: open
+
+### [P2] Quote acceptance is not fully specified: direct acceptance and quote expiry
+- Category: ambiguity
+- Rule: spec "Lock order" chain B, "The flow", Phase 7–8; LINK-09
+- Evidence: "direct quote acceptance" appears only in the lock order (lines 776, 791, 811) and in tests (lines 795, 951, 1058). No section says how a client accepts a quote directly (OTP? typed name? signature row?), which phase builds it, or whether it creates an agreement. The lock chain takes `customer FOR SHARE` "to read the pattern", which suggests it does. Bob's v4.5 R8 already noted: "the spec does not say whether direct quote acceptance creates an agreement" (`.andy/bob-review-v4.5-r8.md:21`); it is still open. Also, `quotation.valid_until` and the daily "expired quotes" scan (line 631) exist, but the approval recheck (line 806) does not check the quote's `valid_until` or `expired` status.
+- Failure scenario: a client approves a proposal a week after its quote's `valid_until`; the approval sets an `expired` quote to `accepted`. Two builders build direct acceptance two ways: one with OTP + signature + agreement, one with a button.
+- Required correction: add a short "Direct quote acceptance" subsection (link, OTP, signature, agreement or none, events, phase), and state whether approval and acceptance are refused after `valid_until`, and what the client sees.
+- Owner: Charlie (product choice), builder (text)
+- Verification: the next spec round, or the Phase 5 plan review, finds both rules.
+- Disposition: deferred to the Phase 5 plan (must be in the spec before that plan is written)
+- Status: open
+
+### [P2] A change to tax registration has no defined effect on open drafts
+- Category: ambiguity (money)
+- Rule: MON-07; spec Money rules step 6, Onboarding
+- Evidence: step 6 (line 474) treats a line as exempt when the "workspace [is] not tax-registered", which reads the current setting at compute time. Onboarding (line 640) says a change "applies only to new documents". Documents store "tax name/rate" but no tax-registered flag.
+- Failure scenario: a draft invoice is created while the workspace is registered. The workspace then turns registration off. On issue, one builder recomputes with no tax (current setting); another keeps the tax (draft created before the change). The issued total differs.
+- Required correction: say which rule wins for drafts, quotes with unsent edits and recurring templates (for example: the server recomputes every draft from the current setting at send / issue; or each document stores the flag when it is created), and add a unit test.
+- Owner: builder (proposal), Charlie (confirm)
+- Verification: the Phase 4 plan review finds the rule and its test.
+- Disposition: deferred to the Phase 4 plan
+- Status: open
+
+### [P2] Rate limits have no numbers, and OTP re-issue has no limit
+- Category: security control not testable
+- Rule: LINK-03, LINK-07; reviewer spec-review check "security controls are testable"
+- Evidence: "separate limits for login, OTP, share-link views" (line 650) and "per-link and per-IP limits" (lines 362, 709) give no numbers or windows. OTP has 5 attempts per challenge (line 713), but the spec sets no limit on how many challenges a link may request. Turnstile is optional on self-host (Open question 9).
+- Failure scenario: someone with a forwarded WhatsApp link requests challenge after challenge, making 5 guesses at each, and floods the contact's inbox. Nobody can test a limit that has no number.
+- Required correction: state the numbers and windows (login, password reset, OTP request per link and per IP, OTP verify, share-link views), the response when a limit is hit, and an OTP re-issue cap per link per hour/day. Add tests that hit each limit.
+- Owner: builder (proposal; Charlie confirms if a value affects clients)
+- Verification: the Phase 1 plan review finds the numbers and the tests.
+- Disposition: deferred to the Phase 1 plan (rate limits are built in Phase 1)
+- Status: open
+
+### [P2] Purge reference checks can pass by seeing nothing
+- Category: material risk (data retention)
+- Rule: TEN-06, REC-04; spec Tenancy, "Audit, logging, privacy" → Customer purge
+- Evidence: Tenancy (line 678) gives workspace policies "`TO crm_app` (and `TO crm_purge` for the purge tables)". The purge section (line 744) gives `crm_purge` "SELECT where it must check references", but does not list those tables. Under `FORCE ROW LEVEL SECURITY`, a table with no policy for `crm_purge` returns zero rows to it, with no error.
+- Failure scenario: the builder adds `crm_purge` policies only on the tables it deletes or updates. The check "the customer has no issued documents" then reads zero invoices, credit notes, receipts and signed agreements, and the purge redacts a customer whose issued invoices must be kept. Version deletes are still saved by the composite FKs (foreign-key checks bypass RLS), but customer redaction has no such backstop. The Phase 9 purge test checks that "issued documents [are] untouched", not that the customer row is untouched.
+- Required correction: list every table `crm_purge` must read, give each a `FOR SELECT TO crm_purge` workspace policy, and add tests: (a) a customer with an issued invoice, a credit note, a receipt or a signed agreement is not redacted; (b) a schema test that `crm_purge` has a SELECT policy on each listed table.
+- Owner: builder
+- Verification: the Phase 1 plan (when the roles and policies are first written) and the Phase 9 test list contain both.
+- Disposition: deferred to the Phase 1 plan
+- Status: open
+
+### [P3] Stale "open question 1" labels and an old "Next steps" list
+- Category: consistency
+- Evidence: Decisions → Database (line 339) says "pg-boss's internal `pg` pool: open question 1", and Known risks R2 (line 884) says "**Open question 1 for Charlie**; not decided here." Open question 1 was resolved at the v4.5 approval (line 215). "Next steps after approval" (lines 986–991) still describes the v4.5 approval steps.
+- Required correction: change both labels to "resolved at the v4.5 approval (Approval record item 3)"; mark "Next steps after approval" as v4.5 history or update it.
+- Owner: builder
+- Status: open
+
+### Self-check audit
+Spec review: there is no builder self-check table. This is the reviewer's own applicability list for the full spec.
+
+| Rule / area | Applies? (why / n-a reason) | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| MON-01–MON-07 | Yes; money, tax, FX. | — | Fail: no credit-note cap; zero-total status; tax-registration ambiguity. The v4.6 currency rules pass (worked example and conversions rechecked). | Lines 455–565, 842, 854; (j), (n), (p), (q). | New findings P1 #2, P2 #1, P2 #3. |
+| REC-01–REC-12 | Yes; issued records. | — | Fail: no payment correction path; invoice void not defined. Numbering, snapshots and PDFs pass. | Lines 404, 451–453, 567–582, 839. | New findings P1 #1, P2 #1. |
+| PAY-01 | Yes; manual payments and refunds. | — | Fail: a payment error can be fixed only outside audited code. | Line 839. | P1 #1. |
+| TEN-01–TEN-10 | Yes; RLS, five roles, composite FKs. | — | Pass, except `crm_purge` read policies are not listed. | Lines 676–690, 744. | P2 #5. |
+| LINK-01–LINK-09 | Yes; client links, OTP, approval. | — | Pass, except no rate-limit numbers or OTP re-issue cap, and direct quote acceptance is undefined. | Lines 692–715, 776–811. | P2 #2, P2 #4. |
+| AUTH | Yes; Better Auth, roles, step-up. | — | Pass for this scope; the login and reset limit numbers fall under P2 #4. | Lines 646–674. | — |
+| EVT, FILE, FE | Yes. | — | Pass; carried from R5 with a fresh read of the jobs, files and "Needs rate" sections. | Lines 584–592, 717–721; (r) 13–14. | None. |
+| Scope vs `PROJECT.md` §9 | Yes. | — | Pass; no out-of-scope feature found. | Scope — Part 1; §9. | None. |
+| Milestones "done when" | Yes. | — | Pass; each phase has testable criteria. | Lines 941–953. | None. |
+| Handoff accuracy | Yes. | — | Pass: `.agent/handoff.md` shows branch `chore/setup-reconcile-v4-6-approved` at `eb9204e`, `main` at `a347854`, matching git. | `git rev-parse HEAD origin/main`. | None. |
+
+### Verification performed
+| Command / check | Result |
+|---|---|
+| `git hash-object docs/superpowers/specs/2026-09-27-core-sales-design.md` | `3d0d99abce0e07c7e1286f77eafd5a8fbce83791`, equal to `PROJECT.md` §2. |
+| Full read of spec lines 185–1072 | Done. Lines 1–184 (change history) skimmed for status only. |
+| Searches over the spec body for payment void, credit-note caps, zero totals, invoice void, `valid_until`, direct quote acceptance, rate limits, tax registration | Results as cited in the findings. |
+| Search of past reviews and `docs/DECISIONS.md` for the same topics | Only the direct-quote-acceptance gap was raised before (`.andy/bob-review-v4.5-r8.md:21`); it is unresolved. |
+| Hand check of worked example and conversions in (j), (n), (q) 1 | Match the stated values. |
+| Code tests / CI | Not run; spec review only. |
+
+### Residual risks and test gaps
+- R1–R7 used non-Opus models. This round re-read the whole body, but did not re-derive every case in Verification (o), (p), (r).
+- Version deletes during purge are protected by FKs; that protection is not stated in the spec, so a later FK change (for example `ON DELETE CASCADE`) could remove it.
+
+### Required before merge
+- P1 #1 payment correction (owner decision first).
+- P1 #2 credit-note cap.
+- P2 #1 zero-total invoice and invoice void rules.
+
+### Deferred conditions
+- P2 #2 quote acceptance → before the Phase 5 plan.
+- P2 #3 tax registration and drafts → Phase 4 plan.
+- P2 #4 rate-limit numbers → Phase 1 plan.
+- P2 #5 `crm_purge` read policies → Phase 1 plan.
+
+### Optional improvements
+- P3 stale labels.
+
+### Note on the build gate
+Phase 0 PR 2 (auth and DB tooling) touches none of these rules. Under `START.md`, `build` still needs an Approved round for the current hash. Whether to allow Phase 0 work while the spec is revised is Charlie's call, not the reviewer's.
+
+## Round 7 — 2026-10-10 · scope: exact-hash re-review and Round 6 follow-up
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 approved revision 11 · hash (`git hash-object`) `3d0d99abce0e07c7e1286f77eafd5a8fbce83791` · on `origin/main` at merge `c79fd762a8cadf86249f42f04db88934ccf02cb8`
+
+**Verdict:** Approved
+**Model used:** GPT-6 · **Switch model next step?** Yes — the project maps spec review to deep tier (Opus 5.5); that remains the recommended confirmation before `build`.
+
+### Findings
+No blocking findings.
+
+### Self-check audit
+The spec hash is unchanged since R6. Applicability is carried forward from the feature-complete revision 11 review; this round rechecked the exact-hash status record and R6's handoff finding.
+
+| Rule / area | Applies? (why / n-a reason) | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| `MON-01`–`MON-07` | Yes; the spec defines money, currency and FX behavior. | No spec change since R6. | Pass carried forward; current hash is identical and the approval line is the only change from R5's reviewed blob. | Spec hash and blob diff; R5 and R6 audits. | None. |
+| Tenancy, auth, public links, finalized records, payments and events/jobs | Yes; included in the feature-complete spec scope. | No spec change since R6. | Pass carried forward; no new requirements or changed controls. | Current spec; R5 audit; unchanged hash. | None. |
+| Frontend and accessibility | Yes; the recurring-rate signal and dashboard link are specified. | No spec change since R6. | Pass carried forward; keyboard, accessible text and responsive acceptance criteria remain. | Verification (r) 12–14; R5 audit. | None. |
+| Scope, security testability, milestones and open questions | Yes; feature-complete spec review. | No spec change since R6. | Pass carried forward; no spec content changed since the exact-hash approval. | Current spec hash; R5 review. | None. |
+| Handoff accuracy | Yes; reviewer role §2 requires reporting repo/handoff drift. | Round 6's P3 was corrected. | Pass; handoff branch, HEAD and commit list now match current git state. | `.agent/handoff.md:15–16,26–40`; `git rev-parse HEAD` = `eb9204ec…`; `origin/main` = `a347854…`. | None. |
+
+### Verification performed
+| Command / check | Result |
+|---|---|
+| `git hash-object docs/superpowers/specs/2026-09-27-core-sales-design.md` | `3d0d99abce0e07c7e1286f77eafd5a8fbce83791`, unchanged from R6 and matching `PROJECT.md` §2. |
+| Blob diff from R5-reviewed spec hash | Only the Status line differs; current spec records Charlie's approval and reconciliation. All requirements below it are unchanged. |
+| Handoff vs git state | Fixed: `.agent/handoff.md` identifies branch `chore/setup-reconcile-v4-6-approved`, HEAD `eb9204e`, and `origin/main` `a347854`, matching git. |
+| Local review vs archived R6 review before this round | Hashes matched (`442d031664e8981da79bed076a86413c271f7858`). |
+| Code tests / CI | Not run; unchanged spec requirements and this review is documentation-only. |
+
+### Residual risks and test gaps
+- Round 5 recommended an independent confirmation in the project's configured deep tier (Opus 5.5) before `build`. This GPT-6 review does not provide that model confirmation.
+- Implementation tests have not been rerun by this spec review.
+
+### Required before merge
+- None.
+
+### Deferred conditions
+- None.
+
+### Optional improvements
+- None.
+
 ## Round 6 — 2026-10-10 · scope: exact-hash approval record follow-up
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 approved revision 11 · hash (`git hash-object`) `3d0d99abce0e07c7e1286f77eafd5a8fbce83791` · on `origin/main` at merge `c79fd762a8cadf86249f42f04db88934ccf02cb8`
 
