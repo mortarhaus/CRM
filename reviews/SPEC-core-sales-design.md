@@ -1,5 +1,58 @@
 # Review — spec `core-sales-design`
 
+## Round 6 — 2026-10-10 · scope: exact-hash approval record follow-up
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 approved revision 11 · hash (`git hash-object`) `3d0d99abce0e07c7e1286f77eafd5a8fbce83791` · on `origin/main` at merge `c79fd762a8cadf86249f42f04db88934ccf02cb8`
+
+**Verdict:** Approved
+**Model used:** GPT-6 · **Switch model next step?** Yes — the project maps spec review to deep tier (Opus 5.5); use it to confirm before `build`, as Round 5 recommended.
+
+### Findings
+No blocking findings.
+
+### [P3] Handoff git state is stale
+- Category: quality
+- Rule: reviewer role §2 (report handoff drift)
+- Evidence: `.agent/handoff.md:15–16` reports `chore/setup-reconcile-v4-6-approved` at `eb9204e` and `main` at `a347854`; `.agent/handoff.md:26–40` instead says the checkout is `docs/spec-v4.6-rev8` at `491957e`, with `origin/main` at `0e11cde`. Current git reports HEAD `eb9204ec…` and `origin/main` `a347854…`.
+- Failure scenario: a later session trusts the stale Git state block and starts work from an old branch or assumes an outdated main revision.
+- Why it matters: the handoff contradicts its own current branch section and repository state.
+- Required correction: refresh the Git state block and commit list to match the current checkout, or clearly mark them as historical.
+- Owner: builder
+- Verification: compare the refreshed block with `git status`, `git rev-parse HEAD`, and `git rev-parse origin/main`.
+- Status: open
+
+### Self-check audit
+This round's spec diff is only the Status line. Applicability is carried forward from Round 5's feature-complete review of revision 11; I rechecked the prior round and the changed approval record.
+
+| Rule / area | Applies? (why / n-a reason) | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| `MON-01`–`MON-07` | Yes; the full spec defines money, currency and FX behavior. | No rule change in this hash update. | Pass carried forward from Round 5; this update changes no money requirement. | Money rules; Round 5 self-check; blob diff between hashes. | None. |
+| Tenancy, auth, public links, finalized records, payments and events/jobs | Yes; these are part of the feature-complete spec scope. | No behavior change in this hash update. | Pass carried forward from Round 5; no runtime rule changed. | Relevant spec sections; Round 5 self-check; blob diff between hashes. | None. |
+| Frontend and accessibility | Yes; the spec includes the recurring-rate signal and dashboard link. | No UI change in this hash update. | Pass carried forward from Round 5; keyboard, accessible text and responsive acceptance checks remain in the spec. | Verification (r) 12–14; Round 5 self-check; blob diff between hashes. | None. |
+| Approval record and source-of-truth state | Yes; exact-hash review is the build gate. | The Status line records Charlie's approval after Round 5 and says the reconciled spec is the source of truth. | Pass. The owner approval, reviewed revision, prior review hash and setup reconciliation hash are represented consistently. | Spec line 3; `docs/DECISIONS.md` approval entry; `agents/PROJECT.md` §2; `origin/main` merge `c79fd76`. | None. |
+| Scope, security testability, milestones and open questions | Yes; feature-complete spec review. | No change in this hash update. | Pass carried forward from Round 5; this round makes no change to controls, scope, milestones or open choices. | Round 5 review and current lower spec content; blob diff between hashes. | None. |
+
+### Verification performed
+| Command / check | Result |
+|---|---|
+| `git hash-object docs/superpowers/specs/2026-09-27-core-sales-design.md` | `3d0d99abce0e07c7e1286f77eafd5a8fbce83791`. |
+| `git diff 7d402bb9a79af423daa06c75de86bf2d74857b01 3d0d99abce0e07c7e1286f77eafd5a8fbce83791` | Blob diff contains only the Status line. It records the Charlie approval and review context; all spec content below it is unchanged from Round 5's approved revision 11. |
+| `git rev-parse origin/main` and spec hash cross-check | `origin/main` is `a347854604081fa8cd253382c16ce7df79692d3d`; the approved spec blob is `3d0d99ab…`, matching `agents/PROJECT.md` §2. Merge `c79fd76` introduced that spec hash. |
+| Prior review and approval record | Round 5 is Approved for revision 11; `docs/DECISIONS.md` records Charlie's v4.6 approval and the Status-line-only change. |
+| Code tests / CI | Not run; this is a specification review and the hash update changes no requirements or implementation. |
+
+### Residual risks and test gaps
+- Round 5 recommends independent confirmation in the project's deep tier (Opus 5.5) before `build`.
+- This exact-hash pass does not rerun implementation tests; the spec change contains no implementation requirements beyond the already approved revision 11.
+
+### Required before merge
+- None.
+
+### Deferred conditions
+- None.
+
+### Optional improvements
+- None.
+
 ## Round 5 — 2026-10-09 · scope: v4.6 revision 11 follow-up
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 draft revision 11 · hash (`git hash-object`) `7d402bb9a79af423daa06c75de86bf2d74857b01` · present on `origin/main` at merge `3b0a4bf9272670243082e04857351f3f3f2992a1`
 
