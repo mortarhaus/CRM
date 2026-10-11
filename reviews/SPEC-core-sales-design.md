@@ -1,5 +1,78 @@
 # Review — spec `core-sales-design`
 
+## Round 9 — 2026-10-11 · scope: feature-complete spec review
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 DRAFT revision 3 · hash (`git hash-object`) `e45ef3c9b4cfdba8b8be4f9450d20f8868b0953c` · identical to the blob on `origin/main` at `dc9d1d51c57e91091f115445744268bd7c97417d`
+
+**Verdict:** Revision required
+**Model used:** GPT-6 (the project maps deep spec review to Opus 5.5) · **Switch model next step?** Yes — use the project's mapped deep tier for independent confirmation after the correction.
+
+### Findings
+
+### [P2] Phase 1 hosting check falsely says the owner chose a VPS provider
+- Category: spec/guardrail mismatch
+- Rule: `agents/PROJECT.md` §9 and §11; spec "Checks before the Phase 1 plan is written"
+- Evidence: the spec says the three checks in that section "ran in Phase 0" and item 3 says the Phase 4 VPS provider was "confirmed by Charlie and recorded in Decisions" (`docs/superpowers/specs/2026-09-27-core-sales-design.md:985-993`). The same spec calls that provider Open question 4 (`:9`, `:252`, `:954`) and lists the choice as a current gate before the Phase 1 plan (`:1046`). `agents/PROJECT.md:239-241` also says Charlie's choice is still required. I found no recorded owner choice in `docs/DECISIONS.md`.
+- Failure scenario: the Phase 1 planner treats item 3 as completed, selects a VPS without Charlie's answer, or skips the hosting gate.
+- Why it matters: an explicit owner choice is represented both as done and as pending in the source of truth.
+- Required correction: rewrite item 3 as an unmet gate, and distinguish it from the two completed spikes. Keep the VPS choice open until Charlie makes and records it. No new owner choice is needed to correct the status text.
+- Owner: builder
+- Verification: item 3, Open question 4, the current gates, and `PROJECT.md` agree that the VPS choice is pending before the Phase 1 plan.
+- Disposition: before merge (before v4.7 approval; the draft is already on `main`)
+- Status: open
+
+### [P2] Deferred policies still need decisions before their named plan PRs
+- Category: ambiguity / material risk
+- Rule: prior spec review Round 8 deferred findings; spec "Changes in v4.7" items 1, 5 and 6
+- Evidence: direct quote acceptance and expiry, tax-registration changes affecting open drafts, rate-limit numbers and OTP reissue cap, and `crm_purge` read policies remain open (`docs/superpowers/specs/2026-09-27-core-sales-design.md:36-41`). The invoice-void policy and four payment-void choices also remain open (`:32`, `:41`). The spec explicitly gates the Phase 1, 4 and 5 plans (`:1046`).
+- Failure scenario: a phase plan or implementation fixes a security number, money policy or document lifecycle rule by inference, producing two plausible implementations of the same spec.
+- Why it matters: these choices affect money correctness, data retention and public-link security, but no affected phase is ready to plan yet.
+- Required correction: resolve each item in the spec with Charlie where the policy is his, then review the revised spec before the affected phase plan is written.
+- Owner: Charlie (policy choices), then builder (spec text and tests)
+- Verification: the first Phase 1 plan PR includes the rate-limit and `crm_purge` rules; the first Phase 4 plan PR follows the tax-registration, invoice-void and payment-void decisions; the first Phase 5 plan PR follows the quote-acceptance and expiry decisions. Each is preceded by a reviewed spec revision.
+- Disposition: deferred to the first Phase 1, Phase 4 and Phase 5 plan PRs respectively, as listed above
+- Status: open (carried forward, not a new block on v4.7)
+
+### [P3] Handoff Git block and one recurring-run sentence are stale
+- Category: consistency
+- Evidence: `.agent/handoff.md` §1 and §5 correctly say PR #17 is merged at `dc9d1d5`, while its §3 Git block still labels `a347854` as `origin/main` and its log-branch summary stops at PR #16. The recurring zero-total rule says "the run and **never** issues or sends it" (`docs/superpowers/specs/2026-09-27-core-sales-design.md:566`).
+- Required correction: builder refreshes the handoff Git block and changes the sentence to "the run never issues or sends it" in the next spec edit.
+- Owner: builder
+- Status: open
+
+### Self-check audit
+Spec review has no builder self-check table; this is my applicability assessment of the full spec and the v4.7 revision. The PR #17 slice self-check and Bob's Round 3 approval are inputs, not a substitute for this review.
+
+| Rule / area | Applies? (why / n-a reason) | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| MON-01–MON-07, PAY-01 | Yes; invoices, FX, payments, refunds and credits. | v4.7 changes listed. | Payment void, invoice-wide refund guard, credit-note cap, nonnegative inputs, zero-subtotal allocation and positive issue guard are coherent; earlier Round 8 money blockers are addressed. | Spec lines 433–438, 491–518, 580–610, 883–920, 1125–1140. | None for these fixes. |
+| REC-01–REC-12 | Yes; issued invoices, receipts and credit notes. | v4.7 changes listed. | Payment and receipt voids preserve rows and numbers, with audit and concurrency cases. Invoice-void policy is explicitly deferred before Phase 4. | Spec lines 438–440, 612–620, 897–915, Verification (a)–(i). | Deferred condition. |
+| TEN-01–TEN-10, LINK-01–LINK-09, AUTH, EVT, FILE, FE | Yes; full spec includes RLS, links, auth, jobs, files and UI. | Existing spec rules. | No new blocker from the v4.7 changes. Rate-limit numbers, purge read policies and direct quote acceptance remain gated to later plan PRs. | Spec lines 36–41, 644–755, 1046; Round 8. | Deferred condition. |
+| `PROJECT.md` §9/§11 and milestone gates | Yes; owner choices must remain open until recorded. | Phase 1 check says hosting confirmed. | VPS gate has contradictory completion status. Phase-specific done-when criteria otherwise remain testable. | Spec lines 9, 252, 985–1011, 1046; `PROJECT.md:239-241`. | P2 before approval. |
+| Handoff accuracy | Yes. | Merged state in §1 and §5. | §3 still names an old `origin/main`. | `git rev-parse origin/main`; `.agent/handoff.md` §3. | P3. |
+
+### Verification performed
+| Command / check | Result |
+|---|---|
+| `git hash-object docs/superpowers/specs/2026-09-27-core-sales-design.md` | `e45ef3c9b4cfdba8b8be4f9450d20f8868b0953c`. |
+| `git show origin/main:<spec> \| git hash-object --stdin` | Same hash; review applies to merged `main` blob. |
+| Targeted read of spec data model, money rules, lock order, refunds/status, phases and Verification; comparison with Round 8 and owner decisions | Prior blocking fixes present; hosting status conflict and deferred gates recorded above. |
+| `git status --short` before review write | Builder checkout clean. No code tests run for this document review. |
+
+### Residual risks and test gaps
+- No implementation of the v4.7 money rules exists to exercise here; their specified tests remain build requirements.
+- This review used GPT-6; the project's deep-tier model mapping is Opus 5.5. A later review on that tier can provide the independent confirmation the handoff requested.
+
+### Required before merge
+- Correct the false completion statement about the VPS provider before v4.7 is approved. The draft is already merged, so this means a new reviewed spec PR.
+
+### Deferred conditions
+- First Phase 1 plan PR: choose and specify rate-limit numbers and OTP reissue cap; enumerate `crm_purge` read policies; obtain Charlie's VPS provider choice.
+- First Phase 4 plan PR: resolve tax-registration effects on open drafts, invoice-void policy, and the four payment-void choices (reason codes, notice content, export treatment, phase placement).
+- First Phase 5 plan PR: resolve direct quote acceptance and quote expiry.
+
+### Optional improvements
+- Refresh handoff §3 and correct the sentence at spec line 566 in the next spec edit.
+
 ## Round 8 — 2026-10-10 · scope: feature-complete spec review (independent deep-tier confirmation)
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.6 approved revision 11 · hash (`git hash-object`) `3d0d99abce0e07c7e1286f77eafd5a8fbce83791` · matches `agents/PROJECT.md` §2 · `origin/main` at `a347854`
 
