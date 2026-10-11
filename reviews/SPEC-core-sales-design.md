@@ -1,5 +1,222 @@
 # Review — spec `core-sales-design`
 
+## Round 11 — 2026-10-11 · scope: feature-complete spec review (independent deep-tier confirmation of Round 10)
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 DRAFT revision 4 · hash (`git hash-object`) `521a70979f48329363f6154a1f73687d9a82e03f` · identical to the blob on `origin/main` at `9b95910d48108a026927e501e918e4fa5e05e234` (same blob as Round 10)
+
+**Verdict:** Approved with conditions
+**Model used:** Opus 5.5 (the project's mapped deep tier) · **Switch model next step?** No — this is the deep-tier confirmation Round 10 asked for.
+
+### Findings
+
+No P0 or P1. Every v4.7 rule was re-read against the body: payment void (data model `:443-444`, "Voiding a payment" `:902-912`, lock order `:845`), credit-note cap (`:445`, `:922`), no-negative bounds and tax-rate bounds (`:501-509`), zero-subtotal allocation (`:519`), issue guard (`:523`) and zero-total recurring run (`:571`). I recomputed Verification "Payment void, credit-note cap…" (f), (g) and (i), including the boundary cases (`5000 ≤ max(0, 15000 − 10000)`; `5000 > max(0, 8000 − 10000)`; void-invoice case `5000 ≤ 5000`) and the (f) rounding chain (`2228`, `1115`, `3342`, `4457`): all match. `SELECT … FOR UPDATE/SHARE` on `payment` works for `crm_app` because it holds column UPDATE on the void columns (PostgreSQL needs UPDATE on at least one column), consistent with `:796`. The three Round 10 P2s are confirmed and carried. Four P2s and two P3s below are new to this file; none blocks v4.7 approval, because each concerns a phase whose plan is not yet written and each is given a plan gate.
+
+### [P2] Credit-note tax rate and registration source are undefined
+- Category: ambiguity (money)
+- Rule: MON-07, REC-02; spec Money rules step 6
+- Evidence: `credit_note` has no document tax rate column (`:445`), unlike `quotation` and `invoice` (`:438`, `:440`). Step 6 takes `tax_rate_override_bps ?? document rate` and treats a line as exempt when the "workspace [is] not tax-registered" (`:521`), i.e. the current setting. Onboarding lets the registration and default rate change later (`:690`). The deferred "Tax registration change vs open drafts" item (`:43`; Round 8 P2) names drafts, quotes and recurring templates only, not credit notes against already-issued invoices.
+- Failure scenario: an invoice is issued with 8% Service Tax. The workspace later changes its default rate to 6%, or turns registration off. A credit note for the full line then computes 6% or 0% tax, so it does not reverse the tax that was charged. One builder reads the invoice's frozen rate; another reads the current setting.
+- Why it matters: the credit note is a legal tax document; its tax must mirror the invoice it corrects.
+- Required correction: state that a credit note's lines take their taxable flag and effective rate from the credited invoice's frozen snapshot (not the current workspace setting), and how that is enforced (copied rate + trigger, as for `currency` and `fx_rate`). Add a test: invoice at 8%, workspace rate changed to 6% and registration turned off, full credit note reverses exactly the invoiced tax. Confirm with the accountant check (`:1044`).
+- Owner: builder (proposal), Charlie (confirm)
+- Verification: the reviewed spec revision before the Phase 4 plan states the rule and the test.
+- Disposition: deferred to the first Phase 4 plan PR (same spec revision as the tax-registration item)
+- Status: open
+
+### [P2] Three proposed exceptions to hard rules are still unruled
+- Category: guardrail mismatch (process)
+- Rule: TEN-02 (hard), REC-01 (hard), AUTH-01 (hard); `agents/PROJECT.md:206-209`; `docs/DECISIONS.md:183-210`
+- Evidence: all three entries say "PROPOSED, NOT APPROVED — awaiting Bob's ruling" since 2026-10-03; no spec round ruled on them. v4.7 adds two new lifecycle transitions on finalized records (payment void, receipt `voided_at`) that the REC-01 (a) list does not name; `docs/DECISIONS.md:19` already says `setup` must add them.
+- Failure scenario: Phase 1 builds five roles (TEN-02), Phase 4 builds payment voids (REC-01) and Phase 7 builds link actions outside `action()` (AUTH-01) on rules no reviewer has ruled on.
+- Bob's ruling (the reviewer cannot downgrade a hard rule; Charlie decides what is recorded):
+  - **TEN-02 — conforming, no exception needed**, provided: no role is superuser or `BYPASSRLS` (`pg_roles` test); `crm_worker` has no privilege on any `public` tenant table (catalog test); `crm_link_resolver` is `NOLOGIN` and reached only via `resolve_share_link()`; all tenant work runs as `crm_app` (or `crm_purge` for the purge) under `withWorkspace()`. Each extra role has fewer rights than `crm_app`, which is the rule's intent.
+  - **REC-01 (a) — conforming interpretation**: the snapshot, hash, number, lines and totals never change; lifecycle columns change only through named transitions enforced by column grants plus triggers. The list must add the v4.7 payment void and receipt void.
+  - **REC-01 (b) — a genuine exception** (deleting sent, hashed versions). Not the reviewer's to accept. It rests on Charlie's v4.5 approval item 1 (narrow purge scope) and must be recorded as owner-accepted, with the PDPA professional check (`:1047`) before Phase 9.
+  - **AUTH-01 — conforming if implemented as a fixed wrapper**: a `linkAction()` (name the builder's choice) in the order token re-resolve → workspace from the resolver → OTP check where required → Zod → idempotency → handler, lint-enforced on link routes. Add **decline** to the idempotency list (the decision entry names only approve and sign).
+- Required correction: builder records these rulings in `docs/DECISIONS.md` and `agents/PROJECT.md` §9 (moving them out of "Proposed"), with Charlie's confirmation; reviewer re-checks the wording.
+- Owner: builder, then Charlie
+- Verification: decisions entries no longer say "awaiting Bob's ruling"; §9 REC-01 (a) names the payment and receipt voids.
+- Disposition: deferred to the `setup` reconcile after v4.7 approval, and in any case before the first Phase 1 plan PR
+- Status: open
+
+### [P2] Phase 1 spec gaps still listed as "Open for Bob": restrictive policy, auth endpoints, archive job
+- Category: spec/guardrail mismatch
+- Rule: TEN-07, UNI-19, UNI-10, TEN-03; `agents/PROJECT.md:213-216`
+- Evidence: (1) Tenancy defines only workspace policies `TO crm_app` with `USING` and `WITH CHECK` (`:729`); TEN-07 asks for a RESTRICTIVE tenant policy plus targeted PERMISSIVE ones. (2) "Only unauthenticated HTTP surface: `/api/health` (and client link routes)" (`:783`) omits Better Auth's `/api/auth/*` (sign-in, sign-up, reset, 2FA verify), which Phase 0 already serves. (3) "`audit_log`, `domain_event`, share-link views: monthly archive job" (`:940`) has no role or mechanism; no role has DELETE on those append-only tables (`:795`).
+- Failure scenario: (1) a later blanket permissive policy silently widens access; (2) a header or rate-limit test misses the auth routes; (3) a builder grants DELETE on `audit_log` to make the archive job work.
+- Required correction: (1) make each tenant table's workspace policy `AS RESTRICTIVE … TO crm_app, crm_purge` (USING + WITH CHECK), plus PERMISSIVE per-operation policies for those roles; `share_link_resolve` stays PERMISSIVE `TO crm_link_resolver`, which a restrictive policy scoped to other roles does not affect. Add a catalog test that every tenant table has the restrictive policy. (2) list `/api/auth/*` as unauthenticated surface, DB-backed rate-limited (AUTH-06), with uniform responses. (3) remove the archive job from Part 1, or replace it with monthly partitions detached by `crm_migrator` in a reviewed runbook — never row deletes by a runtime role.
+- Owner: builder
+- Verification: the spec revision before the Phase 1 plan states all three; the Phase 1 plan carries the tests.
+- Disposition: deferred to the first Phase 1 plan PR
+- Status: open
+
+### [P2] "Agreements rendered again at sign" is ambiguous against "never regenerated"
+- Category: ambiguity
+- Rule: REC-11; `agents/PROJECT.md:217`
+- Evidence: `:631` says agreements are rendered at first send "and again at sign, with certificate page; … never regenerated". `document_artifact` is unique on `(target_type, target_id, kind)` (`:479`), with kinds `pdf`, `merged_pdf`, `certificate_pdf` and target types including `agreement` and `signature`.
+- Failure scenario: one builder re-renders the agreement `pdf` at sign (blocked by the unique key, or a second file for the same record); another writes a `certificate_pdf` for the `signature`. The client's downloaded "signed agreement" differs between builds.
+- Required correction: state that at sign the original agreement `pdf` is untouched and the worker renders a `certificate_pdf` (target `signature`) and, if wanted, a `merged_pdf` (target `agreement`) of agreement + certificate. Apply the same rule to the proposal approval certificate.
+- Owner: builder
+- Verification: the spec revision before the Phase 7 plan names the artifact kinds and targets.
+- Disposition: deferred to the first Phase 7 plan PR
+- Status: open
+
+### [P2] Phase 1 security, purge, and hosting choices remain open (carried from Round 10)
+- Rule, evidence, correction and verification as in Round 10. Confirmed on this blob (`:41-45`, `:998`, `:1051`).
+- Disposition: deferred to the first Phase 1 plan PR
+- Status: open
+
+### [P2] Phase 4 tax and void policies remain open (carried from Round 10)
+- As in Round 10 (`:37`, `:39-46`, `:1051`). The credit-note tax finding above belongs in the same spec revision.
+- Disposition: deferred to the first Phase 4 plan PR
+- Status: open
+
+### [P2] Direct quote acceptance and expiry remain open (carried from Round 10)
+- As in Round 10 (`:41-42`, `:1051`).
+- Disposition: deferred to the first Phase 5 plan PR
+- Status: open
+
+### [P3] Zero-total credit note and refund-void step-up are not stated
+- Category: consistency
+- Evidence: the issue guard refuses a total `≤ 0` for invoices only (`:523`); the cap allows a credit note of total 0 (`:922`), which would use a gapless number and change nothing. A payment void needs step-up (`:713`), but a refund void, including a cross-invoice `wrong_payment` move (`:899`), does not.
+- Required correction: decide whether a zero-total credit note is refused (recommended: yes, as for invoices) and whether a refund void needs step-up (recommended: yes, matching the payment void). Both are small owner choices; bundle them with the Phase 4 questions.
+- Owner: Charlie, then builder
+- Status: open
+
+### [P3] Handoff Git block still stale (carried from Round 10)
+- Evidence: `.agent/handoff.md` §3 still labels `dc9d1d5` as `origin/main`; actual `origin/main` is `9b95910`.
+- Owner: builder
+- Status: open
+
+### Self-check audit
+Spec review: no builder self-check table applies. My applicability list covered every ticked pack and `agents/PROJECT.md` §9; Round 10's table was input only.
+
+| Rule / area | Applies? | Reviewer found | Evidence | Disagreement with Round 10 |
+|---|---|---|---|---|
+| MON-01–MON-07 | Yes | v4.7 rules consistent; fixtures (f), (g), (i) recomputed and correct. New gap: credit-note tax source. | `:445`, `:501-523`, `:521`, `:1130` | New P2. |
+| REC-01–REC-12, PAY-01 | Yes | Payment/receipt void preserves rows and numbers, audited, locked `invoice` → `payment` → receipt; REC-01 ruling pending; REC-11 ambiguous. | `:443-444`, `:631`, `:845`, `:902-912` | New P2s. |
+| TEN-01–TEN-12 | Yes | Composite FKs, `nullif`, five roles sound; TEN-07 restrictive policy not specified; TEN-02 ruling pending. | `:729-741`, `:747-756` | New P2s. |
+| AUTH-01–AUTH-13 | Yes | Matrix and step-up consistent except refund-void step-up; AUTH-01 link-action ruling pending; `/api/auth/*` missing from surface list. | `:704-724`, `:783` | New P2/P3. |
+| LINK, EVT, FILE, FE, UNI | Yes | No v4.7 defect; UNI-10 archive job conflicts with append-only; rate limits carried. | `:636-642`, `:760-772`, `:940` | New P2 (UNI-10). |
+| Scope vs §9 | Yes | No out-of-scope feature. | Scope — Part 1 | None. |
+| Milestones "done when" | Yes | Testable; plan gates explicit. | `:1000-1016`, `:1051` | None. |
+
+### Verification performed
+| Command / check | Result |
+|---|---|
+| `git fetch origin`; `git rev-parse origin/main HEAD` | `9b95910…`; checkout HEAD `9a94988`. |
+| `git hash-object <spec>` and `git show origin/main:<spec> \| git hash-object --stdin` | Both `521a70979f48329363f6154a1f73687d9a82e03f`. |
+| `git status --short` before writing | Clean. |
+| Read the spec body `:328-1153`, all non-frontend packs, `agents/PROJECT.md`, `docs/DECISIONS.md` (recent and hard-rule entries), Rounds 8–10 | Findings above. |
+| Hand recomputation of Verification "Payment void…" (f), (g), (i) | All values match. |
+| Search of review files and decisions for prior rulings on TEN-07, UNI-10, UNI-19, REC-11, TEN-02, REC-01, AUTH-01 | None found beyond "open" mentions in `PR-4.md`. |
+| Code tests / CI | Not run; document review only. |
+
+### Residual risks and test gaps
+- `guardrails/frontend.md` was not re-read this round; the v4.7 UI surface is unchanged from v4.6 (Rounds 5–8 covered it).
+- Appendix A (Part 3) was not re-reviewed.
+- UNI-04 and FE-13 in `PROJECT.md` "Open for Bob" are lint and plan matters, not spec text; not ruled here.
+- UNI-02 (where security constants live): my view is that fixed security values (link 30 d, OTP 10 min / 5, step-up 5 min, reset 30 min) may be named constants in one core module named in the spec, while business values stay in `workspace_settings`; not raised as a finding.
+
+### Required before merge
+- None. The blob is already on `main` (PR #18). Charlie's own v4.7 approval is a separate owner gate.
+
+### Deferred conditions
+- `setup` reconcile after approval, and before the first Phase 1 plan PR: record the TEN-02 / REC-01 / AUTH-01 rulings.
+- First Phase 1 plan PR: VPS choice, rate limits and OTP re-issue cap, `crm_purge` read policies (Round 10); restrictive tenant policy, `/api/auth/*` surface, archive-job removal or partition design (this round).
+- First Phase 4 plan PR: tax registration vs open drafts, invoice-void policy, four payment-void choices (Round 10); credit-note tax source (this round); P3 zero-total credit note and refund-void step-up.
+- First Phase 5 plan PR: direct quote acceptance and expiry.
+- First Phase 7 plan PR: artifact kinds at sign (REC-11).
+
+## Round 10 — 2026-10-11 · scope: feature-complete spec review
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 DRAFT revision 4 · hash (`git hash-object`) `521a70979f48329363f6154a1f73687d9a82e03f` · identical to the blob on `origin/main` at `9b95910d48108a026927e501e918e4fa5e05e234`
+
+**Verdict:** Approved with conditions
+**Model used:** GPT-6 (the project maps deep spec review to Opus 5.5) · **Switch model next step?** Yes, if independent confirmation on the mapped deep tier is wanted before Charlie's approval; this verdict is based on the pinned blob and the evidence below.
+
+### Findings
+
+The Round 9 before-approval P2 is resolved: the two completed spikes are separated from the still-unmet VPS provider choice (`docs/superpowers/specs/2026-09-27-core-sales-design.md:990-998`). The recurring-run wording is corrected (`:571`). No P0, P1, or P2 requiring correction before v4.7 approval remains.
+
+### [P2] Phase 1 security, purge, and hosting choices remain open
+- Category: ambiguity / material risk
+- Rule: LINK-03, LINK-07, TEN-06, REC-04; spec "Changes in v4.7" item 5 and "Checks before the Phase 1 plan is written"
+- Evidence: the spec still gates rate-limit numbers and the OTP reissue cap, `crm_purge` read policies, and Charlie's VPS provider choice before the Phase 1 plan (`docs/superpowers/specs/2026-09-27-core-sales-design.md:41-45`, `:990-998`, `:1051`). Open question 4 and `agents/PROJECT.md` §11 agree that the VPS choice is pending.
+- Failure scenario: a Phase 1 plan invents security thresholds, leaves reference tables unreadable to `crm_purge`, or selects a host without the owner choice.
+- Why it matters: the controls cannot be implemented or tested consistently while these values and grants are open.
+- Required correction: record Charlie's VPS choice; specify numeric limits, windows and responses including OTP reissue; enumerate purge reference-table SELECT policies and tests in a reviewed spec revision before the Phase 1 plan.
+- Owner: Charlie (hosting and any client-facing policy), then builder (spec and tests)
+- Verification: the reviewed spec preceding the first Phase 1 plan PR states each value and policy, and that plan includes the corresponding checks.
+- Disposition: deferred to the first Phase 1 plan PR
+- Status: open (carried forward)
+
+### [P2] Phase 4 tax and void policies remain open
+- Category: ambiguity / material risk
+- Rule: MON-07, REC-01, REC-02, PAY-01; spec "Changes in v4.7" items 1, 5 and 6
+- Evidence: the effect of tax-registration changes on open drafts, invoice-void policy, and four payment-void choices are explicitly undecided and gated before the Phase 4 plan (`docs/superpowers/specs/2026-09-27-core-sales-design.md:37`, `:39-46`, `:1051`). The four choices are reason codes, void-notice content, period-export treatment, and phase placement; shown values are proposals.
+- Failure scenario: a Phase 4 plan treats a proposal as an owner decision or defines incompatible money and document-lifecycle behaviour.
+- Why it matters: these choices affect issued records, client notices, and accounting exports.
+- Required correction: Charlie decides the open policies; the builder writes the outcomes and verification cases in a reviewed spec revision before the Phase 4 plan.
+- Owner: Charlie, then builder
+- Verification: the reviewed spec preceding the first Phase 4 plan PR resolves each item and the plan implements its stated tests.
+- Disposition: deferred to the first Phase 4 plan PR
+- Status: open (carried forward)
+
+### [P2] Direct quote acceptance and expiry remain open
+- Category: ambiguity
+- Rule: LINK-09; spec "Changes in v4.7" item 5 and Phase 5 gate
+- Evidence: direct quote acceptance and approval or acceptance after `valid_until` remain deferred to before the Phase 5 plan (`docs/superpowers/specs/2026-09-27-core-sales-design.md:41-42`, `:1051`).
+- Failure scenario: one implementation creates an agreement through an authenticated acceptance while another accepts an expired quote or treats a click as sufficient.
+- Why it matters: client consent and quote validity would differ between implementations.
+- Required correction: Charlie chooses the acceptance and expiry policy; the builder specifies the flow and tests in a reviewed spec revision before the Phase 5 plan.
+- Owner: Charlie, then builder
+- Verification: the reviewed spec preceding the first Phase 5 plan PR covers direct acceptance and expiry, and that plan tests both.
+- Disposition: deferred to the first Phase 5 plan PR
+- Status: open (carried forward)
+
+### [P3] Handoff Git block still identifies an old `origin/main`
+- Category: consistency
+- Evidence: `.agent/handoff.md:40` labels `dc9d1d5` as `origin/main`, and `:44` stops the log summary at PR #17, while `git rev-parse origin/main` is `9b95910d48108a026927e501e918e4fa5e05e234`. The handoff's current §5 correctly reports PR #18 merged (`.agent/handoff.md:50`).
+- Failure scenario: the next agent relies on §3 instead of §5 and reviews or reconciles against the old main commit.
+- Why it matters: a stale status block makes the handoff harder to trust, though the spec and current gate are clear.
+- Required correction: builder refreshes §3's Git block and log summary.
+- Owner: builder
+- Verification: both sections name the same current main commit and PR #18 state.
+- Status: open
+
+### Self-check audit
+This is a document review, so there is no builder self-check table for this command. I assessed the full spec against the applicable packs and `agents/PROJECT.md` §9; earlier PR self-checks and spec rounds were inputs, not substitutes.
+
+| Rule / area | Applies? (why / n-a reason) | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| MON-01–MON-07, PAY-01, REC-01–REC-12 | Yes; invoices, FX, payment/receipt voids, refunds, credits and recurring runs. | v4.7 money changes and tests are specified. | The owner-approved void, credit cap, nonnegative amount, positive issue-total and zero-total recurring rules are internally consistent; the Phase 4 owner choices are clearly gated. | Spec items 1–3, 6; money/status, immutability and Verification sections; Decisions entries of 2026-10-10. | Deferred Phase 4 conditions. |
+| TEN, AUTH, LINK, EVT, FILE, FE, UNI | Yes; full spec covers tenant isolation, auth, public links, jobs, files and UI. | Existing controls, with later policy gates. | No new v4.7 blocker found; numeric rate limits, purge reads and direct acceptance remain open for their named plans. | Spec items 5–6, security/tenancy and phase sections; prior Round 9. | Deferred Phase 1 and 5 conditions. |
+| `PROJECT.md` §9/§11 and milestone gates | Yes; owner choices must not be presented as complete. | Revision 4 says spikes complete, VPS choice unmet. | The Round 9 hosting contradiction is corrected; the Phase 1/4/5 plan gates are explicit. | Spec lines 990–998, 1051; `agents/PROJECT.md` §11. | None before v4.7 approval. |
+| Handoff accuracy | Yes; the next agent uses it to find current state. | §5 says PR #18 merged. | §3 has an older main and log summary. | `.agent/handoff.md:37-50`; `git rev-parse origin/main`. | P3. |
+
+### Verification performed
+| Command / check | Result |
+|---|---|
+| `git hash-object docs/superpowers/specs/2026-09-27-core-sales-design.md` | `521a70979f48329363f6154a1f73687d9a82e03f`. |
+| `git show origin/main:<spec> \| git hash-object --stdin` | Same hash; this review applies to the merged main blob. |
+| Read the full v4.7 revision, owner decisions, PROJECT gates, prior spec rounds and relevant guardrails | Round 9 hosting P2 and wording P3 are fixed; the remaining open policies are tied to specific later plan PRs. |
+| `git rev-parse origin/main`; `git status --short` before review write | Main is `9b95910d…`; tracked builder checkout clean. No local code tests run for this document review. |
+
+### Residual risks and test gaps
+- The Phase 1, 4 and 5 policy gates above must be resolved through reviewed spec revisions before their plan PRs. No implementation tests were run or claimed for this spec review.
+- `agents/PROJECT.md` §2 still points to the approved v4.6 hash; it should be reconciled only after Charlie approves v4.7 and the approval is recorded.
+- This round ran on GPT-6 rather than the project's mapped Opus 5.5 deep tier.
+
+### Required before merge
+- None for this exact spec blob (already merged as PR #18). Charlie's own v4.7 approval remains a separate owner gate.
+
+### Deferred conditions
+- First Phase 1 plan PR: VPS choice, numeric rate limits and OTP reissue cap, and `crm_purge` reference-read policies, all in a reviewed spec revision first.
+- First Phase 4 plan PR: tax registration vs open drafts, invoice-void policy, and four payment-void choices, all in a reviewed spec revision first.
+- First Phase 5 plan PR: direct quote acceptance and expiry, in a reviewed spec revision first.
+
+### Optional improvements
+- Builder refreshes `.agent/handoff.md` §3 to match the merged main state.
+
 ## Round 9 — 2026-10-11 · scope: feature-complete spec review
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 DRAFT revision 3 · hash (`git hash-object`) `e45ef3c9b4cfdba8b8be4f9450d20f8868b0953c` · identical to the blob on `origin/main` at `dc9d1d51c57e91091f115445744268bd7c97417d`
 
