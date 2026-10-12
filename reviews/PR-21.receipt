@@ -1,0 +1,8 @@
+pr: 21
+reviewed_head_sha: 84dcf29b53e67bf988490193499540a7004d09a2
+review_file: reviews/PR-21.md
+review_file_hash: a5c93bfc12fc76a0ac04e9b15af8efc9baa3b27e
+log_branch_commit_with_review: 3feabb1a136180269d9d0beaf4b746bba3e1d007
+verdict: Approved (Round 1)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-12T09:21:50Z
