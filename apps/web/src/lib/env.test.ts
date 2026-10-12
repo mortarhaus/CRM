@@ -57,4 +57,31 @@ describe("parseEnv", () => {
     expect(message).toContain("DATABASE_URL: must be a postgres:// URL");
     expect(message).not.toContain("hunter2");
   });
+
+  it("refuses a plain-http public APP_URL in production, naming the variable but not the value", () => {
+    const message = messageOf(() =>
+      parseEnv({ ...valid, NODE_ENV: "production", APP_URL: "http://crm.example.test" }),
+    );
+    expect(message).toContain("APP_URL: must be an https:// URL in production");
+    expect(message).not.toContain("crm.example.test");
+  });
+
+  it("accepts an https APP_URL in production", () => {
+    expect(parseEnv({ ...valid, NODE_ENV: "production", APP_URL: "https://crm.example.test" }).APP_URL).toBe(
+      "https://crm.example.test",
+    );
+  });
+
+  it.each(["http://localhost:3000", "http://127.0.0.1:3000", "http://[::1]:3000"])(
+    "accepts the loopback origin %s over http in production",
+    (appUrl) => {
+      expect(parseEnv({ ...valid, NODE_ENV: "production", APP_URL: appUrl }).APP_URL).toBe(appUrl);
+    },
+  );
+
+  it("accepts a loopback http APP_URL in development", () => {
+    expect(parseEnv({ ...valid, NODE_ENV: "development", APP_URL: "http://localhost:3000" }).APP_URL).toBe(
+      "http://localhost:3000",
+    );
+  });
 });

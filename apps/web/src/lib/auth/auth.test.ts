@@ -63,6 +63,43 @@ async function findUser(email: string) {
   return row;
 }
 
+describe("session cookie attributes", () => {
+  function authAt(baseURL: string): Auth {
+    return createAuth({ db: handle.db, secret: "integration test secret, not a real key", baseURL });
+  }
+
+  async function signInCookies(instance: Auth): Promise<string[]> {
+    const email = uniqueEmail();
+    await instance.api.signUpEmail({ body: { name: "Cookie User", email, password: PASSWORD } });
+    const response = await instance.api.signInEmail({ body: { email, password: PASSWORD }, asResponse: true });
+    expect(response.status).toBe(200);
+    const cookies = response.headers.getSetCookie();
+    expect(cookies.some((line) => line.includes("better-auth.session_token="))).toBe(true);
+    return cookies;
+  }
+
+  it.each(["https://crm.example.test", "http://crm.example.test"])(
+    "marks every auth cookie Secure, HttpOnly and SameSite=Lax for the public origin %s",
+    async (baseURL) => {
+      for (const line of await signInCookies(authAt(baseURL))) {
+        expect(line).toMatch(/^__Secure-better-auth\./);
+        expect(line).toMatch(/; Secure(;|$)/i);
+        expect(line).toMatch(/; HttpOnly(;|$)/i);
+        expect(line).toMatch(/; SameSite=Lax(;|$)/i);
+      }
+    },
+  );
+
+  it("keeps loopback http development usable: HttpOnly and SameSite=Lax without the Secure flag", async () => {
+    for (const line of await signInCookies(auth)) {
+      expect(line).toMatch(/^better-auth\./);
+      expect(line).not.toMatch(/; Secure(;|$)/i);
+      expect(line).toMatch(/; HttpOnly(;|$)/i);
+      expect(line).toMatch(/; SameSite=Lax(;|$)/i);
+    }
+  });
+});
+
 describe("passwords", () => {
   it("stores an Argon2id hash, never scrypt or plaintext", async () => {
     const email = uniqueEmail();

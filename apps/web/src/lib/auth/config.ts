@@ -4,6 +4,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization, twoFactor } from "better-auth/plugins";
 import type { Database } from "../../db/client";
 import * as schema from "../../db/schema";
+import { isHttpsUrl, isLoopbackUrl } from "../origin";
 
 const INVITATION_EXPIRY_SECONDS = 30 * 60;
 
@@ -20,6 +21,8 @@ export function createAuth({ db, secret, baseURL }: AuthDeps) {
     baseURL,
     database: drizzleAdapter(db, { provider: "pg", schema }),
     advanced: {
+      // Better Auth only sets Secure when baseURL is https; force it for every non-loopback origin.
+      useSecureCookies: isHttpsUrl(baseURL) || !isLoopbackUrl(baseURL),
       // Postgres-generated uuids so Phase 1 RLS policies can compare against current_setting(...)::uuid.
       database: { generateId: "uuid" },
     },

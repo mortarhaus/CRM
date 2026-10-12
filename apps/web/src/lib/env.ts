@@ -1,16 +1,23 @@
 import { z } from "zod";
+import { isHttpsUrl, isLoopbackUrl } from "./origin";
 
 const postgresUrl = z.url().refine((value) => /^postgres(ql)?:\/\//.test(value), {
   error: "must be a postgres:// URL",
 });
 
-const envSchema = z.object({
-  DEPLOYMENT_MODE: z.enum(["saas", "selfhost"]),
-  APP_URL: z.url(),
-  AUTH_SECRET: z.string().min(32, { error: "must be at least 32 characters" }),
-  DATABASE_URL: postgresUrl,
-  DATABASE_MIGRATOR_URL: postgresUrl,
-});
+const envSchema = z
+  .object({
+    NODE_ENV: z.string().optional(),
+    DEPLOYMENT_MODE: z.enum(["saas", "selfhost"]),
+    APP_URL: z.url(),
+    AUTH_SECRET: z.string().min(32, { error: "must be at least 32 characters" }),
+    DATABASE_URL: postgresUrl,
+    DATABASE_MIGRATOR_URL: postgresUrl,
+  })
+  .refine((env) => env.NODE_ENV !== "production" || isHttpsUrl(env.APP_URL) || isLoopbackUrl(env.APP_URL), {
+    path: ["APP_URL"],
+    error: "must be an https:// URL in production (only localhost, 127.0.0.1 and ::1 may use http)",
+  });
 
 export type Env = z.infer<typeof envSchema>;
 
