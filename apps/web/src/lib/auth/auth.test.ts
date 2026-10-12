@@ -1,9 +1,9 @@
 import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDb, type DbHandle } from "../../db/client";
 import { runMigrations } from "../../db/migrate";
-import { account, twoFactor, user } from "../../db/schema";
+import { account, invitation, member, twoFactor, user } from "../../db/schema";
 import { MIGRATIONS_DIR, startPostgres } from "../../test/postgres";
 import { totpFromUri, wrongTotpCode } from "../../test/totp";
 import { createAuth, type Auth } from "./config";
@@ -169,5 +169,78 @@ describe("switching workspace", () => {
       headers: ownerHeaders,
     });
     expect(switched?.id).toBe(workspace.id);
+  });
+});
+
+describe("workspace invitations", () => {
+  const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+  const TOLERANCE_MS = 60 * 1000;
+
+  function expectAboutThirtyMinutesAhead(expiresAt: Date | string): void {
+    const remaining = new Date(expiresAt).getTime() - Date.now();
+    expect(remaining).toBeGreaterThan(THIRTY_MINUTES_MS - TOLERANCE_MS);
+    expect(remaining).toBeLessThanOrEqual(THIRTY_MINUTES_MS);
+  }
+
+  async function setInvitationExpiry(invitationId: string, expiresAt: Date): Promise<void> {
+    await handle.db.update(invitation).set({ expiresAt }).where(eq(invitation.id, invitationId));
+  }
+
+  async function inviteToNewWorkspace() {
+    const ownerHeaders = await signUpAndSignIn(uniqueEmail());
+    const workspace = await auth.api.createOrganization({
+      body: { name: "Inviting Studio", slug: `inviting-studio-${Date.now()}-${emailCounter}` },
+      headers: ownerHeaders,
+    });
+    if (!workspace) throw new Error("workspace not created");
+    const inviteeEmail = uniqueEmail();
+    const invite = await auth.api.createInvitation({
+      body: { email: inviteeEmail, role: "member", organizationId: workspace.id },
+      headers: ownerHeaders,
+    });
+    return { ownerHeaders, workspace, inviteeEmail, invite };
+  }
+
+  it("expires a new invitation 30 minutes after it is created", async () => {
+    const { invite } = await inviteToNewWorkspace();
+    expectAboutThirtyMinutesAhead(invite.expiresAt);
+    const [stored] = await handle.db.select().from(invitation).where(eq(invitation.id, invite.id));
+    if (!stored) throw new Error("invitation not stored");
+    expectAboutThirtyMinutesAhead(stored.expiresAt);
+  });
+
+  it("refuses an expired invitation, and the same invitation is accepted once inside the window", async () => {
+    const { workspace, inviteeEmail, invite } = await inviteToNewWorkspace();
+    const inviteeHeaders = await signUpAndSignIn(inviteeEmail);
+
+    await setInvitationExpiry(invite.id, new Date(Date.now() - 1000));
+    await expect(
+      auth.api.acceptInvitation({ body: { invitationId: invite.id }, headers: inviteeHeaders }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    const invitee = await findUser(inviteeEmail);
+    const membershipAfterExpiry = await handle.db
+      .select()
+      .from(member)
+      .where(and(eq(member.organizationId, workspace.id), eq(member.userId, invitee.id)));
+    expect(membershipAfterExpiry).toHaveLength(0);
+
+    await setInvitationExpiry(invite.id, new Date(Date.now() + 60_000));
+    const accepted = await auth.api.acceptInvitation({ body: { invitationId: invite.id }, headers: inviteeHeaders });
+    expect(accepted?.member.userId).toBe(invitee.id);
+  });
+
+  it("gives a resent invitation a fresh 30-minute expiry", async () => {
+    const { ownerHeaders, workspace, inviteeEmail, invite } = await inviteToNewWorkspace();
+    await setInvitationExpiry(invite.id, new Date(Date.now() + 60_000));
+
+    const resent = await auth.api.createInvitation({
+      body: { email: inviteeEmail, role: "member", organizationId: workspace.id, resend: true },
+      headers: ownerHeaders,
+    });
+    expect(resent.id).toBe(invite.id);
+    expectAboutThirtyMinutesAhead(resent.expiresAt);
+    const [stored] = await handle.db.select().from(invitation).where(eq(invitation.id, invite.id));
+    if (!stored) throw new Error("invitation not stored");
+    expectAboutThirtyMinutesAhead(stored.expiresAt);
   });
 });

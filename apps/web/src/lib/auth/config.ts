@@ -5,6 +5,8 @@ import { organization, twoFactor } from "better-auth/plugins";
 import type { Database } from "../../db/client";
 import * as schema from "../../db/schema";
 
+const INVITATION_EXPIRY_SECONDS = 30 * 60;
+
 export interface AuthDeps {
   db: Database;
   secret: string;
@@ -33,7 +35,7 @@ export function createAuth({ db, secret, baseURL }: AuthDeps) {
         verify: ({ hash, password }) => verifyPassword(hash, password),
       },
     },
-    plugins: [twoFactor({ issuer: "CRM" }), organization()],
+    plugins: [twoFactor({ issuer: "CRM" }), organization({ invitationExpiresIn: INVITATION_EXPIRY_SECONDS })],
   });
 }
 
