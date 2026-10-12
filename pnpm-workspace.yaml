@@ -4,7 +4,11 @@ packages:
 savePrefix: ""
 engineStrict: true
 allowBuilds:
+  # Testcontainers transitive deps (via dockerode); their optional native builds and postinstall are not needed.
+  cpu-features: false
   esbuild: true
+  protobufjs: false
+  ssh2: false
 overrides:
   # GHSA-68fv-2mgg-jv7q (source-map-js < 1.2.2, high); transitive via postcss. See docs/DECISIONS.md.
   source-map-js: 1.2.2
