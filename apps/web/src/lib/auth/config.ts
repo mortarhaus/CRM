@@ -25,6 +25,9 @@ export function createAuth({ db, secret, baseURL }: AuthDeps) {
     logger: { level: "warn" },
     emailAndPassword: {
       enabled: true,
+      // Spec: uniform responses on sign-up. With auto sign-in off, a duplicate email gets the same
+      // synthetic success as a new one, and the user signs in explicitly afterwards.
+      autoSignIn: false,
       password: {
         hash: hashPassword,
         verify: ({ hash, password }) => verifyPassword(hash, password),
