@@ -6,25 +6,41 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "auth:generate": "auth generate --config src/lib/auth/cli-config.ts --output src/db/schema/auth.ts --yes && tsx scripts/apply-timestamptz.ts src/db/schema/auth.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx --env-file=../../.env migrate.ts",
+    "smoke:auth-route": "tsx scripts/smoke-auth-route.ts"
   },
   "dependencies": {
     "@crm/core": "workspace:*",
     "@next/env": "16.3.8",
     "@node-rs/argon2": "2.2.1",
+    "better-auth": "1.7.6",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+    "drizzle-orm": "0.45.3",
     "next": "16.3.8",
+    "postgres": "3.4.9",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "tailwind-merge": "3.7.0"
+    "tailwind-merge": "3.7.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
+    "@testcontainers/postgresql": "12.2.0",
     "@types/node": "24.19.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "auth": "1.7.6",
+    "drizzle-kit": "0.31.11",
+    "otpauth": "9.5.2",
     "tailwindcss": "4.3.3",
-    "typescript": "6.0.3"
+    "testcontainers": "12.2.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.2"
   }
 }

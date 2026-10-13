@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./password": "./src/password/index.ts"
+    "./password": "./src/password/index.ts",
+    "./security": "./src/security/limits.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
