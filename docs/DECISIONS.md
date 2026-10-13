@@ -3,6 +3,15 @@
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
 
+## 2026-10-13 — Agent kit updated from 1.7.1 to 1.7.4
+- **Decision:** Four kit files are replaced with the master kit 1.7.4 copy from `/Users/charlie/Downloads/agents`: `agents/README.md`, `agents/START.md`, `agents/roles/builder.md`, `agents/roles/reviewer.md`. `agents/PROJECT.md` "Kit version used" is now 1.7.4. The other 16 kit files already matched the 1.7.4 sha256 hashes Charlie supplied. What changed: 1.7.2 `setup` applies listed defaults and reports them; 1.7.3 the reviewer may review a `git archive` snapshot when `.git` is read-only; 1.7.4 after `merged` the builder removes that PR's own local branch and `build-` worktree without asking, only when it can prove they are merged and clean.
+- **Why:** Charlie keeps the master kit in `/Users/charlie/Downloads/agents` and said, in his own words: "i did not replace the agents file in this project, what i mean is i have the new folder in the /downloads/agents, you may copy those that have changes".
+- **Alternatives rejected:** copying all 21 files (16 are identical); leaving the project on 1.7.1 (the project would miss the 1.7.4 cleanup and reviewer-sandbox rules).
+- **Scope / affects:** `agents/` only (plus the `PROJECT.md` version line). Builder cleanup rule applies to the PR's own branch and worktree after `merged`; older merged branches and worktrees still need Charlie's OK. No code, no spec change.
+- **Versions:** kit 1.7.4
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-10-13), quoted above.
+
 ## 2026-10-12 — CLAUDE.md brought to spec v4.7 (outside the kit markers); three stale "Bob to rule" lines refreshed
 - **Decision:** Three lines of `CLAUDE.md` are edited: "Source of truth" (spec v4.7, revision 4), the first Status bullet (v4.7 approved 2026-10-11; v4.6 and v4.5 superseded) and the second Status bullet (Phase 0 plan unchanged by v4.6/v4.7; the Phase 1 plan waits for the spec's Current gates (b)). Nothing between `<!-- agent-kit:start -->` and `<!-- agent-kit:end -->` changes. The three 2026-10-03 entries (AUTH-01, REC-01, TEN-02) no longer say "Bob to rule" in "Alternatives rejected".
 - **Why:** `CLAUDE.md` still said v4.5 and would send agents to stale guidance. Bob's PR #20 Round 2 [P3] asked for the three history lines.
