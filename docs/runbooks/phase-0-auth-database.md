@@ -13,8 +13,10 @@ limiter is in memory per process), the five DB roles with RLS, and the `action()
 ## Required environment
 
 All values live in one `.env` at the repo root (git-ignored). Copy `.env.example` and set every value.
-`apps/web/src/lib/env.ts` validates them at first use and fails with the variable names only, never
-the values.
+`apps/web/next.config.ts` loads that file for `pnpm dev`; nothing needs exporting in the shell. A
+variable already set in the shell wins over the file. A change to `.env` needs a dev server restart.
+`apps/web/src/lib/env.ts` validates the values on first use (today: the first request to
+`/api/auth/*`), not at process start, and fails with the variable names only, never the values.
 
 | Variable | Rule |
 |---|---|
@@ -52,16 +54,20 @@ Run from the repo root (Node 24.21.0, pnpm 11.6.0).
 | Start Postgres 17 on `127.0.0.1:5433` | `pnpm stack:up` | Verified |
 | Apply migrations | `pnpm db:migrate` | Verified; prints `{"level":"info","msg":"migrations applied"}` |
 | Check applied migrations | `docker exec crm-dev-postgres-1 psql -U crm -d crm -c 'select id, hash, created_at from drizzle.__drizzle_migrations order by id'` | Verified; one row per file in `apps/web/drizzle/` (today: `0000_auth_baseline.sql`) |
-| Start the app | `pnpm dev` | Verified to fail: the dev server does not see the root `.env` and every request to `/api/auth/*` returns 500 with "Invalid environment configuration". Workaround, verified: `set -a; . ./.env; set +a; pnpm dev` |
-| Auth route answers | `curl -s http://localhost:3000/api/auth/ok` | Verified with the workaround; returns `{"ok":true}` |
+| Start the app | `pnpm dev` | Verified; reads the root `.env`, no exported variables needed |
+| Auth route answers | `curl -s http://localhost:3000/api/auth/ok` | Verified; returns `{"ok":true}` |
+| Smoke check: start with only the root `.env` | `pnpm smoke:auth-route` | Verified; prints `PASS: GET /api/auth/ok -> 200 {"ok":true} ...`. It starts `pnpm dev` on a free port with `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `DATABASE_MIGRATOR_URL`, `DEPLOYMENT_MODE` and `NODE_ENV` removed from its environment, then stops it. Not in CI yet (plan Task 17) |
 | Stop Postgres | `pnpm stack:down` | Not run |
 
 Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are skipped.
 
 ## Safe public-origin settings
 
-- Production `APP_URL` must be the public `https://` origin. The app refuses to start otherwise
-  (`APP_URL: must be an https:// URL in production ...`).
+- Production `APP_URL` must be the public `https://` origin. Otherwise the process still starts,
+  but the first request to `/api/auth/*` fails with 500 and the log line
+  `APP_URL: must be an https:// URL in production ...`; no auth request succeeds. (First-use
+  failure verified under `pnpm dev` with an invalid `AUTH_SECRET`; the production `APP_URL` case
+  uses the same check and was not run.)
 - Auth cookies are always `HttpOnly` and `SameSite=Lax`. They are `Secure` (with the `__Secure-`
   prefix) for every non-loopback origin; only loopback `http://` dev gets non-Secure cookies.
 - Terminate TLS in front of the app. Do not serve a public host over plain HTTP.
@@ -77,7 +83,7 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 
 | Symptom | Meaning | Action |
 |---|---|---|
-| `Invalid environment configuration:` then lines like `DATABASE_MIGRATOR_URL: must be a postgres:// URL` | A variable is missing or invalid; only its name is printed | Fix that variable in `.env` (compare with `.env.example`) and rerun |
+| `Invalid environment configuration:` then lines like `DATABASE_MIGRATOR_URL: must be a postgres:// URL` | A variable is missing or invalid; only its name is printed. Under `pnpm dev` it shows on the first `/api/auth/*` request, which returns 500 | Fix that variable in `.env` (compare with `.env.example`), check it is not overridden by an exported shell variable, and restart |
 | `connect ECONNREFUSED 127.0.0.1:5433` | Postgres is not running or the port is wrong | `pnpm stack:up`, then rerun |
 | `password authentication failed for user "crm"` | Wrong credentials in the URL | Fix the URL in `.env` |
 | `pnpm db:migrate` hangs with no output | Another runner holds the migration lock; this one waits without a timeout | Find the holder: `docker exec crm-dev-postgres-1 psql -U crm -d crm -c "select l.pid, l.granted, a.state, a.query_start from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory'"` (verified). Wait for it to finish. If the holder is a dead session, end it with `select pg_terminate_backend(<pid>)` (unverified) and rerun |
