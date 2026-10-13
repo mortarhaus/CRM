@@ -75,8 +75,8 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 ## Expiry of reset and invitation links
 
 - Workspace invitations expire 30 minutes after they are created or resent (spec "Authentication and
-  sessions"). The value is `INVITATION_EXPIRY_SECONDS` in `packages/core/src/security/limits.ts`, the proposed
-  place for fixed security values (DECISIONS 2026-10-13, awaiting Charlie); changing it needs a reviewed PR.
+  sessions"). The value is `INVITATION_EXPIRY_SECONDS` in `packages/core/src/security/limits.ts`, the one
+  place for fixed security values (DECISIONS 2026-10-13); changing it needs a reviewed PR.
 - Password reset is not enabled in Phase 0. When it is, set `emailAndPassword.resetPasswordTokenExpiresIn`
   to the spec's 30 minutes (in seconds); the better-auth 1.7.6 default is 1 hour.
 
