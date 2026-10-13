@@ -1,0 +1,8 @@
+pr: 22
+reviewed_head_sha: 01196a43bafe971b375746505d3d18a7e3d50038
+review_file: reviews/PR-22.md
+review_file_hash: 90c6b9a5c502411362943e2f8b3cc89bad745709
+log_branch_commit_with_review: 27298399eb97a4aac0f6dece5b5a3bb3d47e2e7e
+verdict: Approved with conditions (Round 5)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-13T12:13:20Z
