@@ -1,0 +1,1 @@
+export const INVITATION_EXPIRY_SECONDS = 30 * 60;

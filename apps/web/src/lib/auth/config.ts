@@ -1,12 +1,11 @@
 import { hashPassword, verifyPassword } from "@crm/core/password";
+import { INVITATION_EXPIRY_SECONDS } from "@crm/core/security";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization, twoFactor } from "better-auth/plugins";
 import type { Database } from "../../db/client";
 import * as schema from "../../db/schema";
 import { isHttpsUrl, isLoopbackUrl } from "../origin";
-
-const INVITATION_EXPIRY_SECONDS = 30 * 60;
 
 export interface AuthDeps {
   db: Database;

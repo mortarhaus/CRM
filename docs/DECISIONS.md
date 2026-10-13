@@ -3,6 +3,15 @@
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
 
+## 2026-10-13 — Fixed security values live in `packages/core/src/security/limits.ts` (UNI-02; Bob PR #22 R2 P1)
+- **Decision:** The spec's fixed security values live in one code file, `packages/core/src/security/limits.ts`. The invitation expiry (`INVITATION_EXPIRY_SECONDS`, 30 minutes) is the first value and `apps/web/src/lib/auth/config.ts` reads it from `@crm/core/security`. The other values (link 30 d, OTP 10 min / 5, step-up 5 min, reset 30 min, sweep 24 h, export 7 d, bank notice 60 d) are added when their feature lands, each with its spec citation. Changing a value needs a reviewed PR and a DECISIONS entry. The 30 minutes did not change. `agents/PROJECT.md` §9 records the location; country defaults (tax, numbering, timezone) stay open.
+- **Why:** Bob PR #22 Round 2 [P1]: UNI-02 says expiry windows live in the config location named in `PROJECT.md`, and none was named for fixed security values. These are fixed by the spec, not per-workspace business settings.
+- **Alternatives rejected:** a settings table with an audit log (more work, and Phase 0 has neither a settings table nor an audit log; the values are fixed by the spec); adding every value now (dead code, UNI-05).
+- **Scope / affects:** `packages/core` (new `./security` export), `apps/web/src/lib/auth/config.ts`, `agents/PROJECT.md` §9, the runbook's expiry section.
+- **Versions:** none.
+- **Exception to a rule?** no.
+- **Decided by:** owner (Charlie, 2026-10-13, answering the builder's multiple-choice question: "Choose Option 1: one code file. Put the fixed security values in `packages/core/src/security/limits.ts`, and have invitation expiry read from it. Keep the approved 30 minutes. Record the location in `PROJECT.md` §9; require a reviewed PR and `DECISIONS.md` entry for any value change.").
+
 ## 2026-10-12 — Phase 0 PR 2 (Tasks 6-10): env, Postgres client, Better Auth, auth schema, auth tests
 - **Decision:** Added, at the plan's exact pins: runtime zod 4.6.5, drizzle-orm 0.45.3, postgres 3.4.9, better-auth 1.7.6; dev vitest 5.0.2, testcontainers 12.2.0, @testcontainers/postgresql 12.2.0, auth 1.7.6, drizzle-kit 0.31.11, tsx 4.23.15, otpauth 9.5.2. `pnpm-workspace.yaml` `allowBuilds` denies `cpu-features`, `protobufjs` and `ssh2` (Testcontainers chain via dockerode; their optional native builds and postinstall are not needed). Max password length stays at Better Auth 1.7.6's built-in default of 128 characters (applied before any hash or verify on sign-up, sign-in and password change); it is not pinned in our config. Generated auth schema: ids are Postgres `uuid`, all timestamps `timestamptz`; `session.active_organization_id` is `text`, not `uuid`; `two_factor.verified` defaults to `true` in the DDL, Better Auth writes `false` at enrolment and a test pins that.
 - **Why:** pnpm 11 refuses unapproved build scripts, so each one needs an explicit allow or deny. A fixed 128 limit stops long-input hashing abuse. The `text` and DDL-default notes are Phase 1 inputs (RLS comparisons use `::uuid`).
