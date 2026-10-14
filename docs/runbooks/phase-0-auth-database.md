@@ -130,7 +130,10 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   scan (WCAG 2.0-2.2 A and AA tags, including `color-contrast`) of each auth, 2FA and workspace state in light and dark,
   checks for horizontal overflow, and walks the sign-up, 2FA enrolment, workspace switch and sign-out paths by keyboard.
   If port 3000 is taken, start `APP_URL=http://localhost:<port> pnpm --filter @crm/web exec next dev -p <port>` and run
-  the tests with `E2E_BASE_URL=http://localhost:<port>`. Verified 2026-10-14 (that way, port 3100): 45 passed. It is not in CI yet (plan Task 17).
+  the tests with `E2E_BASE_URL=http://localhost:<port>`. Verified 2026-10-14 with `pnpm test:e2e` on port 3000: 63 passed
+  (21 tests at three widths). Also verified 2026-10-14 against `next start` of the CI-style build (port 3320,
+  `E2E_RATE_LIMITED=1`): the six no-JavaScript tests pass, and a fourth wrong sign-in within 10 seconds shows
+  "Too many attempts" with JavaScript off and on. It is not in CI yet (plan Task 17).
 
 ## Safe public-origin settings
 
