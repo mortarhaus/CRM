@@ -1,3 +1,4 @@
+import { normalizePassword } from "@crm/core/password";
 import {
   characterCount,
   NAME_MAX_LENGTH,
@@ -17,6 +18,8 @@ const NEW_PASSWORD_FIELD: Record<string, string> = {
   "/reset-password": "newPassword",
 };
 const USER_NAME_PATHS = new Set(["/sign-up/email", "/update-user"]);
+// Every body field that carries a password, new or to verify, on any endpoint.
+const PASSWORD_FIELDS = ["password", "newPassword", "currentPassword"];
 
 type Body = Record<string, unknown>;
 
@@ -30,7 +33,7 @@ function refuse(code: LimitErrorCode): never {
 
 function checkPassword(value: unknown): void {
   if (typeof value !== "string") return;
-  const length = characterCount(value);
+  const length = characterCount(normalizePassword(value));
   if (length < PASSWORD_MIN_LENGTH) refuse("PASSWORD_TOO_SHORT");
   if (length > PASSWORD_MAX_LENGTH) refuse("PASSWORD_TOO_LONG");
 }
@@ -41,7 +44,8 @@ function checkMax(value: unknown, max: number, code: LimitErrorCode): void {
 
 // Runs before every endpoint, for `auth.api` calls and HTTP requests alike, and before Better Auth
 // looks the email up, so a refusal reads the same for a new and an existing account (AUTH-05).
-// Better Auth's own length checks count UTF-16 units; this one counts characters (code points).
+// Better Auth's own length checks count UTF-16 units; this one counts characters (code points) of the
+// NFC form, the form that is hashed. Passing the NFC form on keeps Better Auth's checks on that form too.
 export const enforceInputLimits = createAuthMiddleware(async (ctx) => {
   const body = asBody(ctx.body);
   if (!body) return;
@@ -52,4 +56,10 @@ export const enforceInputLimits = createAuthMiddleware(async (ctx) => {
   if (ctx.path === "/organization/update") {
     checkMax(asBody(body.data)?.name, WORKSPACE_NAME_MAX_LENGTH, "WORKSPACE_NAME_TOO_LONG");
   }
+  const normalized: Body = {};
+  for (const field of PASSWORD_FIELDS) {
+    const value = body[field];
+    if (typeof value === "string") normalized[field] = normalizePassword(value);
+  }
+  if (Object.keys(normalized).length > 0) return { context: { body: { ...body, ...normalized } } };
 });

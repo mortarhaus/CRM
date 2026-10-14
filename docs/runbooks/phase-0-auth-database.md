@@ -97,6 +97,13 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   once). Better Auth's own check counts UTF-16 units, so its maximum is set to 256 units to keep it from
   refusing a 128-character password; the hook is the real limit. The minimum applies when a password is
   set, not at sign-in, so an older dev account with a shorter password can still sign in.
+- Unicode (owner decision 2026-10-14): passwords are normalized to NFC before they are counted, hashed
+  and verified (`normalizePassword` in `packages/core/src/password/index.ts`, used by `hashPassword` and
+  `verifyPassword`, so any later password change or reset path gets it too). A password typed with a
+  decomposed accent ("e" + U+0301) matches the same password typed with a composed one ("é"). NFC does
+  not fold compatibility look-alikes: a full-width "Ａ" or the "ﬁ" ligature stays a different password.
+  Hashes stored before this change were made from the raw string; an older dev account whose password
+  had a decomposed character must set it again (no such production data exists).
 - End-to-end tests: `pnpm test:e2e` (Playwright 1.63.0, Chrome for Testing 153.0.8010.12). It starts its own dev server
   and needs the dev Postgres from `pnpm stack:up` and a root `.env`. Every spec runs at three widths (Playwright projects
   `chromium` 1280x720, `tablet-768` 768x1024, `mobile-320` 320x640). `e2e/accessibility.spec.ts` runs an axe-core 4.13.0

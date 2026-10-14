@@ -205,6 +205,26 @@ describe("input limits enforced on the server (owner decision 2026-10-14)", () =
     });
   });
 
+  it.each([
+    [PASSWORD_MIN_LENGTH - 1, 400, "PASSWORD_TOO_SHORT"],
+    [PASSWORD_MAX_LENGTH, 200, undefined],
+  ])("counts after NFC: a decomposed password of %i composed characters answers %i", async (length, status, code) => {
+    // "e" + combining acute: two code points that NFC composes into one "é".
+    const password = "é".repeat(length);
+    for (const signUp of Object.values(signUpPaths)) {
+      expect(await signUp(signUpBody({ password }))).toEqual({ status, code });
+    }
+  });
+
+  it("hands Better Auth the NFC password, so its UTF-16 maximum does not refuse a valid decomposed one", async () => {
+    // 128 Hangul syllables as conjoining jamo: 384 UTF-16 units before NFC, 128 after.
+    const password = "한".normalize("NFD").repeat(PASSWORD_MAX_LENGTH);
+    expect(password.length).toBe(PASSWORD_MAX_LENGTH * 3);
+    for (const signUp of Object.values(signUpPaths)) {
+      expect(await signUp(signUpBody({ password }))).toEqual({ status: 200 });
+    }
+  });
+
   it("refuses a name over the limit when a signed-in user renames themselves", async () => {
     const headers = await signUpAndSignIn(uniqueEmail());
     expect(await viaHttp("/update-user", { name: "n".repeat(NAME_MAX_LENGTH + 1) }, headers)).toEqual({
@@ -249,6 +269,25 @@ describe("input limits enforced on the server (owner decision 2026-10-14)", () =
       });
       expect(await rename("w".repeat(WORKSPACE_NAME_MAX_LENGTH))).toEqual({ status: 200 });
     });
+  });
+});
+
+describe("Unicode passwords (NFC, owner decision 2026-10-14)", () => {
+  const COMPOSED = "café crème brûlée";
+  const DECOMPOSED = COMPOSED.normalize("NFD");
+
+  it("lets a user who signed up with decomposed accents sign in with composed ones, and back", async () => {
+    expect(DECOMPOSED).not.toBe(COMPOSED);
+    for (const [signUpWith, signInWith] of [
+      [DECOMPOSED, COMPOSED],
+      [COMPOSED, DECOMPOSED],
+    ] as const) {
+      const email = uniqueEmail();
+      expect(await viaHttp("/sign-up/email", { name: "Unicode User", email, password: signUpWith })).toEqual({
+        status: 200,
+      });
+      expect(await viaHttp("/sign-in/email", { email, password: signInWith })).toEqual({ status: 200 });
+    }
   });
 });
 
