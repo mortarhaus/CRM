@@ -1,6 +1,5 @@
 "use client";
 
-import { WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +20,6 @@ export function CreateWorkspaceForm() {
           type="text"
           autoComplete="organization"
           required
-          maxLength={WORKSPACE_NAME_MAX_LENGTH}
           defaultValue={state.fields.name}
           aria-invalid={state.error ? true : undefined}
           aria-describedby={state.error ? "create-workspace-error" : undefined}

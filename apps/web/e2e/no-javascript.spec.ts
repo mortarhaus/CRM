@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { PASSWORD_MIN_LENGTH, WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
+import { NAME_MAX_LENGTH, PASSWORD_MIN_LENGTH, WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
 import { expect, test, type APIResponse, type Locator, type Page } from "@playwright/test";
 import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { tabTo } from "./a11y";
@@ -305,6 +305,11 @@ test("the workspace switcher works without JavaScript and the server refuses a f
   await page.reload();
   await expect(page.getByRole("listitem").filter({ hasText: "Beta Studio" })).toContainText("(active)");
 
+  // A nonblank id that is not a uuid never reaches Better Auth's uuid lookup.
+  const malformed = await postForm(page, formWithButton(page, "Switch"), { organizationId: "not-a-uuid" });
+  expect(malformed.status()).toBe(200);
+  expect(await malformed.text()).toContain("Couldn&#x27;t switch workspace. Try again.");
+
   // A workspace the user does not belong to is refused, and Better Auth then clears the active
   // workspace (organization plugin 1.7.6); the page shows what the server has.
   await switcher.locator("option", { hasText: "Alpha Studio" }).evaluate((option: HTMLOptionElement, id) => {
@@ -342,4 +347,38 @@ test("sign-out works without JavaScript and ends the server session", async ({ p
 
   await page.goto("/workspaces");
   await expect(page).toHaveURL(/\/sign-in$/);
+});
+
+// UNI-02: the server counts characters (code points); an emoji is two UTF-16 units, so a native
+// maxlength would have cut these names at half the limit.
+test("names of emoji at the limit arrive whole and one over is refused visibly, without JavaScript", async ({
+  page,
+}) => {
+  const email = uniqueEmail();
+  const userName = "😀".repeat(NAME_MAX_LENGTH);
+  await signUp(page, email, PASSWORD, userName);
+
+  const tooLongName = "😀".repeat(NAME_MAX_LENGTH + 1);
+  await page.goto("/sign-up");
+  await page.getByLabel("Name", { exact: true }).fill(tooLongName);
+  await page.getByLabel("Email", { exact: true }).fill(uniqueEmail());
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(`Use at most ${NAME_MAX_LENGTH} characters for your name.`);
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue(tooLongName);
+
+  await signIn(page, email);
+  await expect(page).toHaveURL(/\/workspaces$/);
+  const workspaces = page.getByRole("list", { name: "Your workspaces" });
+  const workspaceName = "😀".repeat(WORKSPACE_NAME_MAX_LENGTH);
+  await createWorkspace(page, workspaceName);
+  await expect(workspaces).toContainText(workspaceName);
+
+  const tooLongWorkspace = "😀".repeat(WORKSPACE_NAME_MAX_LENGTH + 1);
+  await createWorkspace(page, tooLongWorkspace);
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+    `Use at most ${WORKSPACE_NAME_MAX_LENGTH} characters for the workspace name.`,
+  );
+  await expect(page.getByLabel("Workspace name")).toHaveValue(tooLongWorkspace);
+  await expect(workspaces.getByRole("listitem")).toHaveCount(1);
 });

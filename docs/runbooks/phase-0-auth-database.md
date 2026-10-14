@@ -126,8 +126,8 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
     right code reloads `/settings/security` with the new session cookie. There is no "turn off 2FA" control
     yet, so none was converted.
   - Workspace switcher: a native `<select>` and a visible "Switch" button. With JavaScript a change submits at
-    once; the select keeps focus and nothing is disabled while it switches (A11Y-01). A blank id is refused
-    before Better Auth is asked. Better Auth 1.7.6 refuses a workspace the user is not a member of and then
+    once; the select keeps focus and nothing is disabled while it switches (A11Y-01). A blank id or an id that is not a
+    uuid is refused before Better Auth is asked (a malformed id would otherwise reach its uuid lookup and give a 500). Better Auth 1.7.6 refuses a workspace the user is not a member of and then
     clears the session's active workspace; the page refreshes and shows "Choose a workspace".
   - Sign-out: posts to the server, which goes to `/sign-in` only after Better Auth confirms the sign-out.
   Next encrypts server action ids per build; a deployment with several app instances needs the same
@@ -149,8 +149,8 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   scan (WCAG 2.0-2.2 A and AA tags, including `color-contrast`) of each auth, 2FA and workspace state in light and dark,
   checks for horizontal overflow, and walks the sign-up, 2FA enrolment, workspace switch and sign-out paths by keyboard.
   If port 3000 is taken, start `APP_URL=http://localhost:<port> pnpm --filter @crm/web exec next dev -p <port>` and run
-  the tests with `E2E_BASE_URL=http://localhost:<port>`. Verified 2026-10-14 with `pnpm test:e2e` against `next dev` on
-  port 3317: 75 passed (25 tests at three widths). The sign-out failure tests make the server action post itself fail
+  the tests with `E2E_BASE_URL=http://localhost:<port>`. Verified 2026-10-14 (Round 2 fixes) with `pnpm test:e2e` against `next dev` on
+  port 3317: 81 passed (27 tests at three widths). The sign-out failure tests make the server action post itself fail
   (network error, HTTP 500); a refusal from Better Auth is covered by the unit tests in `src/app/form-actions.test.ts`. Also verified 2026-10-14 against `next start` of the CI-style build (port 3320,
   `E2E_RATE_LIMITED=1`): the six no-JavaScript form tests then in the spec pass, and a fourth wrong sign-in within 10 seconds shows
   "Too many attempts" with JavaScript off and on. Verified again 2026-10-14 against `next start` of a build made with
@@ -187,3 +187,5 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 | A migration fails with a SQL error | Drizzle runs all pending files in one transaction (verified in drizzle-orm 0.45.3 source), so nothing from the run is applied and no row is added to `drizzle.__drizzle_migrations` | Fix the migration in a new PR, then rerun. Never edit an applied migration file |
 
 A failed `pnpm db:migrate` exits non-zero.
+
+The name fields (sign-up name, workspace name) have no native `maxlength`: it counts UTF-16 units while the server counts characters (code points), so it would cut valid names. The server refuses an over-limit name with a message; `e2e/name-limits.spec.ts` (JavaScript on) and a test in `e2e/no-javascript.spec.ts` check names of emoji at the limit and one over.

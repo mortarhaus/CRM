@@ -7,11 +7,14 @@ import { SIGN_OUT_FAILED, TOO_MANY_ATTEMPTS, WORKSPACE_SWITCH_FAILED } from "@/l
 import { getCurrentSession } from "@/lib/auth/session";
 import { EMPTY_FORM_STATE, textField, type FormState } from "@/lib/forms";
 
+// Workspace ids are database uuids; Better Auth passes the value straight to a uuid column.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function setActiveWorkspaceAction(_previous: FormState, form: FormData): Promise<FormState> {
   // The layout's guard is not a boundary for a posted action (AUTH-02).
   if (!(await getCurrentSession())) redirect("/sign-in");
   const organizationId = textField(form, "organizationId");
-  if (!organizationId.trim()) return { ...EMPTY_FORM_STATE, error: WORKSPACE_SWITCH_FAILED };
+  if (!UUID.test(organizationId)) return { ...EMPTY_FORM_STATE, error: WORKSPACE_SWITCH_FAILED };
 
   const result = await postToAuth("/organization/set-active", { organizationId });
   // Better Auth refuses a workspace the user is not a member of, and then clears the active workspace

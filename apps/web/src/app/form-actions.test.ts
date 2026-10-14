@@ -29,6 +29,8 @@ const { createWorkspaceAction } = await import("./(app)/workspaces/actions");
 const { setActiveWorkspaceAction, signOutAction } = await import("./(app)/actions");
 const { startTwoFactorAction, confirmTwoFactorAction } = await import("./(app)/settings/security/actions");
 
+const WORKSPACE_ID = "0c3f6f6e-3b59-4f0e-8a2d-6f1b7a9c4d10";
+
 function answer(status: number, data: unknown = null): AuthResult {
   const code = typeof data === "object" && data !== null && "code" in data ? String(data.code) : undefined;
   return { ok: status >= 200 && status < 300, status, code, data };
@@ -188,7 +190,7 @@ describe("createWorkspaceAction", () => {
 describe("setActiveWorkspaceAction", () => {
   it("sends a visitor without a session to sign in and switches nothing", async () => {
     vi.mocked(getCurrentSession).mockResolvedValue(null);
-    await expect(setActiveWorkspaceAction(EMPTY_FORM_STATE, formData({ organizationId: "w1" }))).rejects.toEqual(
+    await expect(setActiveWorkspaceAction(EMPTY_FORM_STATE, formData({ organizationId: WORKSPACE_ID }))).rejects.toEqual(
       new Redirect("/sign-in"),
     );
     expect(postToAuth).not.toHaveBeenCalled();
@@ -197,8 +199,16 @@ describe("setActiveWorkspaceAction", () => {
   describe("with a session", () => {
     beforeEach(withSession);
 
-    it.each<Record<string, string>>([{}, { organizationId: "" }, { organizationId: "   " }])(
-      "refuses a missing or blank workspace without calling Better Auth (%#)",
+    it.each<Record<string, string>>([
+      {},
+      { organizationId: "" },
+      { organizationId: "   " },
+      { organizationId: "not-a-uuid" },
+      { organizationId: `${WORKSPACE_ID} ` },
+      { organizationId: `${WORKSPACE_ID}0` },
+      { organizationId: "{" + WORKSPACE_ID + "}" },
+    ])(
+      "refuses a missing, blank or malformed workspace id without calling Better Auth (%#)",
       async (fields) => {
         await expect(setActiveWorkspaceAction(EMPTY_FORM_STATE, formData(fields))).resolves.toEqual({
           error: "Couldn't switch workspace. Try again.",
@@ -211,10 +221,10 @@ describe("setActiveWorkspaceAction", () => {
 
     it("switches the workspace and refreshes the page", async () => {
       vi.mocked(postToAuth).mockResolvedValue(answer(200, { id: "w1" }));
-      await expect(setActiveWorkspaceAction(EMPTY_FORM_STATE, formData({ organizationId: "w1" }))).resolves.toEqual(
+      await expect(setActiveWorkspaceAction(EMPTY_FORM_STATE, formData({ organizationId: WORKSPACE_ID }))).resolves.toEqual(
         EMPTY_FORM_STATE,
       );
-      expect(postToAuth).toHaveBeenCalledWith("/organization/set-active", { organizationId: "w1" });
+      expect(postToAuth).toHaveBeenCalledWith("/organization/set-active", { organizationId: WORKSPACE_ID });
       expect(refresh).toHaveBeenCalledOnce();
     });
 
@@ -225,7 +235,7 @@ describe("setActiveWorkspaceAction", () => {
     ])("shows the refusal and refreshes, as Better Auth may have cleared the workspace (%#)", async (result, error) => {
       vi.mocked(postToAuth).mockResolvedValue(result);
       await expect(
-        setActiveWorkspaceAction(EMPTY_FORM_STATE, formData({ organizationId: "someone-elses" })),
+        setActiveWorkspaceAction(EMPTY_FORM_STATE, formData({ organizationId: "5f0c1a52-6c1e-4b8e-9a52-0d0f2f4b7a11" })),
       ).resolves.toEqual({ error, fields: {} });
       expect(refresh).toHaveBeenCalledOnce();
     });
