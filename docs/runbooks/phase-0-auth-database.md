@@ -87,7 +87,12 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 - Switching to a workspace the user is not a member of is refused with `403`; the session keeps its
   previous active workspace.
 - End-to-end tests: `pnpm test:e2e` (Playwright 1.63.0, Chrome for Testing 153.0.8010.12). It starts its own dev server
-  and needs the dev Postgres from `pnpm stack:up` and a root `.env`. Verified 2026-10-14: 6 passed. It is not in CI yet (plan Task 17).
+  and needs the dev Postgres from `pnpm stack:up` and a root `.env`. Every spec runs at three widths (Playwright projects
+  `chromium` 1280x720, `tablet-768` 768x1024, `mobile-320` 320x640). `e2e/accessibility.spec.ts` runs an axe-core 4.13.0
+  scan (WCAG 2.0-2.2 A and AA tags, including `color-contrast`) of each auth, 2FA and workspace state in light and dark,
+  checks for horizontal overflow, and walks the sign-up, 2FA enrolment, workspace switch and sign-out paths by keyboard.
+  If port 3000 is taken, start `APP_URL=http://localhost:<port> pnpm --filter @crm/web exec next dev -p <port>` and run
+  the tests with `E2E_BASE_URL=http://localhost:<port>`. Verified 2026-10-14 (that way, port 3100): 45 passed. It is not in CI yet (plan Task 17).
 
 ## Safe public-origin settings
 

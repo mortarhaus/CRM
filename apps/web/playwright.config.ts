@@ -13,7 +13,12 @@ export default defineConfig({
     baseURL: externalBaseURL ?? "http://localhost:3000",
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // FE-70: every spec runs at a mobile, an intermediate and a desktop width.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "tablet-768", use: { ...devices["Desktop Chrome"], viewport: { width: 768, height: 1024 } } },
+    { name: "mobile-320", use: { ...devices["Desktop Chrome"], viewport: { width: 320, height: 640 } } },
+  ],
   webServer: externalBaseURL
     ? undefined
     : {
