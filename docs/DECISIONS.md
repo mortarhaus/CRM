@@ -2,6 +2,15 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-10-14 — The three remaining FE-32 controls ship in PR #26 (Bob PR #26 R1 P1)
+- **Decision:** The 2FA enrolment forms on `/settings/security`, the workspace switcher and sign-out get server submit paths and work without JavaScript (FE-31, FE-32). They ship in PR #26, not in a follow-up.
+- **Why:** Bob PR #26 Round 1 P1 (FE-31/32). Decision (3) of the entry below chose option A (forms work without JavaScript); these three controls were the part still open.
+- **Alternatives rejected:** a follow-up PR after #26 merges (leaves FE-32 unmet on main in the meantime).
+- **Scope / affects:** `apps/web/src/app/(app)/settings/security/`, `workspace-switcher.tsx`, `sign-out-button.tsx`, their server actions, JavaScript-disabled E2E tests, the runbook. The sign-out retry message (AUTH-13) stays.
+- **Versions:** none new.
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-10-14, in his own words in the Andy session; Bob cannot see it). The builder asked in plain text: "Do the three remaining FE-32 controls in PR #26, or in a follow-up?" A pasted advice text (Bob's) arrived first and the builder labelled it advice, not a decision. Charlie then answered: "all three yes".
+- **Still open:** whether to remove the HTML `maxLength` from the sign-up password field. Charlie's answer did not cover it; the builder asks again and records the answer when it comes.
 
 ## 2026-10-14 — Password rules, shared limits, forms that work without JavaScript, Unicode normalization (Bob PR #26 R1 P1, P2)
 - **Decision:** (1) Password minimum is **15** characters and maximum **128**. No composition rules. (2) The limits live in `packages/core/src/security/limits.ts` (the home chosen on 2026-10-13): password minimum 15, password maximum 128, name maximum 100, workspace name maximum 80. The server enforces them and the forms use the same constants. (3) Forms **work without JavaScript (option A)**: sign-up, sign-in, the 2FA code step and workspace creation get server submit paths; JavaScript only improves them (FE-31, FE-32). (4) Passwords are normalized to **Unicode NFC** before hashing and before verifying, at sign-up and sign-in now and at any password change or reset that ships later.
