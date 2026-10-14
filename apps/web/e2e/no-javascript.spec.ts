@@ -201,3 +201,19 @@ test("workspace creation works without JavaScript and the server refuses what th
   await expect(workspaces).not.toContainText(tooLong);
   await expect(workspaces).not.toContainText("Anonymous Studio");
 });
+
+test("the 2FA enrolment form, which still needs JavaScript, never puts the password in a URL", async ({ page }) => {
+  const email = uniqueEmail();
+  await signUp(page, email);
+  await signIn(page, email);
+  await expect(page).toHaveURL(/\/workspaces$/);
+  const requestedUrls: string[] = [];
+  page.on("request", (request) => requestedUrls.push(request.url()));
+
+  await page.goto("/settings/security");
+  await page.getByLabel("Current password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
+
+  await expect(page).toHaveURL(/\/settings\/security$/);
+  expect(requestedUrls.filter((url) => url.includes("password="))).toEqual([]);
+});

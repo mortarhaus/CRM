@@ -74,7 +74,9 @@ export function TwoFactorSetup({ initiallyEnabled }: { initiallyEnabled: boolean
 
   if (!enrolment) {
     return (
-      <form onSubmit={startEnrolment} className="flex flex-col gap-4">
+      // Enrolment still needs JavaScript (FE-32 follow-up). POST keeps a no-script submit from putting the
+      // password in the URL, browser history and request logs; the page just renders again.
+      <form method="post" onSubmit={startEnrolment} className="flex flex-col gap-4">
         <p className="text-sm text-muted-foreground">
           Protect your account with a code from an authenticator app. Confirm your password to start.
         </p>
@@ -136,7 +138,7 @@ export function TwoFactorSetup({ initiallyEnabled }: { initiallyEnabled: boolean
           ))}
         </ol>
       </div>
-      <form onSubmit={confirmEnrolment} className="flex flex-col gap-4">
+      <form method="post" onSubmit={confirmEnrolment} className="flex flex-col gap-4">
         <h3 className="font-medium">3. Enter the 6-digit code from the app</h3>
         <div className="flex flex-col gap-2">
           <Label htmlFor="totp-code">Authentication code</Label>
