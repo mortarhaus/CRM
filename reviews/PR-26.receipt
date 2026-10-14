@@ -1,0 +1,8 @@
+pr: 26
+reviewed_head_sha: 3cdede217e78943df64bc930a057bde0824b218a
+review_file: reviews/PR-26.md
+review_file_hash: 0f426a6bab7b29dce39658b8a5f0c2a184bd2a4b
+log_branch_commit_with_review: 16a8b89589eee31130dce39ad026486048c9e52f
+verdict: Approved with conditions (Round 3)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-14T15:06:15Z
