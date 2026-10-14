@@ -116,6 +116,8 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   the session itself before calling Better Auth (AUTH-02). If the server cannot be reached while JavaScript
   is on, `apps/web/src/app/error.tsx` shows "Something went wrong" with a "Try again" button. Still needing
   JavaScript (follow-up): the 2FA enrolment on `/settings/security`, the workspace switcher and sign-out.
+  The enrolment forms use `method="post"`, so without JavaScript a submit only renders the page again and
+  never puts the password or code in a URL.
   Next encrypts server action ids per build; a deployment with several app instances needs the same
   `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` on all of them (not needed for one instance; not set today).
 - Testing with JavaScript off: `e2e/no-javascript.spec.ts` runs with `javaScriptEnabled: false` and covers
@@ -130,9 +132,9 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   scan (WCAG 2.0-2.2 A and AA tags, including `color-contrast`) of each auth, 2FA and workspace state in light and dark,
   checks for horizontal overflow, and walks the sign-up, 2FA enrolment, workspace switch and sign-out paths by keyboard.
   If port 3000 is taken, start `APP_URL=http://localhost:<port> pnpm --filter @crm/web exec next dev -p <port>` and run
-  the tests with `E2E_BASE_URL=http://localhost:<port>`. Verified 2026-10-14 with `pnpm test:e2e` on port 3000: 63 passed
-  (21 tests at three widths). Also verified 2026-10-14 against `next start` of the CI-style build (port 3320,
-  `E2E_RATE_LIMITED=1`): the six no-JavaScript tests pass, and a fourth wrong sign-in within 10 seconds shows
+  the tests with `E2E_BASE_URL=http://localhost:<port>`. Verified 2026-10-14 with `pnpm test:e2e` on port 3000: 66 passed
+  (22 tests at three widths). Also verified 2026-10-14 against `next start` of the CI-style build (port 3320,
+  `E2E_RATE_LIMITED=1`): the six no-JavaScript form tests then in the spec pass, and a fourth wrong sign-in within 10 seconds shows
   "Too many attempts" with JavaScript off and on. It is not in CI yet (plan Task 17).
 
 ## Safe public-origin settings
