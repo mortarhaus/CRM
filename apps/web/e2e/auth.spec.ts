@@ -10,6 +10,21 @@ test("a signed-out visitor is sent to sign in", async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in$/);
 });
 
+test("the root page sends signed-out visitors to sign in and signed-in visitors to their workspaces", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/sign-in$/);
+
+  const email = uniqueEmail();
+  await signUp(page, email);
+  await signIn(page, email);
+  await expect(page).toHaveURL(/\/workspaces$/);
+
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/workspaces$/);
+});
+
 test("a new user can sign up and then sign in", async ({ page }) => {
   const email = uniqueEmail();
   await signUp(page, email);

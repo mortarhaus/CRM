@@ -17,7 +17,16 @@ All values live in one `.env` at the repo root (git-ignored). Copy `.env.example
 `apps/web/next.config.ts` loads that file for `pnpm dev`; nothing needs exporting in the shell. A
 variable already set in the shell wins over the file. A change to `.env` needs a dev server restart.
 `apps/web/src/lib/env.ts` validates the values on first use (today: the first request to
-`/api/auth/*`), not at process start, and fails with the variable names only, never the values.
+`/api/auth/*`, `/`, `/workspaces` or `/settings/security`), not at process start or during
+`next build`, and fails with the variable names only, never the values.
+
+`pnpm build` needs no runtime values: CI builds without a `.env`. Pages that read the session call
+`headers()` before auth starts (`apps/web/src/lib/auth/session.ts`), so `next build` renders them at
+request time instead of prerendering them; `apps/web/src/lib/auth/session.test.ts` fails if auth runs
+first. To build like CI locally, move the root `.env` aside, run
+`env -i PATH="$PATH" HOME="$HOME" pnpm --filter @crm/web build`, then move it back (verified
+2026-10-14: exit 0; `/`, `/sign-in`, `/workspaces`, `/settings/security` and the API routes are dynamic,
+`/sign-up` and `/two-factor` are static).
 
 | Variable | Rule |
 |---|---|
@@ -103,7 +112,7 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 
 | Symptom | Meaning | Action |
 |---|---|---|
-| `Invalid environment configuration:` then lines like `DATABASE_MIGRATOR_URL: must be a postgres:// URL` | A variable is missing or invalid; only its name is printed. Under `pnpm dev` it shows on the first `/api/auth/*` request, which returns 500 | Fix that variable in `.env` (compare with `.env.example`), check it is not overridden by an exported shell variable, and restart |
+| `Invalid environment configuration:` then lines like `DATABASE_MIGRATOR_URL: must be a postgres:// URL` | A variable is missing or invalid; only its name is printed. Under `pnpm dev` it shows on the first `/api/auth/*` or signed-in page request, which returns 500. If it shows during `pnpm build`, a page started auth before reading `headers()` (see "Required environment") | Fix that variable in `.env` (compare with `.env.example`), check it is not overridden by an exported shell variable, and restart |
 | `connect ECONNREFUSED 127.0.0.1:5433` | Postgres is not running or the port is wrong | `pnpm stack:up`, then rerun |
 | `password authentication failed for user "crm"` | Wrong credentials in the URL | Fix the URL in `.env` |
 | `pnpm db:migrate` hangs with no output | Another runner holds the migration lock; this one waits without a timeout | Find the holder: `docker exec crm-dev-postgres-1 psql -U crm -d crm -c "select l.pid, l.granted, a.state, a.query_start from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory'"` (verified). Wait for it to finish. If the holder is a dead session, end it with `select pg_terminate_backend(<pid>)` (unverified) and rerun |
