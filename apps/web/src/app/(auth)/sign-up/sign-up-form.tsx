@@ -38,7 +38,6 @@ export function SignUpForm() {
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}
-          maxLength={PASSWORD_MAX_LENGTH}
           aria-describedby="password-hint"
         />
         <p id="password-hint" className="text-sm text-muted-foreground">
