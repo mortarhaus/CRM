@@ -86,6 +86,17 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   "That code didn't work" for these cases without telling the user to sign in again (follow-up).
 - Switching to a workspace the user is not a member of is refused with `403`; the session keeps its
   previous active workspace.
+- Limits (owner decision 2026-10-14): a password has 15 to 128 characters and no composition rules; a
+  user name at most 100 characters; a workspace name at most 80. The values live only in
+  `packages/core/src/security/limits.ts`; the forms read them from there and changing one needs a reviewed PR.
+  The server enforces them in a Better Auth `before` hook (`apps/web/src/lib/auth/input-limits.ts`) on
+  sign-up, password change and reset, user rename, and workspace create and rename, for the app and for
+  direct `POST /api/auth/*` requests alike. Refusals are `400` with the code `PASSWORD_TOO_SHORT`,
+  `PASSWORD_TOO_LONG`, `NAME_TOO_LONG` or `WORKSPACE_NAME_TOO_LONG`, and are the same whether or not
+  the email already has an account. Characters are counted as Unicode code points (an emoji counts
+  once). Better Auth's own check counts UTF-16 units, so its maximum is set to 256 units to keep it from
+  refusing a 128-character password; the hook is the real limit. The minimum applies when a password is
+  set, not at sign-in, so an older dev account with a shorter password can still sign in.
 - End-to-end tests: `pnpm test:e2e` (Playwright 1.63.0, Chrome for Testing 153.0.8010.12). It starts its own dev server
   and needs the dev Postgres from `pnpm stack:up` and a root `.env`. Every spec runs at three widths (Playwright projects
   `chromium` 1280x720, `tablet-768` 768x1024, `mobile-320` 320x640). `e2e/accessibility.spec.ts` runs an axe-core 4.13.0

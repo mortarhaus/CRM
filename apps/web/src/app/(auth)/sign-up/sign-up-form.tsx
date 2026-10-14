@@ -1,5 +1,6 @@
 "use client";
 
+import { NAME_MAX_LENGTH, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@crm/core/security";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export function SignUpForm() {
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="name">Name</Label>
-        <Input id="name" name="name" type="text" autoComplete="name" required maxLength={100} />
+        <Input id="name" name="name" type="text" autoComplete="name" required maxLength={NAME_MAX_LENGTH} />
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="email">Email</Label>
@@ -53,12 +54,12 @@ export function SignUpForm() {
           type="password"
           autoComplete="new-password"
           required
-          minLength={8}
-          maxLength={128}
+          minLength={PASSWORD_MIN_LENGTH}
+          maxLength={PASSWORD_MAX_LENGTH}
           aria-describedby="password-hint"
         />
         <p id="password-hint" className="text-sm text-muted-foreground">
-          At least 8 characters.
+          Use {PASSWORD_MIN_LENGTH} to {PASSWORD_MAX_LENGTH} characters. A phrase of several words works well.
         </p>
       </div>
       {error && (

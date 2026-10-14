@@ -1,3 +1,9 @@
+import {
+  NAME_MAX_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  WORKSPACE_NAME_MAX_LENGTH,
+} from "@crm/core/security";
 import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -107,6 +113,142 @@ describe("passwords", () => {
     const { id } = await findUser(email);
     const [credential] = await handle.db.select().from(account).where(eq(account.userId, id));
     expect(credential?.password).toMatch(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
+  });
+});
+
+interface Outcome {
+  status: number;
+  code?: string;
+}
+
+function outcomeOf(error: unknown): Outcome {
+  const { statusCode, body } = error as { statusCode: number; body?: { code?: string } };
+  return { status: statusCode, code: body?.code };
+}
+
+async function viaApi(call: () => Promise<unknown>): Promise<Outcome> {
+  try {
+    await call();
+    return { status: 200 };
+  } catch (error) {
+    return outcomeOf(error);
+  }
+}
+
+// The HTTP route a crafted request reaches (`/api/auth/*`), not the in-process `auth.api` call.
+async function viaHttp(path: string, body: unknown, headers: Headers = new Headers()): Promise<Outcome> {
+  const requestHeaders = new Headers(headers);
+  requestHeaders.set("content-type", "application/json");
+  requestHeaders.set("origin", "http://localhost:3000");
+  const response = await auth.handler(
+    new Request(`http://localhost:3000/api/auth${path}`, {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify(body),
+    }),
+  );
+  const json = (await response.json().catch(() => null)) as { code?: string } | null;
+  return response.ok ? { status: response.status } : { status: response.status, code: json?.code };
+}
+
+describe("input limits enforced on the server (owner decision 2026-10-14)", () => {
+  const signUpBody = (overrides: { name?: string; password?: string; email?: string }) => ({
+    name: "Limit Tester",
+    email: uniqueEmail(),
+    password: PASSWORD,
+    ...overrides,
+  });
+  const ascii = (length: number) => "p".repeat(length);
+  // One code point, two UTF-16 units each.
+  const astral = (length: number) => "🔑".repeat(length);
+
+  const signUpPaths = {
+    "auth.api": (body: ReturnType<typeof signUpBody>) => viaApi(() => auth.api.signUpEmail({ body })),
+    "HTTP POST /api/auth/sign-up/email": (body: ReturnType<typeof signUpBody>) => viaHttp("/sign-up/email", body),
+  };
+
+  describe.each(Object.entries(signUpPaths))("sign-up through %s", (_, signUp) => {
+    it.each([
+      [PASSWORD_MIN_LENGTH - 1, 400, "PASSWORD_TOO_SHORT"],
+      [PASSWORD_MIN_LENGTH, 200, undefined],
+      [PASSWORD_MAX_LENGTH, 200, undefined],
+      [PASSWORD_MAX_LENGTH + 1, 400, "PASSWORD_TOO_LONG"],
+    ])("a %i-character password answers %i", async (length, status, code) => {
+      expect(await signUp(signUpBody({ password: ascii(length) }))).toEqual({ status, code });
+    });
+
+    it.each([
+      [PASSWORD_MIN_LENGTH - 1, 400, "PASSWORD_TOO_SHORT"],
+      [PASSWORD_MIN_LENGTH, 200, undefined],
+      [PASSWORD_MAX_LENGTH, 200, undefined],
+      [PASSWORD_MAX_LENGTH + 1, 400, "PASSWORD_TOO_LONG"],
+    ])("counts characters, not UTF-16 units: %i emoji answer %i", async (length, status, code) => {
+      expect(await signUp(signUpBody({ password: astral(length) }))).toEqual({ status, code });
+    });
+
+    it.each([
+      [NAME_MAX_LENGTH, 200, undefined],
+      [NAME_MAX_LENGTH + 1, 400, "NAME_TOO_LONG"],
+    ])("a %i-character name answers %i", async (length, status, code) => {
+      expect(await signUp(signUpBody({ name: "n".repeat(length) }))).toEqual({ status, code });
+    });
+
+    it("refuses an over-limit name or password the same way whether or not the email exists", async () => {
+      const email = uniqueEmail();
+      await auth.api.signUpEmail({ body: signUpBody({ email }) });
+      for (const overrides of [{ name: "n".repeat(NAME_MAX_LENGTH + 1) }, { password: ascii(PASSWORD_MIN_LENGTH - 1) }]) {
+        const existing = await signUp(signUpBody({ ...overrides, email }));
+        const fresh = await signUp(signUpBody({ ...overrides, email: uniqueEmail() }));
+        expect(existing).toEqual(fresh);
+        expect(existing.status).toBe(400);
+      }
+    });
+  });
+
+  it("refuses a name over the limit when a signed-in user renames themselves", async () => {
+    const headers = await signUpAndSignIn(uniqueEmail());
+    expect(await viaHttp("/update-user", { name: "n".repeat(NAME_MAX_LENGTH + 1) }, headers)).toEqual({
+      status: 400,
+      code: "NAME_TOO_LONG",
+    });
+    expect(await viaHttp("/update-user", { name: "n".repeat(NAME_MAX_LENGTH) }, headers)).toEqual({ status: 200 });
+  });
+
+  it("applies the password limits to a password change", async () => {
+    const headers = await signUpAndSignIn(uniqueEmail());
+    const change = (newPassword: string) => viaHttp("/change-password", { currentPassword: PASSWORD, newPassword }, headers);
+    expect(await change(ascii(PASSWORD_MIN_LENGTH - 1))).toEqual({ status: 400, code: "PASSWORD_TOO_SHORT" });
+    expect(await change(astral(PASSWORD_MAX_LENGTH + 1))).toEqual({ status: 400, code: "PASSWORD_TOO_LONG" });
+  });
+
+  describe("workspace names", () => {
+    const slug = () => `limit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    it.each([
+      [WORKSPACE_NAME_MAX_LENGTH, 200, undefined],
+      [WORKSPACE_NAME_MAX_LENGTH + 1, 400, "WORKSPACE_NAME_TOO_LONG"],
+    ])("creating with a %i-character name answers %i, through auth.api and HTTP", async (length, status, code) => {
+      const headers = await signUpAndSignIn(uniqueEmail());
+      const name = "w".repeat(length);
+      expect(await viaApi(() => auth.api.createOrganization({ body: { name, slug: slug() }, headers }))).toEqual({
+        status,
+        code,
+      });
+      expect(await viaHttp("/organization/create", { name, slug: slug() }, headers)).toEqual({ status, code });
+    });
+
+    it("refuses renaming a workspace past the limit", async () => {
+      const headers = await signUpAndSignIn(uniqueEmail());
+      const workspace = await auth.api.createOrganization({ body: { name: "Rename Me", slug: slug() }, headers });
+      if (!workspace) throw new Error("workspace not created");
+      const rename = (name: string) =>
+        viaHttp("/organization/update", { organizationId: workspace.id, data: { name } }, headers);
+      expect(await rename("w".repeat(WORKSPACE_NAME_MAX_LENGTH + 1))).toEqual({
+        status: 400,
+        code: "WORKSPACE_NAME_TOO_LONG",
+      });
+      expect(await rename("w".repeat(WORKSPACE_NAME_MAX_LENGTH))).toEqual({ status: 200 });
+    });
   });
 });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
 import { toWorkspaceSlug } from "@crm/core/workspace";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -46,7 +47,7 @@ export function CreateWorkspaceForm() {
           type="text"
           autoComplete="organization"
           required
-          maxLength={80}
+          maxLength={WORKSPACE_NAME_MAX_LENGTH}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? "create-workspace-error" : undefined}
         />

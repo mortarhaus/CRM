@@ -1,3 +1,4 @@
+import { WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
 import { expect, test, type Page } from "@playwright/test";
 import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { expectAccessible, expectVisibleFocus, tabTo } from "./a11y";
@@ -11,8 +12,10 @@ import {
   uniqueEmail,
 } from "./helpers";
 
-// The longest name the form accepts (maxLength 80), as one unbroken word to stress wrapping.
-const LONGEST_WORKSPACE_NAME = "Supercalifragilisticexpialidocious-Creative-Partnership-Studio-International-Ltd";
+// The longest name the form accepts, as one unbroken word to stress wrapping.
+const LONGEST_WORKSPACE_NAME = "Supercalifragilisticexpialidocious-Creative-Partnership-Studio-International-Ltd"
+  .padEnd(WORKSPACE_NAME_MAX_LENGTH, "s")
+  .slice(0, WORKSPACE_NAME_MAX_LENGTH);
 
 async function createWorkspace(page: Page, name: string): Promise<void> {
   await page.getByLabel("Workspace name").fill(name);
