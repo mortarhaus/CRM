@@ -104,27 +104,44 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   not fold compatibility look-alikes: a full-width "Ａ" or the "ﬁ" ligature stays a different password.
   Hashes stored before this change were made from the raw string; an older dev account whose password
   had a decomposed character must set it again (no such production data exists).
-- Forms without JavaScript (owner decision 2026-10-14, FE-31/32): sign-up, sign-in, both `/two-factor` forms
-  (authenticator code and recovery code) and workspace creation are HTML forms posting to Next server actions
-  (`actions.ts` next to each form). With JavaScript on, React submits them in place and shows the pending
+- Forms without JavaScript (owner decisions 2026-10-14, FE-31/32): sign-up, sign-in, both `/two-factor` forms
+  (authenticator code and recovery code), workspace creation, the 2FA enrolment on `/settings/security`
+  (password, then the code), the workspace switcher and sign-out are HTML forms posting to Next server actions
+  (`actions.ts` next to each form; the switcher and sign-out use `apps/web/src/app/(app)/actions.ts`). With JavaScript on, React submits them in place and shows the pending
   state; with it off, the browser posts the form and the server renders the result (the same messages,
   names and emails kept, never a password or code). Codes and passwords travel only in POST bodies, never in
   a URL. Each action posts to Better Auth's own HTTP handler (`apps/web/src/lib/auth/forward.ts`), forwarding
   the cookies, `Origin`, `Referer`, Fetch Metadata and `X-Forwarded-For`, so the rate limiter (production
   only), origin and CSRF checks and input limits of `/api/auth/*` apply to the form path too; the cookies
-  Better Auth sets (session, 2FA) are copied onto the response with their flags. Workspace creation checks
-  the session itself before calling Better Auth (AUTH-02). If the server cannot be reached while JavaScript
-  is on, `apps/web/src/app/error.tsx` shows "Something went wrong" with a "Try again" button. Still needing
-  JavaScript (follow-up): the 2FA enrolment on `/settings/security`, the workspace switcher and sign-out.
-  The enrolment forms use `method="post"`, so without JavaScript a submit only renders the page again and
-  never puts the password or code in a URL.
+  Better Auth sets (session, 2FA) are copied onto the response with their flags. Workspace creation, 2FA
+  enrolment, the switcher and sign-out check the session themselves before calling Better Auth (AUTH-02); a
+  post without one is sent to `/sign-in`. If the server cannot be reached while JavaScript is on,
+  `apps/web/src/app/error.tsx` shows "Something went wrong" with a "Try again" button; the switcher and
+  sign-out instead stay in the header and show their own message ("Couldn't switch workspace. Try again.",
+  "We couldn't sign you out. Try again.", AUTH-13) with focus back on the select or button
+  (`apps/web/src/components/submit-failure-boundary.tsx`).
+  - 2FA enrolment: the setup key, link and recovery codes come back from the password step. The code form
+    posts the link and recovery codes back (POST body only) so a wrong code can show them again without
+    JavaScript; they are only displayed, and Better Auth checks the code against the secret it stored. A
+    right code reloads `/settings/security` with the new session cookie. There is no "turn off 2FA" control
+    yet, so none was converted.
+  - Workspace switcher: a native `<select>` and a visible "Switch" button. With JavaScript a change submits at
+    once; the select keeps focus and nothing is disabled while it switches (A11Y-01). A blank id is refused
+    before Better Auth is asked. Better Auth 1.7.6 refuses a workspace the user is not a member of and then
+    clears the session's active workspace; the page refreshes and shows "Choose a workspace".
+  - Sign-out: posts to the server, which goes to `/sign-in` only after Better Auth confirms the sign-out.
   Next encrypts server action ids per build; a deployment with several app instances needs the same
   `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` on all of them (not needed for one instance; not set today).
 - Testing with JavaScript off: `e2e/no-javascript.spec.ts` runs with `javaScriptEnabled: false` and covers
   sign-up (success, server refusal, and a crafted post with a 14-character password), sign-in (success,
   cookie flags, wrong password), the 2FA code and recovery-code forms (wrong and right, no code or secret in
-  any requested URL) and workspace creation (success, blank name, 80 characters, a crafted 81-character
-  post, and a crafted post without a session). By hand: in Chrome DevTools open the command menu
+  any requested URL), workspace creation (success, blank name, 80 characters, a crafted 81-character
+  post, and a crafted post without a session), 2FA enrolment (wrong password, wrong code with the setup
+  key and recovery codes shown again, right code, then sign-in asks for a code; no password, secret or code
+  in any requested URL; a post without a session), the workspace switcher (Switch button by mouse and by
+  keyboard, a blank id, a workspace the user is not a member of, a post without a session) and sign-out
+  (by keyboard; the server session ends). axe cannot run with JavaScript off; `e2e/accessibility.spec.ts`
+  scans the same states with it on. By hand: in Chrome DevTools open the command menu
   (Cmd+Shift+P), run "Disable JavaScript", and reload.
 - End-to-end tests: `pnpm test:e2e` (Playwright 1.63.0, Chrome for Testing 153.0.8010.12). It starts its own dev server
   and needs the dev Postgres from `pnpm stack:up` and a root `.env`. Every spec runs at three widths (Playwright projects
@@ -132,10 +149,13 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   scan (WCAG 2.0-2.2 A and AA tags, including `color-contrast`) of each auth, 2FA and workspace state in light and dark,
   checks for horizontal overflow, and walks the sign-up, 2FA enrolment, workspace switch and sign-out paths by keyboard.
   If port 3000 is taken, start `APP_URL=http://localhost:<port> pnpm --filter @crm/web exec next dev -p <port>` and run
-  the tests with `E2E_BASE_URL=http://localhost:<port>`. Verified 2026-10-14 with `pnpm test:e2e` on port 3000: 66 passed
-  (22 tests at three widths). Also verified 2026-10-14 against `next start` of the CI-style build (port 3320,
+  the tests with `E2E_BASE_URL=http://localhost:<port>`. Verified 2026-10-14 with `pnpm test:e2e` against `next dev` on
+  port 3317: 75 passed (25 tests at three widths). The sign-out failure tests make the server action post itself fail
+  (network error, HTTP 500); a refusal from Better Auth is covered by the unit tests in `src/app/form-actions.test.ts`. Also verified 2026-10-14 against `next start` of the CI-style build (port 3320,
   `E2E_RATE_LIMITED=1`): the six no-JavaScript form tests then in the spec pass, and a fourth wrong sign-in within 10 seconds shows
-  "Too many attempts" with JavaScript off and on. It is not in CI yet (plan Task 17).
+  "Too many attempts" with JavaScript off and on. Verified again 2026-10-14 against `next start` of a build made with
+  `env -i` (port 3321, `E2E_RATE_LIMITED=1`, chromium): all 10 tests in `e2e/no-javascript.spec.ts` and the 3 in
+  `e2e/sign-out.spec.ts` pass. It is not in CI yet (plan Task 17).
 
 ## Safe public-origin settings
 
