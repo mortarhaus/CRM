@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
+import { failServerActions, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
 
-const SIGN_OUT_ENDPOINT = "**/api/auth/sign-out";
 const SIGN_OUT_FAILED = "We couldn't sign you out. Try again.";
 
 async function signedInUser(page: Page): Promise<void> {
@@ -16,13 +15,15 @@ async function serverSession(page: Page): Promise<unknown> {
   return (await page.request.get("/api/auth/get-session")).json();
 }
 
-for (const [failure, fail] of [
-  ["a network error", (page: Page) => page.route(SIGN_OUT_ENDPOINT, (route) => route.abort("failed"))],
-  ["a server error", (page: Page) => page.route(SIGN_OUT_ENDPOINT, (route) => route.fulfill({ status: 500 }))],
+// The sign-out form posts to a server action. A refusal from Better Auth is covered by the unit tests
+// (signOutAction); here the action post itself fails.
+for (const [label, failure] of [
+  ["a network error", "network"],
+  ["a server error", "server"],
 ] as const) {
-  test(`sign-out that fails with ${failure} keeps the user on the page and can be retried`, async ({ page }) => {
+  test(`sign-out that fails with ${label} keeps the user on the page and can be retried`, async ({ page }) => {
     await signedInUser(page);
-    await fail(page);
+    const restore = await failServerActions(page, failure);
 
     const signOutButton = page.getByRole("button", { name: "Sign out" });
     await signOutButton.click();
@@ -33,7 +34,12 @@ for (const [failure, fail] of [
     await expect(signOutButton).toBeFocused();
     expect(await serverSession(page)).not.toBeNull();
 
-    await page.unroute(SIGN_OUT_ENDPOINT);
+    // A second failure is handled the same way.
+    await signOutButton.click();
+    await expect(page.getByRole("alert").filter({ hasText: SIGN_OUT_FAILED })).toBeVisible();
+    await expect(signOutButton).toBeFocused();
+
+    await restore();
     await signOutButton.click();
     await expect(page).toHaveURL(/\/sign-in$/);
     expect(await serverSession(page)).toBeNull();

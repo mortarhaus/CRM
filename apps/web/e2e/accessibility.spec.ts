@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
 import { expect, test, type Page } from "@playwright/test";
 import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { expectAccessible, expectVisibleFocus, tabTo } from "./a11y";
 import {
+  failServerActions,
   PASSWORD,
   respectRateLimit,
   signIn,
@@ -117,15 +119,28 @@ test.describe("axe scan, light and dark, no horizontal overflow", () => {
     await expect(page.getByRole("main").getByRole("alert")).toHaveText("Enter a workspace name.");
     await expectAccessible(page, "/workspaces create error");
 
-    await page.route("**/api/auth/organization/set-active", (route) => route.fulfill({ status: 500 }));
-    await page.getByLabel("Active workspace").selectOption({ label: "Studio Alpha" });
+    // Better Auth refuses a workspace the user is not a member of.
+    const switcher = page.getByLabel("Active workspace");
+    await switcher.locator("option", { hasText: "Studio Alpha" }).evaluate((option: HTMLOptionElement, id) => {
+      option.value = id;
+    }, randomUUID());
+    await switcher.focus();
+    await switcher.selectOption({ label: "Studio Alpha" });
     await expect(page.getByRole("alert").filter({ hasText: "Couldn't switch workspace" })).toBeVisible();
-    await expectAccessible(page, "/workspaces switch error");
+    // Better Auth clears the active workspace when it refuses one; the select follows the server.
+    await expect(switcher.locator("option:checked")).toHaveText("Choose a workspace");
+    await expect(switcher).toBeFocused();
+    await expectAccessible(page, "/workspaces switch refused");
 
-    await page.route("**/api/auth/sign-out", (route) => route.fulfill({ status: 500 }));
+    const restore = await failServerActions(page, "server");
+    await page.getByRole("button", { name: "Switch" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Couldn't switch workspace" })).toBeVisible();
+    await expectAccessible(page, "/workspaces switch unreachable");
+
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "couldn't sign you out" })).toBeVisible();
     await expectAccessible(page, "/workspaces sign-out error");
+    await restore();
   });
 });
 
@@ -186,6 +201,9 @@ test.describe("keyboard only", () => {
     await expect(switcher.locator("option:checked")).toHaveText("Alpha Studio");
     await expect(page.getByRole("listitem").filter({ hasText: "Alpha Studio" })).toContainText("(active)");
     await expectVisibleFocus(switcher);
+
+    // The Switch button (the path without JavaScript) is next in the tab order and shows focus.
+    await tabTo(page, page.getByRole("button", { name: "Switch" }));
 
     await tabTo(page, page.getByRole("button", { name: "Sign out" }));
     await page.keyboard.press("Enter");

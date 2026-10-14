@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { PASSWORD_MIN_LENGTH, WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
 import { expect, test, type APIResponse, type Locator, type Page } from "@playwright/test";
 import { totpFromUri, wrongTotpCode } from "../src/test/totp";
-import { PASSWORD, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
+import { tabTo } from "./a11y";
+import { PASSWORD, respectRateLimit, signIn, signOut, signUp, uniqueEmail } from "./helpers";
 
 // FE-32: every flow here runs in a browser with JavaScript off, so the forms post to their server
 // actions as plain HTML forms and the server renders the result.
@@ -108,10 +110,7 @@ test("sign-in without JavaScript refuses a wrong password with the neutral messa
   await expect(page.getByLabel("Email", { exact: true })).toHaveValue(email);
 });
 
-test("the 2FA code and recovery-code forms work without JavaScript and keep codes out of URLs", async ({
-  page,
-  context,
-}) => {
+test("the 2FA code and recovery-code forms work without JavaScript and keep codes out of URLs", async ({ page }) => {
   const email = uniqueEmail();
   await signUp(page, email);
   await signIn(page, email);
@@ -124,8 +123,7 @@ test("the 2FA code and recovery-code forms work without JavaScript and keep code
   const requestedUrls: string[] = [];
   page.on("request", (request) => requestedUrls.push(request.url()));
 
-  // The sign-out button needs JavaScript (reported separately); a fresh sign-in starts from no cookies.
-  await context.clearCookies();
+  await signOut(page);
   await signIn(page, email);
   await expect(page).toHaveURL(/\/two-factor$/);
 
@@ -142,7 +140,7 @@ test("the 2FA code and recovery-code forms work without JavaScript and keep code
   await page.getByRole("button", { name: "Verify", exact: true }).click();
   await expect(page).toHaveURL(/\/workspaces$/);
 
-  await context.clearCookies();
+  await signOut(page);
   await signIn(page, email);
   await expect(page).toHaveURL(/\/two-factor$/);
   await page.getByRole("textbox", { name: "Recovery code" }).fill("not-a-recovery-code");
@@ -202,7 +200,13 @@ test("workspace creation works without JavaScript and the server refuses what th
   await expect(workspaces).not.toContainText("Anonymous Studio");
 });
 
-test("the 2FA enrolment form, which still needs JavaScript, never puts the password in a URL", async ({ page }) => {
+function formWithButton(page: Page, name: string): Locator {
+  return page.locator("form").filter({ has: page.getByRole("button", { name, exact: true }) });
+}
+
+test("2FA enrolment works without JavaScript and keeps the password, secret and codes out of URLs", async ({
+  page,
+}) => {
   const email = uniqueEmail();
   await signUp(page, email);
   await signIn(page, email);
@@ -211,9 +215,131 @@ test("the 2FA enrolment form, which still needs JavaScript, never puts the passw
   page.on("request", (request) => requestedUrls.push(request.url()));
 
   await page.goto("/settings/security");
+  await page.getByLabel("Current password").fill("not-the-password-at-all");
+  await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
+  await expect(page).toHaveURL(/\/settings\/security$/);
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText("Your password didn't match. Try again.");
+  await expect(page.getByLabel("Current password")).toHaveValue("");
+
+  await respectRateLimit(page);
   await page.getByLabel("Current password").fill(PASSWORD);
   await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
-
   await expect(page).toHaveURL(/\/settings\/security$/);
-  expect(requestedUrls.filter((url) => url.includes("password="))).toEqual([]);
+  const uri = (await page.getByTestId("totp-uri").textContent())?.trim() ?? "";
+  const totp = totpFromUri(uri);
+  const recoveryCodes = page.getByRole("list", { name: "recovery codes" }).getByRole("listitem");
+  await expect(recoveryCodes).toHaveCount(10);
+  const codes = await recoveryCodes.allTextContents();
+
+  // A refused code renders the page again with the same setup key and recovery codes.
+  const wrongCode = wrongTotpCode(totp);
+  await page.getByLabel("Authentication code").fill(wrongCode);
+  await page.getByRole("button", { name: "Verify and turn on" }).click();
+  await expect(page).toHaveURL(/\/settings\/security$/);
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+    "That code didn't work. Check your authenticator app and try again.",
+  );
+  await expect(page.getByTestId("totp-uri")).toHaveText(uri);
+  await expect(recoveryCodes).toHaveText(codes);
+  await expect(page.getByLabel("Authentication code")).toHaveValue("");
+
+  await respectRateLimit(page);
+  const rightCode = totp.generate();
+  await page.getByLabel("Authentication code").fill(rightCode);
+  await page.getByRole("button", { name: "Verify and turn on" }).click();
+  await expect(page).toHaveURL(/\/settings\/security$/);
+  await expect(page.getByRole("status")).toHaveText("Two-factor authentication is on.");
+
+  await signOut(page);
+  await respectRateLimit(page);
+  await signIn(page, email);
+  await expect(page).toHaveURL(/\/two-factor$/);
+
+  const secret = new URL(uri).searchParams.get("secret") ?? "";
+  for (const value of ["password=", encodeURIComponent(PASSWORD), secret, wrongCode, rightCode, ...codes]) {
+    expect(requestedUrls.filter((url) => url.includes(value))).toEqual([]);
+  }
+});
+
+test("a 2FA enrolment post without a session is sent to sign in", async ({ page, context }) => {
+  const email = uniqueEmail();
+  await signUp(page, email);
+  await signIn(page, email);
+  await page.goto("/settings/security");
+  await context.clearCookies();
+  const anonymous = await postForm(page, formWith(page, "Current password"), { password: PASSWORD });
+  expect(anonymous.status()).toBe(303);
+  expect(anonymous.headers().location).toMatch(/\/sign-in$/);
+});
+
+test("the workspace switcher works without JavaScript and the server refuses a foreign or blank workspace", async ({
+  page,
+  context,
+}) => {
+  const email = uniqueEmail();
+  await signUp(page, email);
+  await signIn(page, email);
+  await expect(page).toHaveURL(/\/workspaces$/);
+  await createWorkspace(page, "Alpha Studio");
+  await createWorkspace(page, "Beta Studio");
+  const switcher = page.getByLabel("Active workspace");
+  await expect(switcher.locator("option:checked")).toHaveText("Beta Studio");
+
+  await switcher.selectOption({ label: "Alpha Studio" });
+  await page.getByRole("button", { name: "Switch", exact: true }).click();
+  await expect(page).toHaveURL(/\/workspaces$/);
+  await expect(page.getByRole("listitem").filter({ hasText: "Alpha Studio" })).toContainText("(active)");
+  await expect(switcher.locator("option:checked")).toHaveText("Alpha Studio");
+
+  // By keyboard: type-ahead picks the workspace, then the Switch button submits it.
+  await tabTo(page, switcher);
+  await page.keyboard.press("b");
+  await tabTo(page, page.getByRole("button", { name: "Switch", exact: true }));
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("listitem").filter({ hasText: "Beta Studio" })).toContainText("(active)");
+
+  // A blank id is refused before Better Auth is asked.
+  const blank = await postForm(page, formWithButton(page, "Switch"), { organizationId: "" });
+  expect(blank.status()).toBe(200);
+  expect(await blank.text()).toContain("Couldn&#x27;t switch workspace. Try again.");
+  await page.reload();
+  await expect(page.getByRole("listitem").filter({ hasText: "Beta Studio" })).toContainText("(active)");
+
+  // A workspace the user does not belong to is refused, and Better Auth then clears the active
+  // workspace (organization plugin 1.7.6); the page shows what the server has.
+  await switcher.locator("option", { hasText: "Alpha Studio" }).evaluate((option: HTMLOptionElement, id) => {
+    option.value = id;
+  }, randomUUID());
+  await switcher.selectOption({ label: "Alpha Studio" });
+  await page.getByRole("button", { name: "Switch", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Couldn't switch workspace. Try again." })).toBeVisible();
+  await expect(switcher.locator("option:checked")).toHaveText("Choose a workspace");
+  await expect(page.getByRole("list", { name: "Your workspaces" })).not.toContainText("(active)");
+
+  // A post without a session is sent to sign in, and switches nothing.
+  const cookies = await context.cookies();
+  await context.clearCookies();
+  const anonymous = await postForm(page, formWithButton(page, "Switch"), {
+    organizationId: (await switcher.locator("option", { hasText: "Beta Studio" }).getAttribute("value")) ?? "",
+  });
+  expect(anonymous.status()).toBe(303);
+  expect(anonymous.headers().location).toMatch(/\/sign-in$/);
+  await context.addCookies(cookies);
+  await page.goto("/workspaces");
+  await expect(page.getByRole("list", { name: "Your workspaces" })).not.toContainText("(active)");
+});
+
+test("sign-out works without JavaScript and ends the server session", async ({ page }) => {
+  const email = uniqueEmail();
+  await signUp(page, email);
+  await signIn(page, email);
+  await expect(page).toHaveURL(/\/workspaces$/);
+
+  await tabTo(page, page.getByRole("button", { name: "Sign out" }));
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/sign-in$/);
+  expect(await (await page.request.get("/api/auth/get-session")).json()).toBeNull();
+
+  await page.goto("/workspaces");
+  await expect(page).toHaveURL(/\/sign-in$/);
 });

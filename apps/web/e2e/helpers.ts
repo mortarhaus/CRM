@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type Route } from "@playwright/test";
 import type { TOTP } from "otpauth";
 import { totpFromUri } from "../src/test/totp";
 
@@ -12,6 +12,18 @@ export function uniqueEmail(): string {
 // on /sign-in*, /sign-up* and /two-factor/*. Set E2E_RATE_LIMITED=1 when testing the production image.
 export async function respectRateLimit(page: Page): Promise<void> {
   if (process.env.E2E_RATE_LIMITED === "1") await page.waitForTimeout(11_000);
+}
+
+// Server actions post to the page's own URL with a `Next-Action` header. Makes every such post fail as
+// if the network dropped or the server broke, until the returned function is called.
+export async function failServerActions(page: Page, failure: "network" | "server"): Promise<() => Promise<void>> {
+  const handler = async (route: Route) => {
+    const request = route.request();
+    if (request.method() !== "POST" || !(await request.headerValue("next-action"))) return route.fallback();
+    return failure === "network" ? route.abort("failed") : route.fulfill({ status: 500 });
+  };
+  await page.route("**/*", handler);
+  return () => page.unroute("**/*", handler);
 }
 
 export async function signUp(page: Page, email: string, password = PASSWORD, name = "E2E Owner"): Promise<void> {
