@@ -14,3 +14,5 @@ test-results/
 next-env.d.ts
 *.tsbuildinfo
 .agent/
+/apps/web/AGENTS.md
+/apps/web/CLAUDE.md
