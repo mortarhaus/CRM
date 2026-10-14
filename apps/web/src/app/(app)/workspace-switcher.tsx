@@ -13,18 +13,26 @@ interface WorkspaceOption {
 export function WorkspaceSwitcher({ workspaces, activeId }: { workspaces: WorkspaceOption[]; activeId: string | null }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [selected, setSelected] = useState(activeId ?? "");
+  const [serverActiveId, setServerActiveId] = useState(activeId);
+
+  // Follow the server's active workspace after a refresh without remounting or disabling the
+  // select, either of which would drop keyboard focus.
+  if (activeId !== serverActiveId) {
+    setServerActiveId(activeId);
+    setSelected(activeId ?? "");
+  }
 
   if (workspaces.length === 0) return null;
 
   async function onChange(event: ChangeEvent<HTMLSelectElement>) {
-    setPending(true);
+    const previous = selected;
+    setSelected(event.target.value);
     setError(null);
     const { error: switchError } = await authClient.organization.setActive({ organizationId: event.target.value });
-    setPending(false);
     if (switchError) {
+      setSelected(previous);
       setError("Couldn't switch workspace. Try again.");
-      return;
     }
     router.refresh();
   }
@@ -33,14 +41,12 @@ export function WorkspaceSwitcher({ workspaces, activeId }: { workspaces: Worksp
     <div className="flex min-w-0 flex-wrap items-center gap-2">
       <Label htmlFor="workspace-switcher">Active workspace</Label>
       <select
-        key={activeId ?? "none"}
         id="workspace-switcher"
-        defaultValue={activeId ?? ""}
+        value={selected}
         onChange={onChange}
-        disabled={pending}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? "workspace-switcher-error" : undefined}
-        className="min-h-10 max-w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+        className="min-h-10 max-w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         {activeId === null && (
           <option value="" disabled>
