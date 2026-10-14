@@ -17,7 +17,7 @@ All values live in one `.env` at the repo root (git-ignored). Copy `.env.example
 `apps/web/next.config.ts` loads that file for `pnpm dev`; nothing needs exporting in the shell. A
 variable already set in the shell wins over the file. A change to `.env` needs a dev server restart.
 `apps/web/src/lib/env.ts` validates the values on first use (today: the first request to
-`/api/auth/*`, `/`, `/workspaces` or `/settings/security`), not at process start or during
+`/api/auth/*`, `/`, `/workspaces` or `/settings/security`, or the first form submit), not at process start or during
 `next build`, and fails with the variable names only, never the values.
 
 `pnpm build` needs no runtime values: CI builds without a `.env`. Pages that read the session call
@@ -104,6 +104,26 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   not fold compatibility look-alikes: a full-width "Ａ" or the "ﬁ" ligature stays a different password.
   Hashes stored before this change were made from the raw string; an older dev account whose password
   had a decomposed character must set it again (no such production data exists).
+- Forms without JavaScript (owner decision 2026-10-14, FE-31/32): sign-up, sign-in, both `/two-factor` forms
+  (authenticator code and recovery code) and workspace creation are HTML forms posting to Next server actions
+  (`actions.ts` next to each form). With JavaScript on, React submits them in place and shows the pending
+  state; with it off, the browser posts the form and the server renders the result (the same messages,
+  names and emails kept, never a password or code). Codes and passwords travel only in POST bodies, never in
+  a URL. Each action posts to Better Auth's own HTTP handler (`apps/web/src/lib/auth/forward.ts`), forwarding
+  the cookies, `Origin`, `Referer`, Fetch Metadata and `X-Forwarded-For`, so the rate limiter (production
+  only), origin and CSRF checks and input limits of `/api/auth/*` apply to the form path too; the cookies
+  Better Auth sets (session, 2FA) are copied onto the response with their flags. Workspace creation checks
+  the session itself before calling Better Auth (AUTH-02). If the server cannot be reached while JavaScript
+  is on, `apps/web/src/app/error.tsx` shows "Something went wrong" with a "Try again" button. Still needing
+  JavaScript (follow-up): the 2FA enrolment on `/settings/security`, the workspace switcher and sign-out.
+  Next encrypts server action ids per build; a deployment with several app instances needs the same
+  `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` on all of them (not needed for one instance; not set today).
+- Testing with JavaScript off: `e2e/no-javascript.spec.ts` runs with `javaScriptEnabled: false` and covers
+  sign-up (success, server refusal, and a crafted post with a 14-character password), sign-in (success,
+  cookie flags, wrong password), the 2FA code and recovery-code forms (wrong and right, no code or secret in
+  any requested URL) and workspace creation (success, blank name, 80 characters, a crafted 81-character
+  post, and a crafted post without a session). By hand: in Chrome DevTools open the command menu
+  (Cmd+Shift+P), run "Disable JavaScript", and reload.
 - End-to-end tests: `pnpm test:e2e` (Playwright 1.63.0, Chrome for Testing 153.0.8010.12). It starts its own dev server
   and needs the dev Postgres from `pnpm stack:up` and a root `.env`. Every spec runs at three widths (Playwright projects
   `chromium` 1280x720, `tablet-768` 768x1024, `mobile-320` 320x640). `e2e/accessibility.spec.ts` runs an axe-core 4.13.0

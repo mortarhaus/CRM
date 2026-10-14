@@ -36,16 +36,29 @@ test.describe("axe scan, light and dark, no horizontal overflow", () => {
     await page.goto("/sign-up");
     await expectAccessible(page, "/sign-up initial");
 
-    await page.route("**/api/auth/sign-up/email", (route) => route.fulfill({ status: 500 }));
     await page.getByLabel("Name", { exact: true }).fill("Error Case");
-    await page.getByLabel("Email", { exact: true }).fill(uniqueEmail());
+    // The browser accepts an address without a dot in the domain; the server refuses it.
+    await page.getByLabel("Email", { exact: true }).fill("error-case@localhost");
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByRole("main").getByRole("alert")).toHaveText(
       "We couldn't create your account. Check your details and try again.",
     );
-    await expectAccessible(page, "/sign-up server error");
-    await page.unroute("**/api/auth/sign-up/email");
+    await expectAccessible(page, "/sign-up server refusal");
+
+    // The form's server action cannot be reached: the error page offers a retry.
+    await page.route("**/sign-up", (route) =>
+      route.request().method() === "POST" ? route.abort("failed") : route.continue(),
+    );
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+      "We couldn't finish that request. Check your connection and try again.",
+    );
+    await expectAccessible(page, "/sign-up unreachable server");
+    await page.unroute("**/sign-up");
+    await page.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByRole("button", { name: "Create account" })).toBeVisible();
 
     await page.goto("/sign-in");
     await expectAccessible(page, "/sign-in initial");
@@ -99,10 +112,9 @@ test.describe("axe scan, light and dark, no horizontal overflow", () => {
     await expect(page.getByLabel("Active workspace").locator("option:checked")).toHaveText(LONGEST_WORKSPACE_NAME);
     await expectAccessible(page, "/workspaces two workspaces, longest name active");
 
-    await page.route("**/api/auth/organization/create", (route) => route.fulfill({ status: 500 }));
-    await page.getByLabel("Workspace name").fill("Will Fail");
+    await page.getByLabel("Workspace name").fill("   ");
     await page.getByRole("button", { name: "Create workspace" }).click();
-    await expect(page.getByRole("main").getByRole("alert")).toHaveText("We couldn't create that workspace. Try again.");
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText("Enter a workspace name.");
     await expectAccessible(page, "/workspaces create error");
 
     await page.route("**/api/auth/organization/set-active", (route) => route.fulfill({ status: 500 }));
