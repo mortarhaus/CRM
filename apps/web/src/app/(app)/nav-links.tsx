@@ -4,7 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-const LINKS = [{ href: "/workspaces", label: "Workspaces" }] as const;
+const LINKS = [
+  { href: "/workspaces", label: "Workspaces" },
+  { href: "/settings/security", label: "Security" },
+] as const;
 
 export function NavLinks() {
   const pathname = usePathname();

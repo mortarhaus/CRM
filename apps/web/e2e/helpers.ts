@@ -1,4 +1,6 @@
 import { expect, type Page } from "@playwright/test";
+import type { TOTP } from "otpauth";
+import { totpFromUri } from "../src/test/totp";
 
 export const PASSWORD = "correct horse battery staple 42";
 
@@ -31,4 +33,31 @@ export async function signIn(page: Page, email: string, password = PASSWORD): Pr
 export async function signOut(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
+}
+
+export async function startTotpEnrolment(page: Page): Promise<TOTP> {
+  await page.getByRole("link", { name: "Security" }).click();
+  await page.getByLabel("Current password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
+  const uri = (await page.getByTestId("totp-uri").textContent())?.trim() ?? "";
+  return totpFromUri(uri);
+}
+
+export async function submitTotpCode(page: Page, code: string): Promise<void> {
+  await page.getByLabel("Authentication code").fill(code);
+  await page.getByRole("button", { name: "Verify and turn on" }).click();
+}
+
+export async function enrolTotp(page: Page): Promise<TOTP> {
+  const totp = await startTotpEnrolment(page);
+  await submitTotpCode(page, totp.generate());
+  await expect(page.getByRole("status")).toHaveText("Two-factor authentication is on.");
+  return totp;
+}
+
+export async function completeTotpSignIn(page: Page, totp: TOTP): Promise<void> {
+  await expect(page).toHaveURL(/\/two-factor$/);
+  await page.getByLabel("Authentication code").fill(totp.generate());
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  await expect(page).toHaveURL(/\/workspaces$/);
 }
