@@ -1,8 +1,9 @@
 # Runbook: Phase 0 auth and database
 
 Scope: the Phase 0 PR 2 slice (env validation, Postgres client, Better Auth, auth schema and the
-migration runner). Unfinished Phase 0 steps (health check, sign-in UI, Docker image, entrypoint, CI
-image job) are in [the Phase 0 plan](../superpowers/plans/2026-09-29-phase-0-foundation.md), Tasks 11-17.
+migration runner) and the Phase 0 PR 3 slice (health check, sign-up and sign-in, 2FA, workspaces).
+Unfinished Phase 0 steps (worker stub, Docker image, entrypoint, CI image job) are in
+[the Phase 0 plan](../superpowers/plans/2026-09-29-phase-0-foundation.md), Tasks 15-17.
 
 **Do not deploy Phase 0 anywhere reachable from outside.** It is a local or private staging slice
 only, until Phase 1 lands: persistent, database-backed auth rate limits (AUTH-06; today Better Auth's
@@ -60,6 +61,24 @@ Run from the repo root (Node 24.21.0, pnpm 11.6.0).
 | Stop Postgres | `pnpm stack:down` | Not run |
 
 Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are skipped.
+
+## Health check, sign-in, 2FA and workspaces (Phase 0 PR 3)
+
+- `GET /api/health` is unauthenticated. It answers `200 {"status":"ok","db":"ok"}` when the database
+  answers within 2 seconds, otherwise `503 {"status":"error","db":"error"}`. It always sends
+  `Cache-Control: no-store` and never shows the database error text. Verified with the dev Postgres up and stopped.
+- Pages: `/sign-up`, `/sign-in`, `/two-factor` (code step of a 2FA sign-in), `/workspaces` and
+  `/settings/security` (2FA enrolment). The last two need a session; the `(app)` layout redirects to `/sign-in` without one.
+- 2FA enrolment: the user enters the password, adds the setup key to an authenticator app, and confirms
+  with a 6-digit code. A wrong code leaves 2FA off. Recovery codes are shown once; the page does not store or log them.
+  The TOTP secret and URI never appear in a URL or in logs.
+- Better Auth 1.7.6 defaults, not set in our config: 5 attempts per 2FA challenge, then the user must sign in
+  again; 10 consecutive failures lock the account for 900 seconds. Today the `/two-factor` page shows
+  "That code didn't work" for these cases without telling the user to sign in again (follow-up).
+- Switching to a workspace the user is not a member of is refused with `403`; the session keeps its
+  previous active workspace.
+- End-to-end tests: `pnpm test:e2e` (Playwright 1.63.0, Chrome for Testing 153.0.8010.12). It starts its own dev server
+  and needs the dev Postgres from `pnpm stack:up` and a root `.env`. Verified 2026-10-14: 6 passed. It is not in CI yet (plan Task 17).
 
 ## Safe public-origin settings
 
