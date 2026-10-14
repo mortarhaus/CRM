@@ -1,70 +1,26 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { authClient } from "@/lib/auth/client";
-import { TOO_MANY_ATTEMPTS, WRONG_CODE } from "@/lib/auth/messages";
+import { confirmTwoFactorAction, startTwoFactorAction, type TwoFactorSetupState } from "./actions";
 
-interface Enrolment {
-  totpURI: string;
-  setupKey: string;
-  backupCodes: string[];
-}
+const EMPTY_SETUP_STATE: TwoFactorSetupState = { error: null, fields: {}, enrolment: null };
 
 export function TwoFactorSetup({ initiallyEnabled }: { initiallyEnabled: boolean }) {
-  const router = useRouter();
-  const [enabled, setEnabled] = useState(initiallyEnabled);
-  const [enrolment, setEnrolment] = useState<Enrolment | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [started, startAction, starting] = useActionState(startTwoFactorAction, EMPTY_SETUP_STATE);
+  const [confirmed, confirmAction, confirming] = useActionState(confirmTwoFactorAction, EMPTY_SETUP_STATE);
+  // A refused code hands the enrolment back, so a page rendered without JavaScript still shows it.
+  const enrolment = confirmed.enrolment ?? started.enrolment;
   const firstStepHeading = useRef<HTMLHeadingElement>(null);
 
   // The password form that held focus is replaced by the enrolment steps; move focus to step 1.
   useEffect(() => {
-    if (enrolment) firstStepHeading.current?.focus();
-  }, [enrolment]);
+    if (started.enrolment) firstStepHeading.current?.focus();
+  }, [started.enrolment]);
 
-  async function startEnrolment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setPending(true);
-    setError(null);
-    const { data, error: enableError } = await authClient.twoFactor.enable({
-      password: String(form.get("password") ?? ""),
-    });
-    setPending(false);
-    if (enableError || !data || !("totpURI" in data)) {
-      setError(enableError?.status === 429 ? TOO_MANY_ATTEMPTS : "Your password didn't match. Try again.");
-      return;
-    }
-    setEnrolment({
-      totpURI: data.totpURI,
-      setupKey: new URL(data.totpURI).searchParams.get("secret") ?? "",
-      backupCodes: data.backupCodes,
-    });
-  }
-
-  async function confirmEnrolment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setPending(true);
-    setError(null);
-    const { error: verifyError } = await authClient.twoFactor.verifyTotp({
-      code: String(form.get("code") ?? "").trim(),
-    });
-    setPending(false);
-    if (verifyError) {
-      setError(verifyError.status === 429 ? TOO_MANY_ATTEMPTS : WRONG_CODE);
-      return;
-    }
-    setEnabled(true);
-    router.refresh();
-  }
-
-  if (enabled) {
+  if (initiallyEnabled) {
     return (
       <p role="status" className="text-sm">
         Two-factor authentication is on.
@@ -74,9 +30,7 @@ export function TwoFactorSetup({ initiallyEnabled }: { initiallyEnabled: boolean
 
   if (!enrolment) {
     return (
-      // Enrolment still needs JavaScript (FE-32 follow-up). POST keeps a no-script submit from putting the
-      // password in the URL, browser history and request logs; the page just renders again.
-      <form method="post" onSubmit={startEnrolment} className="flex flex-col gap-4">
+      <form action={startAction} className="flex flex-col gap-4">
         <p className="text-sm text-muted-foreground">
           Protect your account with a code from an authenticator app. Confirm your password to start.
         </p>
@@ -88,16 +42,16 @@ export function TwoFactorSetup({ initiallyEnabled }: { initiallyEnabled: boolean
             type="password"
             autoComplete="current-password"
             required
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? "two-factor-setup-error" : undefined}
+            aria-invalid={started.error ? true : undefined}
+            aria-describedby={started.error ? "two-factor-setup-error" : undefined}
           />
         </div>
-        {error && (
+        {started.error && (
           <p id="two-factor-setup-error" role="alert" className="text-sm text-destructive">
-            {error}
+            {started.error}
           </p>
         )}
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={starting}>
           Set up two-factor authentication
         </Button>
       </form>
@@ -138,8 +92,12 @@ export function TwoFactorSetup({ initiallyEnabled }: { initiallyEnabled: boolean
           ))}
         </ol>
       </div>
-      <form method="post" onSubmit={confirmEnrolment} className="flex flex-col gap-4">
+      <form action={confirmAction} className="flex flex-col gap-4">
         <h3 className="font-medium">3. Enter the 6-digit code from the app</h3>
+        <input type="hidden" name="totpURI" value={enrolment.totpURI} />
+        {enrolment.backupCodes.map((code) => (
+          <input key={code} type="hidden" name="backupCode" value={code} />
+        ))}
         <div className="flex flex-col gap-2">
           <Label htmlFor="totp-code">Authentication code</Label>
           <Input
@@ -151,16 +109,16 @@ export function TwoFactorSetup({ initiallyEnabled }: { initiallyEnabled: boolean
             pattern="[0-9]{6}"
             maxLength={6}
             required
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? "two-factor-confirm-error" : undefined}
+            aria-invalid={confirmed.error ? true : undefined}
+            aria-describedby={confirmed.error ? "two-factor-confirm-error" : undefined}
           />
         </div>
-        {error && (
+        {confirmed.error && (
           <p id="two-factor-confirm-error" role="alert" className="text-sm text-destructive">
-            {error}
+            {confirmed.error}
           </p>
         )}
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={confirming}>
           Verify and turn on
         </Button>
       </form>

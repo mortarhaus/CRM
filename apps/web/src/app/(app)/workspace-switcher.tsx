@@ -1,20 +1,38 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, type ChangeEvent } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { authClient } from "@/lib/auth/client";
+import { WORKSPACE_SWITCH_FAILED } from "@/lib/auth/messages";
+import { EMPTY_FORM_STATE } from "@/lib/forms";
+import { setActiveWorkspaceAction } from "./actions";
 
 interface WorkspaceOption {
   id: string;
   name: string;
 }
 
-export function WorkspaceSwitcher({ workspaces, activeId }: { workspaces: WorkspaceOption[]; activeId: string | null }) {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+interface SwitcherProps {
+  workspaces: WorkspaceOption[];
+  activeId: string | null;
+}
+
+function WorkspaceSwitcherForm({ workspaces, activeId, unreachable }: SwitcherProps & { unreachable: boolean }) {
+  const [state, formAction] = useActionState(setActiveWorkspaceAction, EMPTY_FORM_STATE);
+  const select = useRef<HTMLSelectElement>(null);
   const [selected, setSelected] = useState(activeId ?? "");
   const [serverActiveId, setServerActiveId] = useState(activeId);
+  const [answered, setAnswered] = useState(state);
+  const [showUnreachable, setShowUnreachable] = useState(unreachable);
 
   // Follow the server's active workspace after a refresh without remounting or disabling the
   // select, either of which would drop keyboard focus.
@@ -22,26 +40,41 @@ export function WorkspaceSwitcher({ workspaces, activeId }: { workspaces: Worksp
     setServerActiveId(activeId);
     setSelected(activeId ?? "");
   }
+  // A refused switch puts the select back on the workspace the server still has active.
+  if (state !== answered) {
+    setAnswered(state);
+    setShowUnreachable(false);
+    if (state.error) setSelected(activeId ?? "");
+  }
 
-  if (workspaces.length === 0) return null;
+  // After an unreachable server the form is mounted again; put focus back on the select (A11Y-01).
+  useEffect(() => {
+    if (unreachable) select.current?.focus();
+  }, [unreachable]);
 
-  async function onChange(event: ChangeEvent<HTMLSelectElement>) {
-    const previous = selected;
+  const error = state.error ?? (showUnreachable ? WORKSPACE_SWITCH_FAILED : null);
+
+  // With JavaScript a change submits at once; focus stays on the select, which is never disabled.
+  function onChange(event: ChangeEvent<HTMLSelectElement>) {
     setSelected(event.target.value);
-    setError(null);
-    const { error: switchError } = await authClient.organization.setActive({ organizationId: event.target.value });
-    if (switchError) {
-      setSelected(previous);
-      setError("Couldn't switch workspace. Try again.");
-    }
-    router.refresh();
+    event.target.form?.requestSubmit();
+  }
+
+  // React resets a form after its action, which would put the select back on the option it first
+  // rendered; dispatching the action here skips that reset. Without JavaScript the form posts as usual.
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    startTransition(() => formAction(form));
   }
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
+    <form action={formAction} onSubmit={onSubmit} className="flex min-w-0 flex-wrap items-center gap-2">
       <Label htmlFor="workspace-switcher">Active workspace</Label>
       <select
+        ref={select}
         id="workspace-switcher"
+        name="organizationId"
         value={selected}
         onChange={onChange}
         aria-invalid={error ? true : undefined}
@@ -59,11 +92,24 @@ export function WorkspaceSwitcher({ workspaces, activeId }: { workspaces: Worksp
           </option>
         ))}
       </select>
+      {/* The submit path without JavaScript; with it, a change already submits. */}
+      <Button type="submit" variant="outline">
+        Switch
+      </Button>
       {error && (
         <p id="workspace-switcher-error" role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}
-    </div>
+    </form>
+  );
+}
+
+export function WorkspaceSwitcher({ workspaces, activeId }: SwitcherProps) {
+  if (workspaces.length === 0) return null;
+  return (
+    <SubmitFailureBoundary>
+      {(unreachable) => <WorkspaceSwitcherForm workspaces={workspaces} activeId={activeId} unreachable={unreachable} />}
+    </SubmitFailureBoundary>
   );
 }

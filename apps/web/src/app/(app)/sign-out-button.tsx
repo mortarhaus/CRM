@@ -1,57 +1,44 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useActionState, useEffect, useRef } from "react";
+import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/lib/auth/client";
+import { SIGN_OUT_FAILED } from "@/lib/auth/messages";
+import { EMPTY_FORM_STATE } from "@/lib/forms";
+import { signOutAction } from "./actions";
 
-const SIGN_OUT_FAILED = "We couldn't sign you out. Try again.";
-
-async function signOutOnServer(): Promise<boolean> {
-  try {
-    const { error } = await authClient.signOut();
-    return !error;
-  } catch {
-    return false;
-  }
-}
-
-export function SignOutButton() {
-  const router = useRouter();
+function SignOutForm({ unreachable }: { unreachable: boolean }) {
+  const [state, formAction, pending] = useActionState(
+    signOutAction,
+    unreachable ? { ...EMPTY_FORM_STATE, error: SIGN_OUT_FAILED } : EMPTY_FORM_STATE,
+  );
   const button = useRef<HTMLButtonElement>(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function onClick() {
-    setPending(true);
-    setError(null);
-    if (await signOutOnServer()) {
-      router.push("/sign-in");
-      router.refresh();
-      return;
-    }
-    setPending(false);
-    setError(SIGN_OUT_FAILED);
-    // Disabling the button while pending dropped its focus; put it back so a keyboard user can retry.
-    requestAnimationFrame(() => button.current?.focus());
-  }
+  // Disabling the button while pending dropped its focus; put it back so a keyboard user can retry.
+  useEffect(() => {
+    if (state.error) button.current?.focus();
+  }, [state]);
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
+    <form action={formAction} className="flex min-w-0 flex-wrap items-center gap-2">
       <Button
         ref={button}
+        type="submit"
         variant="outline"
-        onClick={onClick}
         disabled={pending}
-        aria-describedby={error ? "sign-out-error" : undefined}
+        aria-describedby={state.error ? "sign-out-error" : undefined}
       >
         Sign out
       </Button>
-      {error && (
+      {state.error && (
         <p id="sign-out-error" role="alert" className="text-sm text-destructive">
-          {error}
+          {state.error}
         </p>
       )}
-    </div>
+    </form>
   );
+}
+
+export function SignOutButton() {
+  return <SubmitFailureBoundary>{(unreachable) => <SignOutForm unreachable={unreachable} />}</SubmitFailureBoundary>;
 }

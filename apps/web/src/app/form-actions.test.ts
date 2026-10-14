@@ -13,6 +13,7 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
     throw new Redirect(url);
   }),
+  RedirectType: { push: "push", replace: "replace" },
 }));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("@/lib/auth/forward", () => ({ postToAuth: vi.fn() }));
@@ -25,16 +26,24 @@ const { signUpAction } = await import("./(auth)/sign-up/actions");
 const { signInAction } = await import("./(auth)/sign-in/actions");
 const { verifyTwoFactorAction } = await import("./(auth)/two-factor/actions");
 const { createWorkspaceAction } = await import("./(app)/workspaces/actions");
+const { setActiveWorkspaceAction, signOutAction } = await import("./(app)/actions");
+const { startTwoFactorAction, confirmTwoFactorAction } = await import("./(app)/settings/security/actions");
 
 function answer(status: number, data: unknown = null): AuthResult {
   const code = typeof data === "object" && data !== null && "code" in data ? String(data.code) : undefined;
   return { ok: status >= 200 && status < 300, status, code, data };
 }
 
-function formData(fields: Record<string, string>): FormData {
+function formData(fields: Record<string, string | string[]>): FormData {
   const form = new FormData();
-  for (const [name, value] of Object.entries(fields)) form.set(name, value);
+  for (const [name, value] of Object.entries(fields)) {
+    for (const item of [value].flat()) form.append(name, item);
+  }
   return form;
+}
+
+function withSession(): void {
+  vi.mocked(getCurrentSession).mockResolvedValue({} as Awaited<ReturnType<typeof getCurrentSession>>);
 }
 
 beforeEach(() => {
@@ -137,9 +146,7 @@ describe("createWorkspaceAction", () => {
   });
 
   describe("with a session", () => {
-    beforeEach(() => {
-      vi.mocked(getCurrentSession).mockResolvedValue({} as Awaited<ReturnType<typeof getCurrentSession>>);
-    });
+    beforeEach(withSession);
 
     it("refuses a blank name without calling Better Auth", async () => {
       await expect(createWorkspaceAction(EMPTY_FORM_STATE, formData({ name: "   " }))).resolves.toEqual({
@@ -174,6 +181,155 @@ describe("createWorkspaceAction", () => {
         fields: { name: "Studio" },
       });
       expect(refresh).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("setActiveWorkspaceAction", () => {
+  it("sends a visitor without a session to sign in and switches nothing", async () => {
+    vi.mocked(getCurrentSession).mockResolvedValue(null);
+    await expect(setActiveWorkspaceAction(EMPTY_FORM_STATE, formData({ organizationId: "w1" }))).rejects.toEqual(
+      new Redirect("/sign-in"),
+    );
+    expect(postToAuth).not.toHaveBeenCalled();
+  });
+
+  describe("with a session", () => {
+    beforeEach(withSession);
+
+    it.each<Record<string, string>>([{}, { organizationId: "" }, { organizationId: "   " }])(
+      "refuses a missing or blank workspace without calling Better Auth (%#)",
+      async (fields) => {
+        await expect(setActiveWorkspaceAction(EMPTY_FORM_STATE, formData(fields))).resolves.toEqual({
+          error: "Couldn't switch workspace. Try again.",
+          fields: {},
+        });
+        expect(postToAuth).not.toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
+      },
+    );
+
+    it("switches the workspace and refreshes the page", async () => {
+      vi.mocked(postToAuth).mockResolvedValue(answer(200, { id: "w1" }));
+      await expect(setActiveWorkspaceAction(EMPTY_FORM_STATE, formData({ organizationId: "w1" }))).resolves.toEqual(
+        EMPTY_FORM_STATE,
+      );
+      expect(postToAuth).toHaveBeenCalledWith("/organization/set-active", { organizationId: "w1" });
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+
+    it.each([
+      [answer(403, { code: "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION" }), "Couldn't switch workspace. Try again."],
+      [answer(500), "Couldn't switch workspace. Try again."],
+      [answer(429), "Too many attempts. Wait a moment and try again."],
+    ])("shows the refusal and refreshes, as Better Auth may have cleared the workspace (%#)", async (result, error) => {
+      vi.mocked(postToAuth).mockResolvedValue(result);
+      await expect(
+        setActiveWorkspaceAction(EMPTY_FORM_STATE, formData({ organizationId: "someone-elses" })),
+      ).resolves.toEqual({ error, fields: {} });
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+  });
+});
+
+describe("signOutAction", () => {
+  it("sends a visitor without a session to sign in without calling Better Auth", async () => {
+    vi.mocked(getCurrentSession).mockResolvedValue(null);
+    await expect(signOutAction()).rejects.toEqual(new Redirect("/sign-in"));
+    expect(postToAuth).not.toHaveBeenCalled();
+  });
+
+  describe("with a session", () => {
+    beforeEach(withSession);
+
+    it("goes to sign in once Better Auth confirms the sign-out", async () => {
+      vi.mocked(postToAuth).mockResolvedValue(answer(200, { success: true }));
+      await expect(signOutAction()).rejects.toEqual(new Redirect("/sign-in"));
+      expect(postToAuth).toHaveBeenCalledWith("/sign-out", {});
+    });
+
+    it.each([answer(500), answer(403, { code: "INVALID_ORIGIN" })])(
+      "stays on the page with the retry message when the sign-out fails (%#)",
+      async (result) => {
+        vi.mocked(postToAuth).mockResolvedValue(result);
+        await expect(signOutAction()).resolves.toEqual({
+          error: "We couldn't sign you out. Try again.",
+          fields: {},
+        });
+      },
+    );
+  });
+});
+
+describe("2FA enrolment actions", () => {
+  const EMPTY_SETUP_STATE = { error: null, fields: {}, enrolment: null };
+  const totpURI = "otpauth://totp/CRM:owner%40example.test?secret=JBSWY3DPEHPK3PXP&issuer=CRM";
+  const backupCodes = ["aaaaa-11111", "bbbbb-22222"];
+  const enrolment = { totpURI, setupKey: "JBSWY3DPEHPK3PXP", backupCodes };
+
+  it("sends a visitor without a session to sign in before starting or confirming", async () => {
+    vi.mocked(getCurrentSession).mockResolvedValue(null);
+    await expect(startTwoFactorAction(EMPTY_SETUP_STATE, formData({ password: "pw" }))).rejects.toEqual(
+      new Redirect("/sign-in"),
+    );
+    await expect(confirmTwoFactorAction(EMPTY_SETUP_STATE, formData({ code: "123456" }))).rejects.toEqual(
+      new Redirect("/sign-in"),
+    );
+    expect(postToAuth).not.toHaveBeenCalled();
+  });
+
+  describe("with a session", () => {
+    beforeEach(withSession);
+
+    it("starts enrolment with the password and returns the setup key and recovery codes", async () => {
+      vi.mocked(postToAuth).mockResolvedValue(answer(200, { totpURI, backupCodes }));
+      await expect(startTwoFactorAction(EMPTY_SETUP_STATE, formData({ password: "the password" }))).resolves.toEqual({
+        error: null,
+        fields: {},
+        enrolment,
+      });
+      expect(postToAuth).toHaveBeenCalledWith("/two-factor/enable", { password: "the password" });
+    });
+
+    it.each([
+      [answer(400, { code: "INVALID_PASSWORD" }), "Your password didn't match. Try again."],
+      [answer(200, { totpURI: "https://example.test/", backupCodes }), "Your password didn't match. Try again."],
+      [answer(429), "Too many attempts. Wait a moment and try again."],
+    ])("refuses a wrong password or a bad answer and never keeps the password (%#)", async (result, error) => {
+      vi.mocked(postToAuth).mockResolvedValue(result);
+      await expect(startTwoFactorAction(EMPTY_SETUP_STATE, formData({ password: "wrong" }))).resolves.toEqual({
+        error,
+        fields: {},
+        enrolment: null,
+      });
+    });
+
+    it("confirms the trimmed code and reloads the security page", async () => {
+      vi.mocked(postToAuth).mockResolvedValue(answer(200, {}));
+      await expect(
+        confirmTwoFactorAction(EMPTY_SETUP_STATE, formData({ code: " 123456 ", totpURI, backupCode: backupCodes })),
+      ).rejects.toEqual(new Redirect("/settings/security"));
+      expect(postToAuth).toHaveBeenCalledWith("/two-factor/verify-totp", { code: "123456" });
+    });
+
+    it.each([
+      [answer(401), "That code didn't work. Check your authenticator app and try again."],
+      [answer(429), "Too many attempts. Wait a moment and try again."],
+    ])("refuses a wrong code and shows the enrolment again (%#)", async (result, error) => {
+      vi.mocked(postToAuth).mockResolvedValue(result);
+      await expect(
+        confirmTwoFactorAction(EMPTY_SETUP_STATE, formData({ code: "000000", totpURI, backupCode: backupCodes })),
+      ).resolves.toEqual({ error, fields: {}, enrolment });
+    });
+
+    it("does not echo a setup link that is not an authenticator link", async () => {
+      vi.mocked(postToAuth).mockResolvedValue(answer(401));
+      await expect(
+        confirmTwoFactorAction(
+          EMPTY_SETUP_STATE,
+          formData({ code: "000000", totpURI: "javascript:alert(1)", backupCode: backupCodes }),
+        ),
+      ).resolves.toMatchObject({ enrolment: null });
     });
   });
 });
