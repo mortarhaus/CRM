@@ -1,0 +1,8 @@
+pr: 27
+reviewed_head_sha: 088d013a41058db3ae8149a5df9f8c75ec26f7d9
+review_file: reviews/PR-27.md
+review_file_hash: 8019a4b52af0fc321ed2438a3f603aa20e5060f0
+log_branch_commit_with_review: fc0013291846f99b7921f23f9a3ec91a64c0a7d4
+verdict: Approved (Round 2)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-15T10:31:08Z
