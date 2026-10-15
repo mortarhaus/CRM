@@ -16,9 +16,11 @@ limiter is in memory per process), the five DB roles with RLS, and the `action()
 All values live in one `.env` at the repo root (git-ignored). Copy `.env.example` and set every value.
 `apps/web/next.config.ts` loads that file for `pnpm dev`; nothing needs exporting in the shell. A
 variable already set in the shell wins over the file. A change to `.env` needs a dev server restart.
-`apps/web/src/lib/env.ts` validates the values on first use (today: the first request to
-`/api/auth/*`, `/`, `/workspaces` or `/settings/security`, or the first form submit), not at process start or during
-`next build`, and fails with the variable names only, never the values.
+`apps/web/src/lib/env.ts` validates the values on first use. Under `pnpm dev` and `next start` that is the first
+request to `/api/auth/*`, `/`, `/workspaces` or `/settings/security`, or the first form submit; it is not checked at
+process start or during `next build`. In the Docker image the entrypoint runs `dist/migrate.mjs` first, and
+`migrate.ts` calls `getEnv()` before anything else, so `web` and `worker` validate every value at container start
+and exit 1 before they listen. Either way the error names the variables only, never the values.
 
 `pnpm build` needs no runtime values: CI builds without a `.env`. Pages that read the session call
 `headers()` before auth starts (`apps/web/src/lib/auth/session.ts`), so `next build` renders them at
@@ -195,11 +197,13 @@ failure it uploads the Playwright report, traces and the stack logs for 7 days.
 
 ## Safe public-origin settings
 
-- Production `APP_URL` must be the public `https://` origin. Otherwise the process still starts,
-  but the first request to `/api/auth/*` fails with 500 and the log line
-  `APP_URL: must be an https:// URL in production ...`; no auth request succeeds. (First-use
-  failure verified under `pnpm dev` with an invalid `AUTH_SECRET`; the production `APP_URL` case
-  uses the same check and was not run.)
+- Production `APP_URL` must be the public `https://` origin. Otherwise the process fails on the log line
+  `APP_URL: must be an https:// URL in production ...`. In the Docker image this happens at container
+  start: `web` and `worker` exit 1 during the migration step and never listen, so `docker compose up --wait web`
+  fails before the health check. (Verified 2026-10-15: `docker run` of `crm-app:dev` with
+  `APP_URL=http://example.com` prints that line and exits 1 for both `web` and `worker`.) Under `pnpm dev` or
+  `next start` the process starts, and the first request to `/api/auth/*` fails with 500 and the same line;
+  no auth request succeeds. (First-use failure verified under `pnpm dev` with an invalid `AUTH_SECRET`.)
 - Auth cookies are always `HttpOnly` and `SameSite=Lax`. They are `Secure` (with the `__Secure-`
   prefix) for every non-loopback origin; only loopback `http://` dev gets non-Secure cookies.
 - Terminate TLS in front of the app. Do not serve a public host over plain HTTP.
@@ -216,7 +220,7 @@ failure it uploads the Playwright report, traces and the stack logs for 7 days.
 
 | Symptom | Meaning | Action |
 |---|---|---|
-| `Invalid environment configuration:` then lines like `DATABASE_MIGRATOR_URL: must be a postgres:// URL` | A variable is missing or invalid; only its name is printed. Under `pnpm dev` it shows on the first `/api/auth/*` or signed-in page request, which returns 500. If it shows during `pnpm build`, a page started auth before reading `headers()` (see "Required environment") | Fix that variable in `.env` (compare with `.env.example`), check it is not overridden by an exported shell variable, and restart |
+| `Invalid environment configuration:` then lines like `DATABASE_MIGRATOR_URL: must be a postgres:// URL` | A variable is missing or invalid; only its name is printed. In the Docker image it shows at container start and the container exits 1 before it listens. Under `pnpm dev` it shows on the first `/api/auth/*` or signed-in page request, which returns 500. If it shows during `pnpm build`, a page started auth before reading `headers()` (see "Required environment") | Fix that variable in `.env` (compare with `.env.example`), check it is not overridden by an exported shell variable, and restart |
 | `connect ECONNREFUSED 127.0.0.1:5433` | Postgres is not running or the port is wrong | `docker compose -f docker/compose.dev.yml up -d --wait postgres`, then rerun |
 | `pnpm stack:up` fails to bind port 3000 (exact message not captured) | `pnpm dev` (or another server) holds port 3000 | Stop that server, or start only Postgres (above) |
 | `password authentication failed for user "crm"` | Wrong credentials in the URL | Fix the URL in `.env` |
