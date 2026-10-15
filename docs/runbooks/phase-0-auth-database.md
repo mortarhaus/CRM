@@ -1,9 +1,9 @@
 # Runbook: Phase 0 auth and database
 
 Scope: the Phase 0 PR 2 slice (env validation, Postgres client, Better Auth, auth schema and the
-migration runner) and the Phase 0 PR 3 slice (health check, sign-up and sign-in, 2FA, workspaces).
-Unfinished Phase 0 steps (worker stub, Docker image, entrypoint, CI image job) are in
-[the Phase 0 plan](../superpowers/plans/2026-09-29-phase-0-foundation.md), Tasks 15-17.
+migration runner), the Phase 0 PR 3 slice (health check, sign-up and sign-in, 2FA, workspaces) and the
+Phase 0 PR 4 slice (worker stub, Docker image and entrypoint, dev compose stack, CI image job; plan
+Tasks 15-17, see "Docker image and compose stack" below).
 
 **Do not deploy Phase 0 anywhere reachable from outside.** It is a local or private staging slice
 only, until Phase 1 lands: persistent, database-backed auth rate limits (AUTH-06; today Better Auth's
@@ -61,13 +61,13 @@ Run from the repo root (Node 24.21.0, pnpm 11.6.0).
 
 | Step | Command | Status |
 |---|---|---|
-| Start Postgres 17 on `127.0.0.1:5433` | `pnpm stack:up` | Verified |
+| Start Postgres 17 on `127.0.0.1:5433` | `docker compose -f docker/compose.dev.yml up -d --wait postgres` | Verified. `pnpm stack:up` now also builds and starts `web` (port 3000) and `worker`; use it only when you want the image, not with `pnpm dev` |
 | Apply migrations | `pnpm db:migrate` | Verified; prints `{"level":"info","msg":"migrations applied"}` |
 | Check applied migrations | `docker exec crm-dev-postgres-1 psql -U crm -d crm -c 'select id, hash, created_at from drizzle.__drizzle_migrations order by id'` | Verified; one row per file in `apps/web/drizzle/` (today: `0000_auth_baseline.sql`) |
 | Start the app | `pnpm dev` | Verified; reads the root `.env`, no exported variables needed |
 | Auth route answers | `curl -s http://localhost:3000/api/auth/ok` | Verified; returns `{"ok":true}` |
-| Smoke check: start with only the root `.env` | `pnpm smoke:auth-route` | Verified; prints `PASS: GET /api/auth/ok -> 200 {"ok":true} ...`. It starts `pnpm dev` on a free port with `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `DATABASE_MIGRATOR_URL`, `DEPLOYMENT_MODE` and `NODE_ENV` removed from its environment, then stops it. Not in CI yet (plan Task 17) |
-| Stop Postgres | `pnpm stack:down` | Not run |
+| Smoke check: start with only the root `.env` | `pnpm smoke:auth-route` | Verified; prints `PASS: GET /api/auth/ok -> 200 {"ok":true} ...`. It starts `pnpm dev` on a free port with `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `DATABASE_MIGRATOR_URL`, `DEPLOYMENT_MODE` and `NODE_ENV` removed from its environment, then stops it. In CI it runs in the `image` job, which has a root `.env` (the `checks` job has none) |
+| Stop the compose stack (keeps the data volume) | `pnpm stack:down` | Verified 2026-10-15 |
 
 Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are skipped.
 
@@ -82,8 +82,12 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   with a 6-digit code. A wrong code leaves 2FA off. Recovery codes are shown once; the page does not store or log them.
   The TOTP secret and URI never appear in a URL or in logs.
 - Better Auth 1.7.6 defaults, not set in our config: 5 attempts per 2FA challenge, then the user must sign in
-  again; 10 consecutive failures lock the account for 900 seconds. Today the `/two-factor` page shows
-  "That code didn't work" for these cases without telling the user to sign in again (follow-up).
+  again; 10 consecutive failures lock the account for 900 seconds. When the challenge has ended (Better Auth
+  answers `INVALID_TWO_FACTOR_COOKIE` for a missing, expired or used challenge cookie, and
+  `TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE` once its attempts ran out), `/two-factor` sends the user to
+  `/sign-in?expired=1`, which says "Your sign-in expired or had too many tries. Sign in again to continue."
+  (a redirect, so it works without JavaScript). The account lock (`ACCOUNT_TEMPORARILY_LOCKED`, 429) shows
+  "Too many attempts. Wait a moment and try again." A wrong code or recovery code keeps its own message.
 - Switching to a workspace the user is not a member of is refused with `403`; the session keeps its
   previous active workspace.
 - Limits (owner decision 2026-10-14): a password has 15 to 128 characters and no composition rules; a
@@ -135,7 +139,7 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 - Testing with JavaScript off: `e2e/no-javascript.spec.ts` runs with `javaScriptEnabled: false` and covers
   sign-up (success, server refusal, and a crafted post with a 14-character password), sign-in (success,
   cookie flags, wrong password), the 2FA code and recovery-code forms (wrong and right, no code or secret in
-  any requested URL), workspace creation (success, blank name, 80 characters, a crafted 81-character
+  any requested URL; a challenge whose cookie is gone goes to `/sign-in?expired=1`), workspace creation (success, blank name, 80 characters, a crafted 81-character
   post, and a crafted post without a session), 2FA enrolment (wrong password, wrong code with the setup
   key and recovery codes shown again, right code, then sign-in asks for a code; no password, secret or code
   in any requested URL; a post without a session), the workspace switcher (Switch button by mouse and by
@@ -144,7 +148,7 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   scans the same states with it on. By hand: in Chrome DevTools open the command menu
   (Cmd+Shift+P), run "Disable JavaScript", and reload.
 - End-to-end tests: `pnpm test:e2e` (Playwright 1.63.0, Chrome for Testing 153.0.8010.12). It starts its own dev server
-  and needs the dev Postgres from `pnpm stack:up` and a root `.env`. Every spec runs at three widths (Playwright projects
+  and needs the dev Postgres (`docker compose -f docker/compose.dev.yml up -d --wait postgres`) and a root `.env`. Every spec runs at three widths (Playwright projects
   `chromium` 1280x720, `tablet-768` 768x1024, `mobile-320` 320x640). `e2e/accessibility.spec.ts` runs an axe-core 4.13.0
   scan (WCAG 2.0-2.2 A and AA tags, including `color-contrast`) of each auth, 2FA and workspace state in light and dark,
   checks for horizontal overflow, and walks the sign-up, 2FA enrolment, workspace switch and sign-out paths by keyboard.
@@ -155,7 +159,39 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   `E2E_RATE_LIMITED=1`): the six no-JavaScript form tests then in the spec pass, and a fourth wrong sign-in within 10 seconds shows
   "Too many attempts" with JavaScript off and on. Verified again 2026-10-14 against `next start` of a build made with
   `env -i` (port 3321, `E2E_RATE_LIMITED=1`, chromium): all 10 tests in `e2e/no-javascript.spec.ts` and the 3 in
-  `e2e/sign-out.spec.ts` pass. It is not in CI yet (plan Task 17).
+  `e2e/sign-out.spec.ts` pass. In CI the `image` job runs the whole suite against the Docker image (below).
+
+## Docker image and compose stack (Phase 0 PR 4)
+
+- One image, `crm-app:dev`, built by `docker/Dockerfile` from `node:24.21.0-alpine` (pinned by digest). The
+  entrypoint (`docker/entrypoint.sh`) takes `web` (migrations, then `node server.js`, the Next standalone
+  server), `worker` (migrations, then `node dist/worker.mjs`) or `migrate` (migrations only). Migrations run
+  from `dist/migrate.mjs` under the advisory lock, so `web` and `worker` starting together is safe: one waits,
+  the other finds nothing to do. The image runs as `node` (uid 1000); compose mounts the root filesystem
+  read-only with tmpfs on `/tmp` (and `.next/cache` for `web`). npm, npx, corepack and yarn are removed from
+  the runtime stage.
+- The worker is a stub until Phase 1 (pg-boss): it checks the database, logs
+  `{"level":"info","msg":"worker ready"}`, and on SIGTERM or SIGINT logs `{"level":"info","msg":"worker stopped"}` and exits 0.
+- `pnpm build` runs `next build` and then `scripts/build-node.mjs` (esbuild 0.28.2), which bundles
+  `worker.ts` and `migrate.ts` into `apps/web/dist/`. `pnpm --filter @crm/web build:node` rebuilds only the
+  bundles; `pnpm worker:dev` runs the worker from source with the root `.env`.
+- Compose (`docker/compose.dev.yml`, project `crm-dev`) reads the root `.env` and replaces both database
+  URLs with `postgres://crm:crm@postgres:5432/crm` inside the containers.
+
+| Step | Command | Status |
+|---|---|---|
+| Build and start postgres, web and worker | `pnpm stack:up` | Verified 2026-10-15: postgres and web `Healthy`, worker started, both app containers log `migrations applied` |
+| Health | `curl -s http://localhost:3000/api/health` | Verified; `{"status":"ok","db":"ok"}` |
+| Missing root `.env` | `docker compose -f docker/compose.dev.yml up -d` | Verified; fails at once with `env file .../.env not found`, exit 1, no container starts |
+| Blank `AUTH_SECRET` | (set `AUTH_SECRET=` in `.env`) `docker compose -f docker/compose.dev.yml up -d --wait web` | Verified; exit 1, `web` exits 1 logging `Invalid environment configuration:` and `AUTH_SECRET: must be at least 32 characters`; no value is logged |
+| First boot on an empty database | `docker compose -f docker/compose.dev.yml down -v` then `pnpm stack:up` (`down -v` deletes the dev database) | Verified; one migration row, all eight auth tables, no restarts |
+| E2E against the image | `E2E_BASE_URL=http://localhost:3000 E2E_RATE_LIMITED=1 pnpm test:e2e` | Verified 2026-10-15: 84 passed (28 tests at three widths) in 21.6 minutes; the rate-limit waits make it slow |
+| Image scan | `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.74.0 image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 crm-app:dev` | Verified 2026-10-15; exit 0, no findings |
+
+CI (`.github/workflows/ci.yml`, job `image`, after `checks`) writes a throwaway `.env` with a random
+`AUTH_SECRET`, builds the image, scans it with Trivy (CRITICAL and HIGH, fixed only, blocking), starts the
+stack, runs `pnpm smoke:auth-route`, and runs the full E2E suite against the image with rate limits on. On
+failure it uploads the Playwright report, traces and the stack logs for 7 days.
 
 ## Safe public-origin settings
 
@@ -181,7 +217,8 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 | Symptom | Meaning | Action |
 |---|---|---|
 | `Invalid environment configuration:` then lines like `DATABASE_MIGRATOR_URL: must be a postgres:// URL` | A variable is missing or invalid; only its name is printed. Under `pnpm dev` it shows on the first `/api/auth/*` or signed-in page request, which returns 500. If it shows during `pnpm build`, a page started auth before reading `headers()` (see "Required environment") | Fix that variable in `.env` (compare with `.env.example`), check it is not overridden by an exported shell variable, and restart |
-| `connect ECONNREFUSED 127.0.0.1:5433` | Postgres is not running or the port is wrong | `pnpm stack:up`, then rerun |
+| `connect ECONNREFUSED 127.0.0.1:5433` | Postgres is not running or the port is wrong | `docker compose -f docker/compose.dev.yml up -d --wait postgres`, then rerun |
+| `pnpm stack:up` fails to bind port 3000 (exact message not captured) | `pnpm dev` (or another server) holds port 3000 | Stop that server, or start only Postgres (above) |
 | `password authentication failed for user "crm"` | Wrong credentials in the URL | Fix the URL in `.env` |
 | `pnpm db:migrate` hangs with no output | Another runner holds the migration lock; this one waits without a timeout | Find the holder: `docker exec crm-dev-postgres-1 psql -U crm -d crm -c "select l.pid, l.granted, a.state, a.query_start from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory'"` (verified). Wait for it to finish. If the holder is a dead session, end it with `select pg_terminate_backend(<pid>)` (unverified) and rerun |
 | A migration fails with a SQL error | Drizzle runs all pending files in one transaction (verified in drizzle-orm 0.45.3 source), so nothing from the run is applied and no row is added to `drizzle.__drizzle_migrations` | Fix the migration in a new PR, then rerun. Never edit an applied migration file |
