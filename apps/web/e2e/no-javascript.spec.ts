@@ -157,6 +157,30 @@ test("the 2FA code and recovery-code forms work without JavaScript and keep code
   }
 });
 
+test("an ended 2FA challenge sends the user back to sign in, not to the wrong-code message", async ({
+  page,
+  context,
+}) => {
+  const email = uniqueEmail();
+  await signUp(page, email);
+  await signIn(page, email);
+  const { uri } = await enrolTotpThroughApi(page);
+  await signOut(page);
+  await signIn(page, email);
+  await expect(page).toHaveURL(/\/two-factor$/);
+
+  // Without the challenge cookie Better Auth answers INVALID_TWO_FACTOR_COOKIE, as it does once the
+  // challenge has expired.
+  await context.clearCookies({ name: /two_factor/ });
+  await page.getByLabel("Authentication code").fill(totpFromUri(uri).generate());
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  await expect(page).toHaveURL(/\/sign-in\?expired=1$/);
+  await expect(page.getByRole("main").getByRole("status")).toHaveText(
+    "Your sign-in expired or had too many tries. Sign in again to continue.",
+  );
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+});
+
 test("workspace creation works without JavaScript and the server refuses what the browser would block", async ({
   page,
   context,

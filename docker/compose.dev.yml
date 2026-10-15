@@ -1,5 +1,20 @@
 name: crm-dev
 
+x-app: &app
+  image: crm-app:dev
+  env_file:
+    - path: ../.env
+      required: true
+  environment:
+    DATABASE_URL: postgres://crm:crm@postgres:5432/crm
+    DATABASE_MIGRATOR_URL: postgres://crm:crm@postgres:5432/crm
+  read_only: true
+  tmpfs:
+    - /tmp
+  depends_on:
+    postgres:
+      condition: service_healthy
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -16,6 +31,33 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  web:
+    <<: *app
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["web"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    tmpfs:
+      - /tmp
+      - /app/apps/web/.next/cache:mode=1777
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  worker:
+    <<: *app
+    pull_policy: never
+    command: ["worker"]
 
 volumes:
   pgdata:
