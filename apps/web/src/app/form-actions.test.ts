@@ -130,6 +130,30 @@ describe("verifyTwoFactorAction", () => {
     });
   });
 
+  it.each([
+    ["totp", answer(401, { code: "INVALID_TWO_FACTOR_COOKIE" })],
+    ["recovery", answer(401, { code: "INVALID_TWO_FACTOR_COOKIE" })],
+    ["totp", answer(400, { code: "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE" })],
+    ["recovery", answer(400, { code: "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE" })],
+  ])("sends a %s attempt on an expired or exhausted challenge back to sign in (%#)", async (method, result) => {
+    vi.mocked(postToAuth).mockResolvedValue(result);
+    await expect(verifyTwoFactorAction(EMPTY_FORM_STATE, formData({ method, code: "000000" }))).rejects.toEqual(
+      new Redirect("/sign-in?expired=1"),
+    );
+  });
+
+  it.each([
+    ["totp", answer(401, { code: "INVALID_CODE" }), "That code didn't work. Check your authenticator app and try again."],
+    ["recovery", answer(401, { code: "INVALID_BACKUP_CODE" }), "That recovery code didn't work. Check it and try again."],
+    ["totp", answer(429, { code: "ACCOUNT_TEMPORARILY_LOCKED" }), "Too many attempts. Wait a moment and try again."],
+  ])("keeps the uniform %s message for Better Auth's other refusals (%#)", async (method, result, error) => {
+    vi.mocked(postToAuth).mockResolvedValue(result);
+    await expect(verifyTwoFactorAction(EMPTY_FORM_STATE, formData({ method, code: "000000" }))).resolves.toEqual({
+      error,
+      fields: {},
+    });
+  });
+
   it("refuses an unknown method without calling Better Auth", async () => {
     await expect(
       verifyTwoFactorAction(EMPTY_FORM_STATE, formData({ method: "sms", code: "000000" })),

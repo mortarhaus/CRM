@@ -9,6 +9,7 @@ import type { LimitErrorCode } from "./input-limits";
 export const TOO_MANY_ATTEMPTS = "Too many attempts. Wait a moment and try again.";
 export const WRONG_CODE = "That code didn't work. Check your authenticator app and try again.";
 export const WRONG_RECOVERY_CODE = "That recovery code didn't work. Check it and try again.";
+export const TWO_FACTOR_EXPIRED = "Your sign-in expired or had too many tries. Sign in again to continue.";
 export const SIGN_IN_FAILED = "Email or password is incorrect.";
 export const SIGN_UP_FAILED = "We couldn't create your account. Check your details and try again.";
 export const WORKSPACE_NAME_REQUIRED = "Enter a workspace name.";
