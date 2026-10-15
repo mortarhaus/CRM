@@ -11,7 +11,8 @@
     "auth:generate": "auth generate --config src/lib/auth/cli-config.ts --output src/db/schema/auth.ts --yes && tsx scripts/apply-timestamptz.ts src/db/schema/auth.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=../../.env migrate.ts",
-    "smoke:auth-route": "tsx scripts/smoke-auth-route.ts"
+    "smoke:auth-route": "tsx scripts/smoke-auth-route.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@crm/core": "workspace:*",
@@ -29,6 +30,8 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
     "@testcontainers/postgresql": "12.2.0",
     "@types/node": "24.19.0",

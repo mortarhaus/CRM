@@ -1,8 +1,9 @@
 # Runbook: Phase 0 auth and database
 
 Scope: the Phase 0 PR 2 slice (env validation, Postgres client, Better Auth, auth schema and the
-migration runner). Unfinished Phase 0 steps (health check, sign-in UI, Docker image, entrypoint, CI
-image job) are in [the Phase 0 plan](../superpowers/plans/2026-09-29-phase-0-foundation.md), Tasks 11-17.
+migration runner) and the Phase 0 PR 3 slice (health check, sign-up and sign-in, 2FA, workspaces).
+Unfinished Phase 0 steps (worker stub, Docker image, entrypoint, CI image job) are in
+[the Phase 0 plan](../superpowers/plans/2026-09-29-phase-0-foundation.md), Tasks 15-17.
 
 **Do not deploy Phase 0 anywhere reachable from outside.** It is a local or private staging slice
 only, until Phase 1 lands: persistent, database-backed auth rate limits (AUTH-06; today Better Auth's
@@ -16,7 +17,16 @@ All values live in one `.env` at the repo root (git-ignored). Copy `.env.example
 `apps/web/next.config.ts` loads that file for `pnpm dev`; nothing needs exporting in the shell. A
 variable already set in the shell wins over the file. A change to `.env` needs a dev server restart.
 `apps/web/src/lib/env.ts` validates the values on first use (today: the first request to
-`/api/auth/*`), not at process start, and fails with the variable names only, never the values.
+`/api/auth/*`, `/`, `/workspaces` or `/settings/security`, or the first form submit), not at process start or during
+`next build`, and fails with the variable names only, never the values.
+
+`pnpm build` needs no runtime values: CI builds without a `.env`. Pages that read the session call
+`headers()` before auth starts (`apps/web/src/lib/auth/session.ts`), so `next build` renders them at
+request time instead of prerendering them; `apps/web/src/lib/auth/session.test.ts` fails if auth runs
+first. To build like CI locally, move the root `.env` aside, run
+`env -i PATH="$PATH" HOME="$HOME" pnpm --filter @crm/web build`, then move it back (verified
+2026-10-14: exit 0; `/`, `/sign-in`, `/workspaces`, `/settings/security` and the API routes are dynamic,
+`/sign-up` and `/two-factor` are static).
 
 | Variable | Rule |
 |---|---|
@@ -61,6 +71,92 @@ Run from the repo root (Node 24.21.0, pnpm 11.6.0).
 
 Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are skipped.
 
+## Health check, sign-in, 2FA and workspaces (Phase 0 PR 3)
+
+- `GET /api/health` is unauthenticated. It answers `200 {"status":"ok","db":"ok"}` when the database
+  answers within 2 seconds, otherwise `503 {"status":"error","db":"error"}`. It always sends
+  `Cache-Control: no-store` and never shows the database error text. Verified with the dev Postgres up and stopped.
+- Pages: `/sign-up`, `/sign-in`, `/two-factor` (code step of a 2FA sign-in), `/workspaces` and
+  `/settings/security` (2FA enrolment). The last two need a session; the `(app)` layout redirects to `/sign-in` without one.
+- 2FA enrolment: the user enters the password, adds the setup key to an authenticator app, and confirms
+  with a 6-digit code. A wrong code leaves 2FA off. Recovery codes are shown once; the page does not store or log them.
+  The TOTP secret and URI never appear in a URL or in logs.
+- Better Auth 1.7.6 defaults, not set in our config: 5 attempts per 2FA challenge, then the user must sign in
+  again; 10 consecutive failures lock the account for 900 seconds. Today the `/two-factor` page shows
+  "That code didn't work" for these cases without telling the user to sign in again (follow-up).
+- Switching to a workspace the user is not a member of is refused with `403`; the session keeps its
+  previous active workspace.
+- Limits (owner decision 2026-10-14): a password has 15 to 128 characters and no composition rules; a
+  user name at most 100 characters; a workspace name at most 80. The values live only in
+  `packages/core/src/security/limits.ts`; the forms read them from there and changing one needs a reviewed PR.
+  The server enforces them in a Better Auth `before` hook (`apps/web/src/lib/auth/input-limits.ts`) on
+  sign-up, password change and reset, user rename, and workspace create and rename, for the app and for
+  direct `POST /api/auth/*` requests alike. Refusals are `400` with the code `PASSWORD_TOO_SHORT`,
+  `PASSWORD_TOO_LONG`, `NAME_TOO_LONG` or `WORKSPACE_NAME_TOO_LONG`, and are the same whether or not
+  the email already has an account. Characters are counted as Unicode code points (an emoji counts
+  once). Better Auth's own check counts UTF-16 units, so its maximum is set to 256 units to keep it from
+  refusing a 128-character password; the hook is the real limit. The minimum applies when a password is
+  set, not at sign-in, so an older dev account with a shorter password can still sign in.
+- Unicode (owner decision 2026-10-14): passwords are normalized to NFC before they are counted, hashed
+  and verified (`normalizePassword` in `packages/core/src/password/index.ts`, used by `hashPassword` and
+  `verifyPassword`, so any later password change or reset path gets it too). A password typed with a
+  decomposed accent ("e" + U+0301) matches the same password typed with a composed one ("é"). NFC does
+  not fold compatibility look-alikes: a full-width "Ａ" or the "ﬁ" ligature stays a different password.
+  Hashes stored before this change were made from the raw string; an older dev account whose password
+  had a decomposed character must set it again (no such production data exists).
+- Forms without JavaScript (owner decisions 2026-10-14, FE-31/32): sign-up, sign-in, both `/two-factor` forms
+  (authenticator code and recovery code), workspace creation, the 2FA enrolment on `/settings/security`
+  (password, then the code), the workspace switcher and sign-out are HTML forms posting to Next server actions
+  (`actions.ts` next to each form; the switcher and sign-out use `apps/web/src/app/(app)/actions.ts`). With JavaScript on, React submits them in place and shows the pending
+  state; with it off, the browser posts the form and the server renders the result (the same messages,
+  names and emails kept, never a password or code). Codes and passwords travel only in POST bodies, never in
+  a URL. Each action posts to Better Auth's own HTTP handler (`apps/web/src/lib/auth/forward.ts`), forwarding
+  the cookies, `Origin`, `Referer`, Fetch Metadata and `X-Forwarded-For`, so the rate limiter (production
+  only), origin and CSRF checks and input limits of `/api/auth/*` apply to the form path too; the cookies
+  Better Auth sets (session, 2FA) are copied onto the response with their flags. Workspace creation, 2FA
+  enrolment, the switcher and sign-out check the session themselves before calling Better Auth (AUTH-02); a
+  post without one is sent to `/sign-in`. If the server cannot be reached while JavaScript is on,
+  `apps/web/src/app/error.tsx` shows "Something went wrong" with a "Try again" button; the switcher and
+  sign-out instead stay in the header and show their own message ("Couldn't switch workspace. Try again.",
+  "We couldn't sign you out. Try again.", AUTH-13) with focus back on the select or button
+  (`apps/web/src/components/submit-failure-boundary.tsx`).
+  - 2FA enrolment: the setup key, link and recovery codes come back from the password step. The code form
+    posts the link and recovery codes back (POST body only) so a wrong code can show them again without
+    JavaScript; they are only displayed, and Better Auth checks the code against the secret it stored. A
+    right code reloads `/settings/security` with the new session cookie. There is no "turn off 2FA" control
+    yet, so none was converted.
+  - Workspace switcher: a native `<select>` and a visible "Switch" button. With JavaScript a change submits at
+    once; the select keeps focus and nothing is disabled while it switches (A11Y-01). A blank id or an id that is not a
+    uuid is refused before Better Auth is asked (a malformed id would otherwise reach its uuid lookup and give a 500). Better Auth 1.7.6 refuses a workspace the user is not a member of and then
+    clears the session's active workspace; the page refreshes and shows "Choose a workspace".
+  - Sign-out: posts to the server, which goes to `/sign-in` only after Better Auth confirms the sign-out.
+  Next encrypts server action ids per build; a deployment with several app instances needs the same
+  `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` on all of them (not needed for one instance; not set today).
+- Testing with JavaScript off: `e2e/no-javascript.spec.ts` runs with `javaScriptEnabled: false` and covers
+  sign-up (success, server refusal, and a crafted post with a 14-character password), sign-in (success,
+  cookie flags, wrong password), the 2FA code and recovery-code forms (wrong and right, no code or secret in
+  any requested URL), workspace creation (success, blank name, 80 characters, a crafted 81-character
+  post, and a crafted post without a session), 2FA enrolment (wrong password, wrong code with the setup
+  key and recovery codes shown again, right code, then sign-in asks for a code; no password, secret or code
+  in any requested URL; a post without a session), the workspace switcher (Switch button by mouse and by
+  keyboard, a blank id, a workspace the user is not a member of, a post without a session) and sign-out
+  (by keyboard; the server session ends). axe cannot run with JavaScript off; `e2e/accessibility.spec.ts`
+  scans the same states with it on. By hand: in Chrome DevTools open the command menu
+  (Cmd+Shift+P), run "Disable JavaScript", and reload.
+- End-to-end tests: `pnpm test:e2e` (Playwright 1.63.0, Chrome for Testing 153.0.8010.12). It starts its own dev server
+  and needs the dev Postgres from `pnpm stack:up` and a root `.env`. Every spec runs at three widths (Playwright projects
+  `chromium` 1280x720, `tablet-768` 768x1024, `mobile-320` 320x640). `e2e/accessibility.spec.ts` runs an axe-core 4.13.0
+  scan (WCAG 2.0-2.2 A and AA tags, including `color-contrast`) of each auth, 2FA and workspace state in light and dark,
+  checks for horizontal overflow, and walks the sign-up, 2FA enrolment, workspace switch and sign-out paths by keyboard.
+  If port 3000 is taken, start `APP_URL=http://localhost:<port> pnpm --filter @crm/web exec next dev -p <port>` and run
+  the tests with `E2E_BASE_URL=http://localhost:<port>`. Verified 2026-10-14 (Round 2 fixes) with `pnpm test:e2e` against `next dev` on
+  port 3317: 81 passed (27 tests at three widths). The sign-out failure tests make the server action post itself fail
+  (network error, HTTP 500); a refusal from Better Auth is covered by the unit tests in `src/app/form-actions.test.ts`. Also verified 2026-10-14 against `next start` of the CI-style build (port 3320,
+  `E2E_RATE_LIMITED=1`): the six no-JavaScript form tests then in the spec pass, and a fourth wrong sign-in within 10 seconds shows
+  "Too many attempts" with JavaScript off and on. Verified again 2026-10-14 against `next start` of a build made with
+  `env -i` (port 3321, `E2E_RATE_LIMITED=1`, chromium): all 10 tests in `e2e/no-javascript.spec.ts` and the 3 in
+  `e2e/sign-out.spec.ts` pass. It is not in CI yet (plan Task 17).
+
 ## Safe public-origin settings
 
 - Production `APP_URL` must be the public `https://` origin. Otherwise the process still starts,
@@ -84,10 +180,12 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 
 | Symptom | Meaning | Action |
 |---|---|---|
-| `Invalid environment configuration:` then lines like `DATABASE_MIGRATOR_URL: must be a postgres:// URL` | A variable is missing or invalid; only its name is printed. Under `pnpm dev` it shows on the first `/api/auth/*` request, which returns 500 | Fix that variable in `.env` (compare with `.env.example`), check it is not overridden by an exported shell variable, and restart |
+| `Invalid environment configuration:` then lines like `DATABASE_MIGRATOR_URL: must be a postgres:// URL` | A variable is missing or invalid; only its name is printed. Under `pnpm dev` it shows on the first `/api/auth/*` or signed-in page request, which returns 500. If it shows during `pnpm build`, a page started auth before reading `headers()` (see "Required environment") | Fix that variable in `.env` (compare with `.env.example`), check it is not overridden by an exported shell variable, and restart |
 | `connect ECONNREFUSED 127.0.0.1:5433` | Postgres is not running or the port is wrong | `pnpm stack:up`, then rerun |
 | `password authentication failed for user "crm"` | Wrong credentials in the URL | Fix the URL in `.env` |
 | `pnpm db:migrate` hangs with no output | Another runner holds the migration lock; this one waits without a timeout | Find the holder: `docker exec crm-dev-postgres-1 psql -U crm -d crm -c "select l.pid, l.granted, a.state, a.query_start from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory'"` (verified). Wait for it to finish. If the holder is a dead session, end it with `select pg_terminate_backend(<pid>)` (unverified) and rerun |
 | A migration fails with a SQL error | Drizzle runs all pending files in one transaction (verified in drizzle-orm 0.45.3 source), so nothing from the run is applied and no row is added to `drizzle.__drizzle_migrations` | Fix the migration in a new PR, then rerun. Never edit an applied migration file |
 
 A failed `pnpm db:migrate` exits non-zero.
+
+The name fields (sign-up name, workspace name) have no native `maxlength`: it counts UTF-16 units while the server counts characters (code points), so it would cut valid names. The server refuses an over-limit name with a message; `e2e/name-limits.spec.ts` (JavaScript on) and a test in `e2e/no-javascript.spec.ts` check names of emoji at the limit and one over.
