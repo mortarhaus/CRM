@@ -1,5 +1,123 @@
 # Review — spec `core-sales-design`
 
+## Round 13 — 2026-10-16 · scope: revision 5 hosting slice (PR #29)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 5 draft · hash (`git hash-object`) `3c2df1a0d8b3a61b7b387c2faee635514b5021f9`.
+- **Pin:** PR #29 base `21507058293ca5d70d62e631eac6bde8d6a134f4`, head `0b907991be0d34d8ec538018b397a8dca4a18c56`, merge base `553f0b2960996bb756f1d4044b443d60e470e5b7`. The working spec in the clean builder worktree and the blob at that head have the same hash. Diff: this spec and `docs/DECISIONS.md` only. The unchanged body keeps Round 11's deep-tier technical review and Round 12's exact-hash approval follow-up as its baseline.
+
+**Verdict:** Revision required  
+**Model used:** GPT-6 · **Switch model next step?** No. Round 11 was the independent Opus 5.5 full-spec pass; this is a narrow hosting revision review.
+
+### Findings
+
+#### [P1] The chosen-provider Phase 1 test is impossible on the revised schedule
+- Category: objective spec contradiction; gate and verification timing.
+- Evidence: `docs/superpowers/specs/2026-09-27-core-sales-design.md:48`, `:259`, `:962` defer the Stage 3 provider and region until first sale. Known risks R6 at `:953` still requires a run against **the chosen managed PostgreSQL provider's pooler**, with *each* R6 item checked in Phase 1 before the worker role is fixed. Phase 1 done-when at `:1009` requires the worker grants and pooler cycle, but has no later provider-specific acceptance gate.
+- Failure scenario: Phase 1 either cannot be marked complete until a provider is chosen much earlier than Charlie decided, or is marked complete while its explicit chosen-provider test has never run. A provider can then be selected at first sale without a named test of its pooler, direct connection, role/grant support and pg-boss lifecycle.
+- Why it matters: this is a delivery gate for the RLS connection and job system; leaving it contradictory makes a production cutover untestable.
+- Required correction: keep the generic local pooler, grant and maintenance checks in Phase 1. Move the **chosen provider** run to a gate after selection and **before** Stage 3 cutover / the first sale's live traffic. Name the provider-specific connection, role/grant, pg-boss and PITR/restore acceptance checks there. This preserves Charlie's choice to defer the provider.
+- Owner: builder. Verification: R6, Phase 1 done-when, Stage 3 and the first-sale gate agree on who tests what and when.
+
+#### [P1] Applicable database and job rules are absent from the PR self-check
+- Category: guardrail review coverage.
+- Evidence: PR #29's self-check lists UNI-07, UNI-12, UNI-13 and owner provenance only. Moving from a named managed service to an as-yet-unknown one directly affects `TEN-01` (migrator ownership/direct migration), `TEN-02` (runtime role without BYPASSRLS), `TEN-09` (tenant transaction context over a transaction pooler), and `EVT-01` (transactional enqueue through that connection). The spec's existing contracts are at `:380`, `:953`, `:962` and `:1009`; `agents/PROJECT.md` §9 names the five roles and pooled/direct connection contract.
+- Failure scenario: a candidate satisfies “managed PostgreSQL with PITR and a transaction-mode pool” but cannot grant the required role/schema privileges or maintain transactional pg-boss jobs; the self-check reports no rule to check before selection.
+- Why it matters: reviewer rule §3 makes a missing applicable rule in a builder self-check a P1. This is a coverage finding, separate from the timing contradiction above.
+- Required correction: add rows for TEN-01, TEN-02, TEN-09 and EVT-01 in the PR self-check, citing the spec's existing provider acceptance requirements and the revised pre-cutover gate. Mark future provider-specific results pending rather than pass.
+- Owner: builder. Verification: each applicable row has evidence or an explicit future gate; no unsupported pass claim.
+
+#### [P2 · before merge] Cross-border and backup-location check is assigned the wrong deadline
+- Category: privacy gate consistency.
+- Evidence: revision 5 item 7 at `:48` and the new `docs/DECISIONS.md` entry at `:8` say the PDPA cross-border and backup-location check is due “before Phase 9.” The spec's professional-check heading at `:1044` and `agents/PROJECT.md` §11 require the PDPA professional check **before Phase 4 goes live**. Stage 2 stores live data on the Malaysia VPS and sends nightly encrypted database dumps to R2 beginning in Phase 4 (`:803`, `:961`, `:1012`); the R2 backup location is unspecified here. Stage 3 introduces another provider and region at first sale.
+- Failure scenario: the builder treats Phase 9 as permission to postpone the location/transfer review through Phase 4, even while live data and backups already exist.
+- Why it matters: the revision weakens the apparent timing of an existing pre-live professional gate; this is a wording conflict with potential privacy consequences, not a legal conclusion about any specific transfer.
+- Required correction: align item 7 and the decision entry with the existing **before Phase 4 live** professional check for the Stage 2 host and R2 backups; require the chosen Stage 3 provider and backup locations to be checked before its cutover. Preserve the separate Phase 9 purge-specific PDPA check.
+- Owner: builder. Verification: the hosting item, decision entry, professional-check section and Stage 3 gate have compatible deadlines.
+
+#### [P2 · before merge] The VPS gate is both met and unmet in the same section
+- Category: documentation consistency.
+- Evidence: the introduction to “Checks before the Phase 1 plan is written” at `:994` says item 3 “is still unmet”; revised item 3 at `:1000` says “MET for the VPS provider.” The current-gates paragraph at `:1053` labels itself revision 5 yet says Round 11 approval completes gate (a), and says `setup` still must record hard-rule rulings that `agents/PROJECT.md` §9 already records. Round 12 flagged the latter stale status text as a P3 follow-up.
+- Failure scenario: the owner or next builder reads the introduction as a blocking host decision or reads revision 4's approval as approval of revision 5.
+- Why it matters: this revision exists to close precisely that VPS gate. Its live status must be unambiguous before approval and reconciliation.
+- Required correction: make the item 3 introduction say the two spikes passed and the VPS gate is now met; keep the prior “NOT MET” statement explicitly as history. In Current gates, distinguish revision 4's completed review, approval and setup from revision 5's pending review, owner approval and later reconcile. Leave other Phase 1/4/5/7 gates open.
+- Owner: builder. Verification: no live gate claims the VPS choice is open and no prior approval is attributed to revision 5.
+
+### Applicability and self-check audit
+
+I built the applicability list from the hosting diff before comparing the PR self-check. UNI-07, UNI-12 and UNI-13 apply to the document PR and are covered; the four database/job rules above apply to the provider change and are missing. `UNI-08` and `UNI-16` become live at implementation of the new host, but this PR changes only the spec and makes no production secret or deployed runbook change. Other ticked UI, money, record, auth, link, file and payment rules have no changed behavior in this slice. The provider requirements already in the spec remain binding; an unspecified provider is not a waiver. Charlie's VPS decision is recorded; this review does not reopen it.
+
+### Verification performed and limits
+
+| Check | Result |
+|---|---|
+| GitHub PR #29 head/base and four CI jobs | Head `0b907991`; all four jobs pass on that head. This is document CI, not proof that any managed provider was exercised. |
+| `git diff --name-status` and `git diff --check` for the exact PR head | Only spec and decisions entry changed; no whitespace errors. |
+| `git hash-object` on the clean builder worktree and `git show <head>:<spec> \| git hash-object --stdin` | Both `3c2df1a0d8b3a61b7b387c2faee635514b5021f9`; review is pinned to that blob. |
+| Hostinger's own Malaysia VPS page, checked 2026-10-16 | Confirms KVM 2's 2 vCPU, 8 GB RAM, 100 GB NVMe and weekly backups, and shows the quoted US-dollar promotional and renewal figures; purchase terms still need rechecking. https://www.hostinger.com/vps/servers/malaysia |
+| Code tests, deployment or restore exercise | Not run; this is a spec review. Provider-specific evidence does not exist yet by design. |
+
+### Required before approval
+
+Resolve both P1s and the two before-merge P2s in a new spec/PR head, then request `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` again. Charlie's approval of revision 4 and the present CI checks do not approve this revision 5 blob. After an approved review and Charlie's own approval, `setup` reconciles its new hash before `build` uses it.
+
+## Round 12 — 2026-10-14 · scope: exact-hash approval-record follow-up
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 APPROVED revision 4 · hash (`git hash-object`) `eb89f4ab817c79c536cd36f8aef7c643a059d697` · same blob on fetched `origin/main`
+- **Prior rule-body review:** Round 11, v4.7 revision 4, hash `521a70979f48329363f6154a1f73687d9a82e03f`, Approved with conditions (Opus 5.5)
+
+**Verdict:** Approved with conditions
+**Model used:** GPT-6 · **Switch model next step?** No — Round 11 supplied the independent deep-tier rule-body review; this round checks the approval record and its exact final hash.
+
+### Findings
+
+No P0, P1 or before-plan P2 was introduced by the approval-record changes. The three diff hunks from the Round 11 blob change the title, Status paragraph and Current gates paragraph only. The substantive v4.7 rules and verification cases are byte-identical to the reviewed blob. The current gate list carries all Round 11 phase conditions; `setup` has now reconciled the exact spec hash and recorded Charlie's hard-rule confirmations.
+
+### [P3] Approval and setup prose has two stale descriptions
+- Category: documentation consistency
+- Rule: spec approval provenance and gate status
+- Evidence: `docs/superpowers/specs/2026-09-27-core-sales-design.md:3` says the approval record changes only the title, Status text and gate (a), but the diff from the Round 11 blob also expands gates (b)–(e) at `:1051`. That Current gates paragraph still says `setup` is remaining, while `agents/PROJECT.md:29` has the same final spec hash and `docs/DECISIONS.md:67-73` records Charlie's confirmation of TEN-02, REC-01 and AUTH-01.
+- Failure scenario: a reader thinks the later gate-list changes were absent from the approval-record PR, or thinks `build` still waits for `setup`.
+- Why it matters: the history and current status should describe the merged, reconciled state accurately. The executable kit gate reads the hash in `PROJECT.md`, so this prose does not block Phase 0.
+- Required correction: in a later reviewed spec revision, describe the amendment as gates (a)–(e) and mark `setup` complete. Keep the Phase 1, 4, 5 and 7 plan gates open.
+- Owner: builder
+- Verification: compare the revised Status and Current gates text with this hash's Git diff, `PROJECT.md` §2 and the decisions entry.
+- Status: open; nonblocking.
+
+### Self-check audit
+
+Spec review has no builder self-check table. For this exact-hash slice, applicability is approval provenance, deferred gate accuracy, and the hard-rule rulings referenced by the new gate paragraph. Runtime guardrail conformance remains as assessed in Round 11 because the rule body is unchanged. I checked the named TEN-07, UNI-19, UNI-10, MON-07, REC-11, AUTH-06, LINK-03 and LINK-07 rules against the gates and `PROJECT.md` §11.
+
+| Area | Applies? | Reviewer found | Evidence |
+|---|---|---|---|
+| Exact hash and approval provenance | Yes | Final hash matches `PROJECT.md` and `origin/main`; Charlie's recorded approval follows Round 11. Minor stale provenance wording above. | Spec `:1-3`; `PROJECT.md` §2; `docs/DECISIONS.md` 2026-10-11 entry |
+| `setup` hard-rule rulings | Yes | Completed in `PROJECT.md` §9 and decisions log; conditions on role/grant tests, lifecycle columns, PDPA check and link wrapper remain explicit. | `PROJECT.md` §9; `docs/DECISIONS.md:67-73` |
+| Phase 1, 4, 5 and 7 gates | Yes | All Round 11 deferred corrections and owner choices remain listed before their respective first plans. | Spec `:1051`; `PROJECT.md` §11; Round 11 Deferred conditions |
+| Other product and technical rules | No new rule-body change | Round 11 findings and dispositions still apply; no new rule claimed by this approval-record slice. | `git diff 9b95910..HEAD -- <spec>`; Round 11 |
+
+### Verification performed
+
+| Command / check | Result |
+|---|---|
+| `git hash-object <spec>`; `git show origin/main:<spec> | git hash-object --stdin` after `git fetch origin` | Both `eb89f4ab817c79c536cd36f8aef7c643a059d697`; matches `PROJECT.md` §2 |
+| `git diff 9b95910..HEAD -- <spec>` | Exactly three approval-record hunks; no body rule or verification-case edit |
+| Read Round 11, PR #19 Round 2, decisions approval and hard-rule rulings, `PROJECT.md` §9/§11, current gates and relevant guardrail text | Round 11 deferred plan gates preserved; `setup` completed; P3 wording issue above |
+| `git status --porcelain=v1 -- <spec> <review>` before writing | No tracked spec change; review file is local and ignored |
+| Code tests / CI / UI preview | Not run; document-only exact-hash review, with no runtime code change |
+
+### Residual risks and test gaps
+- This is an exact-hash review of approval-record edits, not a fresh full technical review of the unchanged 1,200-line rule body. Round 11's deep-tier review remains the technical basis.
+- The Phase 1, 4, 5 and 7 choices below remain open. This verdict does not approve their proposed values or authorize their plans before the named spec revisions.
+
+### Required before merge
+- None. This spec hash is already on `main`; the exact-hash spec and reconcile gates for Phase 0 `build` are met.
+
+### Deferred conditions
+- Before the first Phase 1 plan PR: Charlie chooses the VPS provider; decide rate-limit numbers and OTP re-issue cap, `crm_purge` read policies, restrictive tenant policies, the `/api/auth/*` public surface, and archive-job removal or partition design in a reviewed spec revision.
+- Before the first Phase 4 plan PR: decide tax registration versus open drafts, invoice-void policy, four payment-void choices, credit-note tax source, zero-total credit-note refusal and refund-void step-up in a reviewed spec revision.
+- Before the first Phase 5 plan PR: decide direct quote acceptance and expiry in a reviewed spec revision.
+- Before the first Phase 7 plan PR: decide artifact kinds and targets at agreement and proposal signing in a reviewed spec revision.
+
+### Optional improvements
+- Correct the P3 status prose when the spec next changes; an isolated edit would create another spec hash requiring review and reconcile.
+
 ## Round 11 — 2026-10-11 · scope: feature-complete spec review (independent deep-tier confirmation of Round 10)
 - **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 DRAFT revision 4 · hash (`git hash-object`) `521a70979f48329363f6154a1f73687d9a82e03f` · identical to the blob on `origin/main` at `9b95910d48108a026927e501e918e4fa5e05e234` (same blob as Round 10)
 
