@@ -1,5 +1,75 @@
 # Review — spec `core-sales-design`
 
+## Round 15 — 2026-10-16 · scope: exact-hash approval-record follow-up (PR #29)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 6 APPROVED · hash (`git hash-object`) `0b4068967dd767addfcc791587317d4445ee4159`.
+- **Pin:** PR #29 base and merge base `21507058293ca5d70d62e631eac6bde8d6a134f4`, head `24317ab7168746cf686c84e32583215dcb9f2cc2`. The clean builder worktree and committed head have the same spec hash. Round 14 approved the rule body at `c826f3ad87558ca9b1d8de2125569ad24fe6a464`; this round checks the four approval-record edits between those blobs.
+
+**Verdict:** Approved  
+**Model used:** GPT-6 · **Switch model next step?** No; this is an exact-hash approval-record check, and Round 11 was the independent Opus 5.5 full-spec review.
+
+### Findings
+
+No new P0, P1 or P2 finding. The spec diff from Round 14 changes exactly the title (`:1`), Status approval record (`:3`) and Current gates paragraph (`:1053`); `docs/DECISIONS.md` adds one approval line. R6, Stage 3's pre-cutover gate, the Phase 4 professional-check deadline, data model, flows, milestones and verification cases are unchanged. The new Status quotes Charlie's “yes” to the builder's explicit “Do you approve revision 6?” question after Round 14. The decisions entry and handoff give the same provenance; Bob cannot independently see that Andy-session exchange, so this check rests on the recorded owner answer rather than an invented one. The current gate text correctly puts merge after green CI and `setup` after merge to reconcile the final hash.
+
+#### [P3] PR body has stale hash and revision labels
+- Category: documentation polish.
+- Rule: exact revision and gate provenance.
+- Evidence: PR #29's top status block names head `24317ab` and hash `0b406896…`, but its “Gates” section still says `c826f3ad…` is the hash “on this head”; its “What” section still says the Current gates label is revision 5. The spec itself now labels Current gates revision 6 (`:1053`) and has the new hash above. The PR title also still says revision 5, reflecting the first hosting draft. The old approval-record clause at spec `:3` says the 2026-10-11 record changed only gate (a), while that older amendment actually touched gates (a)–(e) (Round 12 P3); it is historical and does not alter this approval.
+- Failure scenario: a reader using the PR body alone cites the prior reviewed blob or an old revision label. The current head/status block and spec record the correct hash and approval.
+- Why it matters: provenance is easier to follow when every PR summary names the final blob consistently; this is not a change to an operative rule.
+- Required correction: refresh the PR body before merge to identify the final hash and revision 6 throughout. Leave the historical spec clause for a later reviewed spec edit if desired; changing it now would create another hash and require another spec review.
+- Owner: builder.
+- Verification: PR body hash, title and revision labels match the final head and spec.
+- Status: open, nonblocking.
+
+### Applicability and verification
+
+- Scope is approval provenance and exact-hash consistency. The Round 14 applicability check of UNI-07, UNI-12, UNI-13, TEN-01, TEN-02, TEN-09 and EVT-01 remains valid because the hosting rule body and PR self-check table did not change. The phase-specific owner choices remain deferred at their named gates.
+- `git diff 223c6ee..24317ab` contains three spec-line replacements and one decisions-log line; `git diff --check` passes. `git show 24317ab:<spec> | git hash-object --stdin` and the clean builder worktree both return `0b4068967dd767addfcc791587317d4445ee4159`.
+- GitHub PR #29 still has its current head at `24317ab`. At the final check, dependency audit, secret scan and typecheck/lint/test pass; Image/Trivy/E2E is pending. No code tests or deployment checks were run locally for this document-only follow-up. Required CI must be green before merge (UNI-13).
+
+### Next step
+
+The owner approval is recorded. Once PR #29's required CI is green, Charlie can merge it. Then run `setup` to reconcile `agents/PROJECT.md` and `CLAUDE.md` to this exact final spec hash before `build` relies on the hosting revision.
+
+## Round 14 — 2026-10-16 · scope: revision 6 follow-up to hosting slice (PR #29)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 6 draft · hash (`git hash-object`) `c826f3ad87558ca9b1d8de2125569ad24fe6a464`.
+- **Pin:** PR #29 base `21507058293ca5d70d62e631eac6bde8d6a134f4`, head `223c6ee8dc7eb4c9db060ee4f817d1abb8525747`, merge base `21507058293ca5d70d62e631eac6bde8d6a134f4`. The clean builder worktree and committed head have the same spec hash. The effective diff is only the spec and `docs/DECISIONS.md`.
+
+**Verdict:** Approved  
+**Model used:** GPT-6 · **Switch model next step?** No for the approval-record and setup steps; Round 11 supplied the Opus 5.5 full-body review. This is a narrow follow-up, not a new pre-production review.
+
+### Round 13 findings rechecked
+
+| Prior finding | Result | Evidence |
+|---|---|---|
+| P1: chosen-provider test impossible in Phase 1 | Resolved. R6 now puts only the local PgBouncer maintenance cycle and `crm_worker` grant checks in Phase 1. Stage 3 has a named provider-specific gate on a staging instance before live traffic moves; it checks pooled/direct connections, migrations, roles/grants and RLS isolation, pg-boss and rollback behavior, PITR and restore, and the privacy locations. | Spec `:953`, `:962`, Phase 1 done-when `:1009`; revision 5 → 6 diff. |
+| P1: database/job rules missing from PR self-check | Resolved. The PR table now includes TEN-01, TEN-02, TEN-09 and EVT-01, each explicitly pending the chosen-provider gate rather than claiming a passed test. Existing contracts remain in the spec. | PR #29 body, Self-check; spec `:380`, `:962`. |
+| P2: cross-border and backup-location deadline | Resolved. The hosting item and both decisions entries refer to the existing professional check before Phase 4 goes live for the Malaysia host and R2 backup location; the Stage 3 location is checked before cutover; the separate Phase 9 purge check remains. The R2 backup location must be stated for the professional check. | Spec `:48`, `:962`, `:1044-1049`; decisions entries dated 2026-10-15 and 2026-10-16. |
+| P2: VPS gate simultaneously met and unmet | Resolved in the live spec text. The introduction and item 3 both say the VPS choice is met; old unmet text is identified as history. Current gates distinguish revision 4's completed review, approval and setup from revisions 5–6, which still need review, owner approval and reconcile. | Spec `:994`, `:1000`, `:1053`. |
+
+### [P3] The PR description and one gate label still carry revision 5 wording
+- Category: documentation polish.
+- Rule: exact revision and gate provenance.
+- Evidence: PR #29's latest status block identifies the current head and Round 13 fixes, but its “What” section still calls the spec revision 5 and its “Not changed / not decided” section still says the PDPA check is due before Phase 9. The current-gates paragraph in the spec at `:1053` labels itself “v4.7 revision 5” before correctly describing pending revisions 5 and 6. The older approval-record line at `:3` also retains Round 12's P3 wording about changing only gate (a).
+- Failure scenario: a reader skimming the PR body or the gate label misses the corrected deadline or mistakes the reviewed revision number. The current spec's operative Stage 2/3 gates and professional-check deadline are clear.
+- Why it matters: the PR and status text should match the exact reviewed blob, but this does not change the deployment criteria or the spec approval gate.
+- Required correction: refresh the PR body to revision 6 and the pre-Phase-4/pre-cutover privacy deadlines; change the current-gates label to revision 6 and clean up Round 12's approval-record provenance when the spec next needs a reviewed edit. A spec-file edit creates a new hash and needs another spec review.
+- Owner: builder.
+- Verification: compare the updated description/labels with this head and the operative spec sections.
+- Status: open, nonblocking.
+
+### Applicability, checks and limits
+
+- Applicable to this hosting revision: UNI-07, UNI-12, UNI-13, TEN-01, TEN-02, TEN-09, EVT-01, the recorded owner decision, the Phase 4 professional gate and the Stage 3 cutover gate. PR #29's self-check covers these. Other ticked UI, money, record, auth, link, file and payment behavior is unchanged from the reviewed revision 4 body. UNI-08 and UNI-16 apply when the host is actually deployed; this document PR changes no production secrets or runbook. There is no Stage 2/3 runbook yet; the only current runbook is the Phase 0 auth/database runbook.
+- `git diff --name-status` shows only the spec and decisions log; `git diff --check` is clean. The spec blob at the PR head and in the clean builder worktree both hash to `c826f3ad87558ca9b1d8de2125569ad24fe6a464`.
+- GitHub checks on this head: dependency audit, secret scan, and typecheck/lint/test pass; Image/Trivy/E2E remains pending at review time. Do not merge while required CI is pending or failing (UNI-13). No code tests, deployment or provider restore were run in this document review; the provider remains unchosen by Charlie's decision.
+- Phase 1, 4, 5 and 7 decisions previously deferred by Round 11 remain open at their named plan gates. This verdict approves this hosting spec slice only; it does not decide them or choose a Stage 3 provider.
+
+### Next step
+
+Charlie can approve revision 6 in his own words after this review. Then run `setup` to reconcile `agents/PROJECT.md` and `CLAUDE.md` to this exact spec hash before `build`. PR #29 merge still requires its CI to finish green and the normal owner merge action.
+
 ## Round 13 — 2026-10-16 · scope: revision 5 hosting slice (PR #29)
 - **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 5 draft · hash (`git hash-object`) `3c2df1a0d8b3a61b7b387c2faee635514b5021f9`.
 - **Pin:** PR #29 base `21507058293ca5d70d62e631eac6bde8d6a134f4`, head `0b907991be0d34d8ec538018b397a8dca4a18c56`, merge base `553f0b2960996bb756f1d4044b443d60e470e5b7`. The working spec in the clean builder worktree and the blob at that head have the same hash. Diff: this spec and `docs/DECISIONS.md` only. The unchanged body keeps Round 11's deep-tier technical review and Round 12's exact-hash approval follow-up as its baseline.
