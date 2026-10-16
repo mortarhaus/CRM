@@ -10,6 +10,7 @@
 - **Versions:** none.
 - **Exception to a rule?** no
 - **Decided by:** owner (Charlie, 2026-10-16, in his own words in the Andy session; Bob cannot see it). The builder asked in plain text how Stage 3 should read: A (managed PostgreSQL, provider chosen at first sale, DigitalOcean only as the earlier plan) or B (keep DigitalOcean Singapore as written), with a pick of A. Charlie started the revision with "spec hosting: Hostinger KVM 2 in Malaysia" and answered "A".
+- **Approval (2026-10-16):** after Bob's spec review Round 14 (Approved, hash `c826f3ad…`, PR #29 head `223c6ee`), the builder asked in plain text "Do you approve revision 6?" and summarised what it changes. Charlie answered: "yes". The builder records the approval in the spec Status; the spec hash changes with that record, so Bob confirms the exact hash before `setup` (as in Round 12).
 
 ## 2026-10-15 — VPS provider for the own-SaaS stage: Hostinger KVM 2 (spec Open question 4)
 - **Decision:** The VPS provider is **Hostinger KVM 2** (Malaysia location). It is the provider for the "one VPS" stage of the staged hosting plan (spec "Runtime and hosting", Stage 2: prod compose with `web`, `worker`, `postgres`, `cloudflared`, files on R2, email via Resend, Cloudflare in front).
