@@ -1,0 +1,8 @@
+pr: 30
+reviewed_head_sha: df507189199a562e0cb492e8deb857e36e827d4c
+review_file: reviews/PR-30.md
+review_file_hash: 2c426fb1d467d31559f6084d672e35efe8bf0d30
+log_branch_commit_with_review: 700fe93857ba3fa55d11a87226d6726a18707c1d
+verdict: Approved (Round 1)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-17T07:36:26Z
