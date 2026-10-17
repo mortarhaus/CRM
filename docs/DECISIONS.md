@@ -2,6 +2,20 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-10-17 — Phase 1 gate proposals (spec v4.7 revision 7, draft)
+- **Decision:** The five Phase 1 plan gates are **drafted as proposals, NOT decided**, in spec v4.7 revision 7 ("Changes in v4.7" item 8; each policy in full in its home section):
+  - Rate limits and OTP re-issue cap: database-backed fixed-window counters per IP, account, link and contact, a uniform `429`, numbers in "Authentication and sessions" → "Rate limits" (e.g. OTP issue 3 per hour and 10 per day per link).
+  - `crm_purge` read policies: exact column-level grants on thirteen named tables plus INSERT on `audit_log`, workspace policies, purge predicates in DELETE and redaction policies, no other reads; catalog and behavioural tests.
+  - TEN-07: a RESTRICTIVE workspace policy `TO crm_app, crm_purge` on every tenant table plus PERMISSIVE per-operation policies; `share_link_resolve` unchanged; a catalog test.
+  - UNI-19 / AUTH-01: `/api/auth/*` listed as unauthenticated surface, not routed through `action()`, rate-limited with uniform responses; only the Phase 1 endpoints enabled.
+  - UNI-10: the monthly archive job for `audit_log` / `domain_event` removed from Part 1 (alternative kept in the spec: partitions detached by `crm_migrator`).
+- **Why:** These are the open Phase 1 plan gates ("Next steps after approval" → Current gates (b); Bob spec review Round 8 P2 #4 and #5, Round 11 P2). The Phase 1 plan cannot be written until they are reviewed and decided.
+- **Alternatives rejected:** none rejected yet; each proposal names its alternative in the spec for Charlie to choose.
+- **Scope / affects:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` only (title, Status, "Changes in v4.7" items 5 and 8, Authentication and sessions, Tenancy, Anonymous access, Client links and signatures, the surface list, Audit, logging, privacy, Scalability, the Phase 1 row, Next steps gates (a) and (b), Verification). `agents/PROJECT.md` (§9 "Open for Bob" and the TEN-06 / TEN-07 exception wording, §11) and `CLAUDE.md` are reconciled by `setup` only after approval.
+- **Versions:** none.
+- **Exception to a rule?** no
+- **Decided by:** builder proposal pending owner review; Bob's R11 proposals adopted for items 3-5; nothing here is an owner decision.
+
 ## 2026-10-16 — Hosting spec revision: Stage 2 on Hostinger KVM 2 (Malaysia); Stage 3 database provider chosen at first sale
 - **Decision:** Spec v4.7 revision 5 (draft; hosting wording only) changes Stage 2 from "one Singapore VPS" to "one Hostinger KVM 2 VPS (Malaysia)" and Stage 3 from "DigitalOcean Managed PostgreSQL, Singapore" to "a managed PostgreSQL with PITR and a transaction-mode pool, provider and region chosen at first sale" (DigitalOcean Singapore stays only as the earlier plan). Open question 4 is marked resolved; gate (3) of "Checks before the Phase 1 plan is written" is met for the VPS provider.
 - **Why:** The VPS choice of 2026-10-15 (entry below) put the host in Malaysia and Charlie found DigitalOcean too expensive; the approved spec text no longer matched. The connection design (Known risks R4 and R6) and tests stay valid for any managed PostgreSQL with a transaction-mode pooler.
