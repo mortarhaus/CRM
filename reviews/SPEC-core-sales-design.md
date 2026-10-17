@@ -1,5 +1,75 @@
 # Review — spec `core-sales-design`
 
+## Round 17 — 2026-10-17 · scope: Phase 1 gate proposal follow-up (PR #31)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft, updated after Round 16 · hash (`git hash-object`) `3e816bee2c65fe8ef646a41939e89a2d22750c40`.
+- **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `01a99591fbad27d374a35f624f29f8d5ef7969d5`; the committed blob and clean builder worktree match. Head rechecked at end: yes. Round 16 reviewed hash `03e64025ffa5db54cd4428c1c02fcb7be581b832`; this round checks the correction diff and the effective revision 7 slice against revision 6.
+
+**Verdict:** Revision required  
+**Model used:** GPT-6 · **Switch model next step?** Yes — `PROJECT.md` §6 maps deep security/spec review to Opus 5.5. This is a review record, but the corrected exact hash should receive that tier's review before Charlie approves it.
+
+### Round 16 corrections rechecked
+
+| Prior finding | Result | Evidence |
+|---|---|---|
+| P1: SaaS IP header absent from form forwarding | Resolved in the design. Phase 1 must change `forward.ts` to use one derived, edge-set IP, stripping all caller forwarding headers; direct and form requests share a key, with spoofing and missing-header tests. Current code still has the Phase 0 forwarding behavior, which is appropriately named as future work. | Spec `:712`, `:739`, `:1186`; code `apps/web/src/lib/auth/forward.ts:8-17`. Caddy's documented default ignores incoming `X-Forwarded-*` values, matching the stated self-host assumption: [Caddy reverse-proxy docs](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy). |
+| P1: app OTP counter not atomic | Resolved for app-owned keys. The spec now requires an atomic upsert/conditional update, fixed key order, a single transaction with challenge creation, rollback on any refused key and concurrent tests. Better Auth storage atomicity is an explicit Phase 1 source-and-test gate. | Spec `:713`, `:1186`. |
+| P1: TEN-03/TEN-09/EVT-06 absent from self-check | Those three rows are present in PR #31's current self-check with pending implementation tests. The worker schedule, tenant transaction and runtime-role grant test are now named in the spec. A separate TEN-10 omission remains below. | PR #31 body, Self-check; spec `:711`, `:838`, `:1005`, `:1186`, `:1214`. |
+| P2: unresolved-link threshold order | Partially resolved. All token states use a pre-resolution gate and the generic-page/429 boundary is explicit. The new reserve/refund algorithm has a concurrency and window-boundary gap below. | Spec `:714`, `:729`, `:794`, `:1186`. |
+
+### Findings
+
+#### [P1] `crm_purge` can mark retained quotation or proposal parents as purged
+- Category: security and data-integrity defect; narrow-purge scope mismatch.
+- Rule: spec Audit, logging, privacy → Customer purge; TEN-06/TEN-07.
+- Evidence: spec `:833` protects any version referenced by an invoice or `version_retention`; `:842-843` grants `crm_purge` UPDATE on `quotation.purged_at` and `proposal.purged_at`; `:857` explicitly gives those UPDATE policies only the workspace predicate, with no purge eligibility condition. The job rechecks under a parent lock at `:861`, but direct role SQL is not bound by that application-level recheck. The behavioural tests at `:860` cover direct DELETE of protected versions and direct UPDATE of customers, not direct UPDATE of these parents.
+- Failure scenario: under `withWorkspace(A)`, `crm_purge` runs `UPDATE quotation SET purged_at = now() WHERE id = <quote with a retained, invoice-sourced version>`. The grant and policy allow the update, even though the version is not purgeable. The same holds for a proposal with an approved version.
+- Why it matters: the dedicated purge role can falsely mark a live or legally retained parent as purged, outside the accepted narrow purge scope. A later read that filters on `purged_at` may hide it or invalidate a live flow while the protected version still exists.
+- Required correction: constrain the `purged_at` transition at the database boundary to the intended purge outcome, including the case where some versions of a parent must be retained; preserve the parent-row lock used for race safety. Add direct-role tests for a retained/invoice-referenced version and an eligible parent, asserting the former update is refused and the latter works only in the permitted purge transaction.
+- Owner: builder. Verification: inspect grants, policy/trigger or narrow function, and the forced direct-role tests in the revised spec; implementation tests use the real `crm_purge` role.
+- Status: open.
+
+#### [P1] TEN-10 is still absent from the PR self-check
+- Category: guardrail review coverage.
+- Rule: reviewer role §3; TEN-10.
+- Evidence: the new app limiter and cleanup job access the no-RLS rate-limit table through the allow-listed system module (spec `:711`); `PROJECT.md` §9 defines the lint-enforced system-module exception, and TEN-10 requires it. PR #31's updated self-check adds TEN-03, TEN-09 and EVT-06, but has no TEN-10 row. Round 16's independent applicability list already included TEN-10; this omission was not called out in that round.
+- Failure scenario: the Phase 1 plan treats the counter table as generally accessible outside `withWorkspace()` instead of limiting direct access to the named system module; the project-specific lint boundary is not reviewed for the new path.
+- Why it matters: reviewer role §3 makes an applicable rule missing from the self-check a P1, regardless of whether the spec text itself appears compliant.
+- Required correction: add a TEN-10 row that names the limiter/cleanup system-module entry points, the lint-enforced allow-list and the Phase 1 test or lint evidence; mark future checks pending.
+- Owner: builder. Verification: compare the updated self-check with the spec and TEN-10.
+- Status: open.
+
+#### [P2 · before merge] The non-resolving gate's reservation is not tied to its window
+- Category: resilience and testability defect.
+- Rule: Security → Rate limits → Order on client link requests.
+- Evidence: spec `:714` says every link request consumes one unit of a 20/hour non-resolving-IP counter before resolution, then gives it back with an atomic decrement when a token resolves. It does not require the decrement to address the same window that was consumed. The `:1186` concurrency test covers bursts one below the cap and a window boundary for app counters, but not a valid-link resolution delayed across that boundary or concurrent valid and invalid requests while the provisional count is full.
+- Failure scenario: a valid request reserves the last slot in window W, resolution waits until W+1 starts, and another request opens W+1's counter. A decrement by IP key alone can subtract from W+1, leaving an extra allowance there. While the valid request is pending, an invalid request can also get `429` even though fewer than 20 non-resolving attempts have completed.
+- Why it matters: the stated 20/hour bound and the test's exact threshold behavior depend on how provisional reservations are accounted for under concurrency and expiry.
+- Required correction: specify a reservation or counter update scoped to the original window, and define whether pending valid requests may temporarily occupy capacity. Test a valid resolution delayed across the boundary and a valid/invalid interleaving at 19 of 20; assert the chosen counting and response behavior exactly.
+- Owner: builder. Verification: revised algorithm and forced Testcontainers interleavings at the threshold/window boundary.
+- Disposition: before merge.
+- Status: open.
+
+### Self-check audit
+
+Applicable to this correction slice: UNI-02/10/12/13/19; TEN-02/03/05/06/07/09/10; AUTH-01/05/06; LINK-03/07; EVT-06; `PROJECT.md` §9's fixed-limit and system-module rules. PR #31 has a self-check. Its new TEN-03/TEN-09/EVT-06 rows match the revised spec and mark tests pending. TEN-10 is applicable and missing as found above. TEN-05, RLS `ENABLE` and `FORCE`, remains an unchanged requirement with the existing schema/Phase 1 test; no new deviation was found. No money, payment, file or UI rule changes in this slice. Charlie has not accepted any of the five proposals; the review does not decide them.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| PR #31 host head/base and local committed blob | Head `01a99591fbad27d374a35f624f29f8d5ef7969d5`, base `bccb846…`; spec blob and clean builder worktree both hash to `3e816bee2c65fe8ef646a41939e89a2d22750c40`. Head rechecked at the end. |
+| `git diff ed0ead7..01a9959` and `git diff --check bccb846...01a9959` | Inspected correction hunks; no whitespace errors. Effective PR changes only the spec and decisions log. |
+| PR #31 CI on this head | Dependency audit, secret scan, typecheck/lint/test and Image/Trivy/E2E pass. They exercise current code, not the proposed Phase 1/7/9 controls. |
+| Project, prior review, guardrails, spec, decisions and Phase 0 auth forwarding | Read; compared each Round 16 finding with the new lines. No local tests, DB tests, deployment or UI preview were run for this document review. |
+
+### Residual risks and test gaps
+- Better Auth 1.7.6's database-counter implementation and missing-IP behavior remain source checks in the Phase 1 plan; the installed package was unavailable in this checkout. The spec provides a custom-storage fallback and test gate.
+- Open question 8 (`crm_purge` login versus `SET ROLE`) is explicitly due in the Phase 1 plan. The six PR-body owner questions on limits, archiving and purge behavior remain unanswered. They cannot be treated as approved values.
+- This is a revision 7 slice review. The revision 6 approval at hash `0b406896…` remains valid; no production behavior was verified.
+
+### Required before approval
+- Andy resolves both P1s and the before-merge P2 on a new spec/PR head. Charlie then runs `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` again, preferably in the project's Opus 5.5 deep tier. After an approved exact-hash review, Charlie decides the five proposals and approves the final spec; `setup` reconciles `PROJECT.md` before the Phase 1 plan.
+
 ## Round 16 — 2026-10-17 · scope: Phase 1 gate proposal slice (PR #31)
 - **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft · hash (`git hash-object`) `03e64025ffa5db54cd4428c1c02fcb7be581b832`.
 - **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `ed0ead751e68d827c7620cfdd4c397ccd110bd86`; committed blob and clean builder worktree have the same spec hash. Head rechecked at end: yes. Diff: spec and `docs/DECISIONS.md` only. Revision 6 at hash `0b4068967dd767addfcc791587317d4445ee4159` remains the approved baseline.
