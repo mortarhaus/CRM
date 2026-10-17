@@ -1,5 +1,77 @@
 # Review — spec `core-sales-design`
 
+## Round 16 — 2026-10-17 · scope: Phase 1 gate proposal slice (PR #31)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft · hash (`git hash-object`) `03e64025ffa5db54cd4428c1c02fcb7be581b832`.
+- **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `ed0ead751e68d827c7620cfdd4c397ccd110bd86`; committed blob and clean builder worktree have the same spec hash. Head rechecked at end: yes. Diff: spec and `docs/DECISIONS.md` only. Revision 6 at hash `0b4068967dd767addfcc791587317d4445ee4159` remains the approved baseline.
+
+**Verdict:** Revision required  
+**Model used:** GPT-6 · **Switch model next step?** Yes — the project maps deep spec/security review to Opus 5.5; use it for the revised exact hash before Charlie approves.
+
+### Findings
+
+#### [P1] The selected SaaS client-IP header is absent from the form forwarding path
+- Category: spec/implementation mismatch; rate-limit security.
+- Rule: AUTH-06, LINK-03; spec Security → Rate limits.
+- Evidence: spec `:711` chooses `CF-Connecting-IP` behind the Cloudflare Tunnel and states that the server-action path `apps/web/src/lib/auth/forward.ts` forwards the selected header. That file `:8-17` forwards `x-forwarded-for` but not `cf-connecting-ip`; `:33-45` passes only that selected list into Better Auth's handler. The new verification paragraph at spec `:1183` tests counters across processes, but not parity between direct `/api/auth/*` requests and the form path or spoofed headers.
+- Failure scenario: Phase 1 configures Better Auth to key SaaS auth limits from `CF-Connecting-IP`. Direct auth requests have that header, while form submissions forwarded by `postToAuth` do not; they are keyed differently or fall back to an absent/shared IP. If a deployment instead accepts a caller-supplied `X-Forwarded-For`, an attacker can rotate it to evade the per-IP cap.
+- Why it matters: the proposed numbers are not a reliable bound unless both entry paths derive the same canonical, trusted client address.
+- Required correction: make the spec explicitly require the Phase 1 change to `forward.ts`, define the trusted proxy/header configuration for SaaS and self-host, discard caller-supplied forwarding headers at the edge, and test a direct auth request and a form submit from the same IP against one counter, including a forged-header attempt.
+- Owner: builder. Verification: inspect the revised contract and its named integration tests; at implementation, run both paths behind the configured proxies.
+- Status: open.
+
+#### [P1] Concurrent requests can exceed the app-owned OTP caps
+- Category: material security risk; incomplete testable control.
+- Rule: AUTH-06, LINK-03, LINK-07; spec Security → Rate limits.
+- Evidence: spec `:711` assigns per-account, per-link and per-contact limits to a new app limiter sharing Better Auth's table; `:727-734` caps OTP challenges and guesses, and `:1183` tests persistence across two processes and restart. It does not require atomic check-and-increment or a concurrent-request test. Better Auth's own rate-limit documentation explicitly requires a custom storage `consume` operation to check and increment atomically; that does not establish atomicity for this separate app limiter. [Better Auth rate-limit documentation](https://better-auth.com/docs/concepts/rate-limit).
+- Failure scenario: two web processes read a per-link count of 2 under a cap of 3 at the same time; both permit an OTP issue and each writes 3. Repeated parallel requests can issue more challenges than the stated 10/day bound.
+- Why it matters: the OTP re-issue cap and stated guessing bound rely on the counter being a real concurrent bound, not only a sequential one.
+- Required correction: specify an atomic database consume operation for every app-owned key, with all relevant keys (link, contact, IP and spacing) checked consistently before issuing a challenge; add forced concurrent requests from two web processes at each cap, asserting at most the remaining allowance succeeds.
+- Owner: builder. Verification: revised spec names the atomic operation and race cases; Phase 7 tests exercise them with a real database.
+- Status: open.
+
+#### [P1] Applicable guardrails are missing from PR #31's self-check
+- Category: guardrail review coverage.
+- Rule: reviewer role §3; TEN-03, TEN-09, EVT-06.
+- Evidence: PR #31's self-check covers UNI-10, TEN-02/06/07 and auth/link rules but has no row for TEN-03 (the new no-DELETE/UPDATE archive decision at spec `:1002`), TEN-09 (the new `crm_purge` policy and `withWorkspace()` contract at `:835-857`) or EVT-06 (the new daily counter-cleanup worker job at `:711`). These are applicable to the changed scope, even if the proposed behavior appears consistent with them.
+- Failure scenario: the Phase 1 plan copies the table as proof and omits the tenant transaction context or schedules the cleanup through HTTP; an unreviewed grants design also weakens the append-only guarantee.
+- Why it matters: reviewer role §3 classifies a missing applicable rule in the builder's self-check as P1; the table is part of the gate evidence.
+- Required correction: add those three rows with exact spec evidence and phase timing; mark future implementation tests pending, not passed.
+- Owner: builder. Verification: recheck the PR's self-check against the revised spec and the relevant guardrail packs.
+- Status: open.
+
+#### [P2 · before merge] The link-limit promise conflicts with the separate unresolved-link threshold
+- Category: spec consistency and testability.
+- Rule: Security → Rate limits; Anonymous access.
+- Evidence: spec `:724-726` gives valid link views 60 per 10 minutes per IP and 200 per day per link, but unresolved links 20 per hour per IP. At `:735` it says counting never depends on whether a link exists and that the `429` reveals nothing; `:791` and `:795` require every unresolved link to show the same generic page/status; `:1183` checks only the `429` body. After 21 requests in an hour, an unknown token can return `429` while a revoked/superseded or valid token may be subject to another counter depending on resolution.
+- Failure scenario: two builders put the unresolved-link limit before versus after resolution and produce different statuses for unknown, revoked and expired tokens, while each can claim to follow one part of the spec. The proposed test does not settle which behavior is required.
+- Why it matters: the anonymous-link response and rate-limit requirements cannot be implemented or verified consistently as written.
+- Required correction: define which IP counter runs before token resolution, how all non-resolving states share it, and whether the generic-page guarantee excludes rate-limited requests. Make the response/status test cover the threshold transition, not just body equality.
+- Owner: builder. Verification: a test forces unknown, revoked and expired tokens past the same threshold and checks their exact statuses and bodies.
+- Disposition: before merge.
+- Status: open.
+
+### Self-check audit
+
+Applicable to this slice: UNI-02/10/12/13/19; TEN-02/03/05/06/07/09/10; AUTH-01/05/06; LINK-03/07; EVT-06; the project's fixed-limit location and Phase 1 plan gate. No new money, payment, file or UI rule is proposed. PR #31 has a self-check, so it is not Blocked; the three omissions above are the P1 coverage finding. The TEN-07 restrictive-plus-permissive shape agrees with PostgreSQL's policy-combination semantics, and the `share_link_resolve` role remains outside the restrictive policy. [PostgreSQL 17 row-security documentation](https://www.postgresql.org/docs/17/ddl-rowsecurity.html). The archive-job removal resolves the identified append-only conflict in principle. Charlie has not decided the five proposals; this review makes no owner choice.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| `gh pr view 31 --json …` at start and end | Open; head remained `ed0ead751e68d827c7620cfdd4c397ccd110bd86`, base `bccb846…`. |
+| `git hash-object` on the builder worktree and `git show ed0ead7:<spec> \| git hash-object --stdin` | Both `03e64025ffa5db54cd4428c1c02fcb7be581b832`; builder worktree clean. |
+| `git diff --check bccb846...ed0ead7` | Clean. Diff is two document files, +90/−15 lines. |
+| GitHub PR #31 checks | Dependency audit, image/Trivy/E2E, secret scan and typecheck/lint/test pass on this head. These validate current code, not the proposed Phase 1 controls. |
+| Spec/decisions/guardrails/current auth forwarding | Read the changed sections, `PROJECT.md` §9/§11, prior spec Round 15, relevant packs and `forward.ts`. No code tests or deployment check were run for this document review. |
+
+### Residual risks and test gaps
+- The six PR-body questions about OTP volumes, Turnstile-off limits, link views, archiving, purge audit writer and issued-document checks still require Charlie's own decisions after the blocking corrections. This round does not approve the proposed values.
+- The installed Better Auth 1.7.6 source was unavailable in this checkout. Current official documentation supports database storage and custom path rules, but version-specific behavior remains to be pinned in the Phase 1 plan.
+- The prior Round 15 approval of revision 6 remains valid for its exact hash. This round reviews only revision 7's Phase 1 gate slice, not the unchanged full spec or production behavior.
+
+### Required before approval
+- Andy addresses the three P1 findings and the before-merge P2 in a new spec/PR head, then Charlie runs `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` again. Use the project's deep model tier (Opus 5.5) for the revised security/RLS review. Charlie then decides the proposals and approves the final exact hash before `setup` reconciles it.
+
 ## Round 15 — 2026-10-16 · scope: exact-hash approval-record follow-up (PR #29)
 - **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 6 APPROVED · hash (`git hash-object`) `0b4068967dd767addfcc791587317d4445ee4159`.
 - **Pin:** PR #29 base and merge base `21507058293ca5d70d62e631eac6bde8d6a134f4`, head `24317ab7168746cf686c84e32583215dcb9f2cc2`. The clean builder worktree and committed head have the same spec hash. Round 14 approved the rule body at `c826f3ad87558ca9b1d8de2125569ad24fe6a464`; this round checks the four approval-record edits between those blobs.
