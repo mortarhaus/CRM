@@ -11,7 +11,7 @@
   - UNI-10: the monthly archive job for `audit_log` / `domain_event` removed from Part 1 (alternative kept in the spec: partitions detached by `crm_migrator`).
 - **Why:** These are the open Phase 1 plan gates ("Next steps after approval" → Current gates (b); Bob spec review Round 8 P2 #4 and #5, Round 11 P2). The Phase 1 plan cannot be written until they are reviewed and decided.
 - **Alternatives rejected:** none rejected yet; each proposal names its alternative in the spec for Charlie to choose.
-- **Scope / affects:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` only (title, Status, "Changes in v4.7" items 5 and 8, Authentication and sessions, Tenancy, Anonymous access, Client links and signatures, the surface list, Audit, logging, privacy, Scalability, the Phase 1 and Phase 7 rows, Next steps gates (a) and (b), Verification). `agents/PROJECT.md` (§9 "Open for Bob" and the TEN-06 / TEN-07 exception wording, §11) and `CLAUDE.md` are reconciled by `setup` only after approval.
+- **Scope / affects:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` only (title, Status, "Changes in v4.7" items 5 and 8, data model `quotation`, Authentication and sessions, Tenancy, Anonymous access, Client links and signatures, the surface list, Audit, logging, privacy, Scalability, Repo layout, the Phase 1, Phase 7 and Phase 9 rows, Next steps gates (a) and (b), Verification). `agents/PROJECT.md` (§9 "Open for Bob" and the TEN-06 / TEN-07 exception wording, §11) and `CLAUDE.md` are reconciled by `setup` only after approval.
 - **Versions:** none.
 - **Exception to a rule?** no
 - **Decided by:** builder proposal pending owner review; Bob's R11 proposals adopted for items 3-5; nothing here is an owner decision.
