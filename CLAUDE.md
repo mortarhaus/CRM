@@ -3,7 +3,7 @@
 Charlie's CRM for selling and getting paid (quotes, invoices, proposals, agreements) for small and
 medium creative agencies. Dogfooded by Charlie's studio. Sold as hosted SaaS and as a self-host product.
 
-- **Source of truth:** `docs/superpowers/specs/2026-09-27-core-sales-design.md`, spec **v4.7** (revision 4; latest version in its Status line).
+- **Source of truth:** `docs/superpowers/specs/2026-09-27-core-sales-design.md`, spec **v4.7** (revision 6; latest version in its Status line).
 - **Builder role (Andy):** `agents/roles/builder.md`. **Reviewer role (Bob):** `agents/roles/reviewer.md`. Commands and ground rules: `agents/START.md`. Project facts: `agents/PROJECT.md`.
 - **Repo root = this folder.** Monorepo: `apps/web`, `packages/core`. `packages/extensions/*` is created in the SaaS part (Part 3, spec Appendix A), not in Part 1.
 - **UI work:** follow `FRONTEND_STANDARDS.md` (semantic HTML, WCAG 2.2, Tailwind + shadcn, `cn()`/`cva()`, semantic tokens).
@@ -11,9 +11,9 @@ medium creative agencies. Dogfooded by Charlie's studio. Sold as hosted SaaS and
 
 ## Status
 
-- Spec v4.7 (revision 4) approved by Charlie on 2026-10-11 (reviewed blob merged at `9b95910`, PR #18; approval recorded by the PR #19 merge `98f8675`). It supersedes v4.6 (approved 2026-10-09) and v4.5 (approved 2026-09-30 at `8989d59`, PR #2). Both Phase 1 spikes passed on 2026-09-29.
-- Phase 0 PRs 1-3 merged: PR 1 (Tasks 1-5, tooling) on 2026-09-30 (`97cfaab`), PR 2 (Tasks 6-10, env, DB, Better Auth) as PR #22 on 2026-10-13 (`ce4bbf2`), PR 3 (Tasks 11-14, health, auth UI, 2FA, workspaces) as PR #26 on 2026-10-15 (`074018f`). PR 4 (Tasks 15-17: worker stub, Docker image, CI image job) is on `feat/p0-runtime`; Phase 0 is complete once it merges.
-- The Phase 0 plan (`docs/superpowers/plans/2026-09-29-phase-0-foundation.md`) is patched for v4.5; v4.6 and v4.7 change no Phase 0 task. Next after Phase 0: the Phase 1 plan (tenancy, five roles, RLS, pg-boss + transactional events), written only after the Phase 1 gates in the spec are met ("Next steps after approval" → Current gates (b), incl. Charlie's VPS provider choice).
+- Spec v4.7 (revision 6, hosting wording only) approved by Charlie on 2026-10-16 (merged as PR #29, `cc3afd7`). It builds on v4.7 revision 4, approved by Charlie on 2026-10-11 (reviewed blob merged at `9b95910`, PR #18; approval recorded by the PR #19 merge `98f8675`), and supersedes v4.6 (approved 2026-10-09) and v4.5 (approved 2026-09-30 at `8989d59`, PR #2). Both Phase 1 spikes passed on 2026-09-29.
+- Phase 0 PRs 1-3 merged: PR 1 (Tasks 1-5, tooling) on 2026-09-30 (`97cfaab`), PR 2 (Tasks 6-10, env, DB, Better Auth) as PR #22 on 2026-10-13 (`ce4bbf2`), PR 3 (Tasks 11-14, health, auth UI, 2FA, workspaces) as PR #26 on 2026-10-15 (`074018f`). PR 4 (Tasks 15-17: worker stub, Docker image, CI image job) as PR #27 on 2026-10-15 (`b90dc48`). Phase 0 is complete.
+- The Phase 0 plan (`docs/superpowers/plans/2026-09-29-phase-0-foundation.md`) is patched for v4.5; v4.6 and v4.7 change no Phase 0 task. Next after Phase 0: the Phase 1 plan (tenancy, five roles, RLS, pg-boss + transactional events), written only after the Phase 1 gates in the spec are met ("Next steps after approval" → Current gates (b)). The VPS provider is chosen (Hostinger KVM 2, Malaysia, 2026-10-15); the other gates in (b) are still open.
 
 ## Commands
 
