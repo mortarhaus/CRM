@@ -1,5 +1,57 @@
 # Review — spec `core-sales-design`
 
+## Round 19 — 2026-10-18 · scope: Phase 1 gate proposal follow-up (PR #31)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft, updated after Rounds 16–18 · hash (`git hash-object`) `f44e0e5f876e4cd15b59a0bf1c4530fe941cd921`.
+- **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `d9c046afed4c9ac350df20d34a194c3bfc97c11a`; local builder worktree is clean and its spec blob matches. Round 18 reviewed hash `418d7a60a43617e20bc0c64ac71d8abfec7dff98`. This round checks the correction diff and effective revision 7 proposal against approved revision 6.
+
+**Verdict:** Revision required  
+**Model used:** GPT-6 · **Switch model next step?** Yes — `PROJECT.md` §6 maps deep security/spec review to Opus 5.5. The corrected exact hash should receive that tier's review before Charlie approves it.
+
+### Round 18 corrections rechecked
+
+| Prior finding | Result | Evidence |
+|---|---|---|
+| P1: version INSERT after a parent is purged | Resolved in the design. The insert trigger locks and checks the parent before writing; app sends check too. Forced purge-first, send-first and direct-role cases assert the final state. PostgreSQL 17 documents the `FOR UPDATE` / `FOR KEY SHARE` conflict and updated-row behavior. | Spec `:875-876`, `:879` tests (9)–(11); [PostgreSQL row locks](https://www.postgresql.org/docs/17/explicit-locking.html). |
+| P2: no FK/current-pointer outcome | The FK actions and intended job outcome are now defined, and PostgreSQL 17 supports column-specific `SET NULL`. However, the stated DELETE predicate does not enforce the current-pointer rule against direct `crm_purge` SQL; finding below. | Spec `:461-476`, `:874`, `:879` test (12); [PostgreSQL FK actions](https://www.postgresql.org/docs/17/ddl-constraints.html). |
+
+### Findings
+
+#### [P1] Direct deletion of a current version can leave a live parent without its current pointer
+- Category: database-enforcement and data-integrity defect.
+- Rule: revision 7 current-pointer rule; TEN-06/TEN-07; narrow purge scope.
+- Evidence: spec `:476` says a current version is deleted only when every version of its parent is deleted, and calls `purge_version_is_purgeable()` the enforcement. But the function's condition (d) at `:874` checks only that **other versions meet** (a)–(c), not that they have been deleted. `crm_purge` has direct DELETE on both version tables (`:861-862`), and the current-pointer FKs use `ON DELETE SET NULL` (`:465-466`). Test (12) at `:879` covers direct DELETE of a current version only when a protected older version exists; it does not cover a current-only parent or one whose other versions are merely eligible.
+- Failure scenario: inside `withWorkspace(A)`, `crm_purge` directly deletes the only current sent version, or deletes the current version first while eligible older versions remain. Conditions (a)–(d) pass. The FK clears `current_version_id` / `current_sent_version_id`, but no job step sets `purged_at`. The parent remains live and `sent` with a NULL current pointer, contradicting the board and send rules. The database guard on `purged_at` does not see an unchanged NULL.
+- Required correction: enforce the final parent/current-pointer invariant at the database boundary for direct-role DELETE, including the case with no other versions; or redesign deletion so only an atomic, guarded purge operation can remove the current version. Add direct-role tests for the current-only and all-others-eligible cases, asserting that no committed live parent has a NULL current pointer.
+- Owner: builder. Verification: inspect the revised DB rule and real-role tests, including a direct DELETE outside the purge job.
+- Status: open.
+
+#### [P1] A queued PDF render can recreate a purged PDF outside the artifact ledger
+- Category: privacy/data-deletion race and job retry failure.
+- Rule: accepted customer-purge scope; EVT-05; spec PDF timing and Customer purge.
+- Evidence: `pdf.render` is enqueued on a quote/proposal send and runs in a worker (`:656`, `:667`); the purge promises to remove the version's artifact rows **and PDF files** (`:851`). The new insert guard at `:876` addresses version INSERT, and the existing artifact insert trigger only refuses a missing target. No rule serializes a render already holding a frozen snapshot with the purge, cancels it, or removes an uploaded file if its later artifact INSERT is refused. PR #31's body explicitly notes the render job after purge as an open gap. The spec's general failed-job path retries and dead-letters (`:667`).
+- Failure scenario: `pdf.render` reads a version, then waits. The purge deletes that version and its existing files and commits. The worker resumes, uploads the PDF, and its `document_artifact` INSERT is refused because the version is gone. The new object has no artifact row for the purge to find; retrying can repeat the upload. The promised PDF deletion is not assured.
+- Required correction: specify a purge/render serialization or compensating cleanup rule that leaves no PDF object after purge, including an in-flight upload and retry. Test both interleavings with object storage and the job queue; a missing purged version should have a defined terminal job outcome. Add EVT-05 to the PR self-check with this pending evidence.
+- Owner: builder. Verification: inspect the revised job/storage contract and forced integration tests; Phase 9 implementation must prove the object is absent after either order.
+- Status: open.
+
+### Self-check audit
+
+Applicable to this correction slice: UNI-02/10/12/13/19; TEN-02/03/05/06/07/09/10; AUTH-01/05/06; LINK-03/07; EVT-05/06; `PROJECT.md` §9's fixed-limit and system-module rules. PR #31 has a self-check with TEN-10, TEN-03, TEN-09 and EVT-06. EVT-05 is applicable to the newly exposed render/purge retry path and is absent; it is included in the P1 above. TEN-05 remains an unchanged Phase 1 requirement. The five Phase 1 items remain builder proposals, not Charlie's decisions.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| PR host head/base, local head and spec hash | Head `d9c046afed4c9ac350df20d34a194c3bfc97c11a`, base `bccb846…`; clean builder worktree; spec hash `f44e0e5f876e4cd15b59a0bf1c4530fe941cd921`. |
+| `git diff --check bccb846..d9c046a` | No whitespace errors. Effective PR changes the spec and `docs/DECISIONS.md` only. |
+| CI on this head | Dependency audit, secret scan and typecheck/lint/test pass. Image/Trivy/E2E was pending when checked. These jobs exercise current code, not the Phase 1/7/9 proposals. |
+| Sources | Read the correction diff, relevant spec sections, PR body/self-check, Round 18, project rules, decisions and relevant guardrails. Checked PostgreSQL 17's official row-lock and FK documentation. No local tests, DB tests, deployment or UI preview were run for this document review. |
+
+### Residual risks and next step
+- PostgreSQL referential-action privilege behavior is explicitly left for a PostgreSQL 17 test in the Phase 1 plan (`:475`); do not treat it as verified from the spec. Better Auth database-counter atomicity and missing-IP behavior are also Phase 1 source-and-test gates.
+- Open question 8 (`crm_purge` login versus `SET ROLE`) and the six PR-body owner questions remain open; this review makes no owner choice.
+- Andy should correct both P1 findings on a new spec/PR head. Charlie should then run `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` again, preferably in Opus 5.5. After an approved exact-hash review, Charlie decides the five proposals and approves the final spec; `setup` reconciles `PROJECT.md` before the Phase 1 plan.
+
 ## Round 18 — 2026-10-18 · scope: Phase 1 gate proposal follow-up (PR #31)
 - **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft, updated after Rounds 16 and 17 · hash (`git hash-object`) `418d7a60a43617e20bc0c64ac71d8abfec7dff98`.
 - **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `1f29584792ac76ab9dfebd86da1db2f2f43b8427`; the committed spec blob and clean builder worktree match. Round 17 reviewed hash `3e816bee2c65fe8ef646a41939e89a2d22750c40`. This round checks its correction diff and the effective revision 7 proposal against approved revision 6.
