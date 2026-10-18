@@ -1,5 +1,58 @@
 # Review — spec `core-sales-design`
 
+## Round 18 — 2026-10-18 · scope: Phase 1 gate proposal follow-up (PR #31)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft, updated after Rounds 16 and 17 · hash (`git hash-object`) `418d7a60a43617e20bc0c64ac71d8abfec7dff98`.
+- **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `1f29584792ac76ab9dfebd86da1db2f2f43b8427`; the committed spec blob and clean builder worktree match. Round 17 reviewed hash `3e816bee2c65fe8ef646a41939e89a2d22750c40`. This round checks its correction diff and the effective revision 7 proposal against approved revision 6.
+
+**Verdict:** Revision required  
+**Model used:** GPT-6 · **Switch model next step?** Yes — `PROJECT.md` §6 maps deep security/spec review to Opus 5.5. The corrected exact hash should receive that tier's review before Charlie approves it.
+
+### Round 17 corrections rechecked
+
+| Prior finding | Result | Evidence |
+|---|---|---|
+| P1: `crm_purge` could mark a parent purged with a retained version | Resolved for the UPDATE itself. The SECURITY INVOKER trigger checks an actual NULL-to-value change, role and absence of child versions; direct-role tests cover protected and eligible parents. A later INSERT can break the resulting state, as found below. | Spec `:859`, `:862` tests (6)–(9). |
+| P1: TEN-10 absent from PR self-check | Resolved. The system-module entry points, lint fixture and no-RLS allow-list check are named in the spec; PR #31 now has a TEN-10 row and marks implementation pending. | Spec `:711-712`, `:1188`; PR #31 Self-check. |
+| P2: non-resolving reservation not tied to its window | Resolved. The consume returns `window_start`, give-back conditions on that value, pending units count, and forced tests cover boundary crossing and both 19-of-20 interleavings. | Spec `:715`, `:1188`. |
+
+### Findings
+
+#### [P1] A sent version can be inserted after its parent is marked purged
+- Category: privacy and data-integrity defect in the new parent-purge invariant.
+- Rule: accepted narrow purge scope; TEN-06/TEN-07; spec Customer purge.
+- Evidence: spec `:859` guards only UPDATE of `quotation.purged_at` / `proposal.purged_at`: it checks no version remains at that instant. It says an INSERT while the purge holds `FOR UPDATE` waits on the parent's FK lock, but does not require the INSERT to refuse a parent whose `purged_at` is now non-NULL after that wait. Spec `:448` still creates a new `quotation_version` on send; `:460` creates proposal sent versions. The forced interleaving test `:862`(9) stops at the trigger's check and does not assert that the waiting INSERT fails after purge commits. PR #31's own body lists post-purge insertion/sending as unspecified.
+- Failure scenario: a quote-send transaction waits to insert its version while the purge holds the parent lock. The purge deletes the old versions, sets `purged_at`, and commits. The FK check then succeeds because the parent row still exists; without a post-wait guard, the send inserts a version under a purged parent. A later read that filters out purged parents hides the newly sent document, and the promised parent state is false.
+- Required correction: specify the DB-enforced rule that version INSERTs under a purged parent are refused (or another precise, safe transition), including the quote and proposal version paths. Make the forced interleaving test assert the waiting INSERT's outcome and the final parent/version state; also test a direct INSERT after purge.
+- Owner: builder. Verification: revised insert guard and Testcontainers interleavings using the real roles.
+- Status: open.
+
+#### [P2 · before merge] Purging the current sent version has no defined FK and pointer outcome
+- Category: incomplete data-model contract for the proposed purge behavior.
+- Evidence: `quotation.current_version_id` and `proposal.current_sent_version_id` refer to sent versions (spec `:447-448`, `:459-460`). Customer purge must delete unreferenced, unretained versions, including a current sent version (`:833-835`, `:859`, test (5) at `:862`). The spec does not define `ON DELETE` behavior for those parent pointers, and the `crm_purge` grant gives UPDATE only on `purged_at` (`:838`, `:843-844`). The PR body explicitly leaves these FK delete actions unspecified.
+- Failure scenario: if the FK uses PostgreSQL's default NO ACTION, deletion of a current version fails and the purge transaction cannot achieve the specified result. If it uses SET NULL, a partially retained parent may remain `sent` with no current version, while flows and the pipeline board select `current_version_id` (`:448`, `:462`). These are materially different outcomes for the same accepted narrow purge.
+- Required correction: define the FK action and the resulting parent status/current-version behavior for fully purged and partially retained parents. Include a test where the only current version is purgeable and one where a retained older version coexists with a purgeable current one. Keep the role grants and immutable retained versions consistent with that outcome.
+- Owner: builder. Verification: revised schema/flow rule and purge tests for those two cases.
+- Disposition: before merge.
+- Status: open.
+
+### Self-check audit
+
+Applicable to this slice: UNI-02/10/12/13/19; TEN-02/03/05/06/07/09/10; AUTH-01/05/06; LINK-03/07; EVT-06; `PROJECT.md` §9's fixed-limit and system-module rules. PR #31's self-check includes the formerly missing TEN-10 row with named entry points and pending lint evidence. Its TEN-03, TEN-09 and EVT-06 rows remain present. TEN-05 remains an unchanged Phase 1 requirement. No new money or UI rule is proposed. The five Phase 1 items are still builder proposals; Charlie has not decided them.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| Host PR head/base, local head and spec blob | PR #31 head `1f29584792ac76ab9dfebd86da1db2f2f43b8427`, base `bccb846…`; clean builder worktree and spec hash `418d7a60a43617e20bc0c64ac71d8abfec7dff98`. |
+| `git diff --check bccb846..1f29584` | No whitespace errors. PR changes the spec and `docs/DECISIONS.md` only. |
+| CI on this head | Dependency audit, secret scan, typecheck/lint/test and Image/Trivy/E2E pass. They exercise existing code, not the proposed Phase 1/7/9 controls. |
+| Sources | Read `PROJECT.md`, `START.md`, reviewer role, decisions, handoff, relevant guardrails, prior review, spec and PR self-check. No local tests, DB migration, deployment or UI preview were run for this document review. |
+
+### Residual risks and next step
+- Better Auth's database-counter atomicity and missing-IP behavior remain source-and-test gates for the Phase 1 plan. Open question 8 (`crm_purge` login versus `SET ROLE`) and the six PR-body owner questions remain open; this review does not decide them.
+- The handoff is append-only and its initial fixed sections are stale, but its latest entry pins this same PR head. Repo and host state take precedence for the reviewed target.
+- Andy should resolve the P1 and before-merge P2 on a new spec head. Charlie should then run `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` again, preferably in Opus 5.5. After an approved exact-hash review, Charlie decides the five proposals and approves the final spec; `setup` reconciles `PROJECT.md` before the Phase 1 plan.
+
 ## Round 17 — 2026-10-17 · scope: Phase 1 gate proposal follow-up (PR #31)
 - **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft, updated after Round 16 · hash (`git hash-object`) `3e816bee2c65fe8ef646a41939e89a2d22750c40`.
 - **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `01a99591fbad27d374a35f624f29f8d5ef7969d5`; the committed blob and clean builder worktree match. Head rechecked at end: yes. Round 16 reviewed hash `03e64025ffa5db54cd4428c1c02fcb7be581b832`; this round checks the correction diff and the effective revision 7 slice against revision 6.
