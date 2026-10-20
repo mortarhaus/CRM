@@ -1,5 +1,273 @@
 # Review — spec `core-sales-design`
 
+## Round 24 — 2026-10-20 · scope: Round 23 label fix, exact-hash confirmation (PR #31)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7, owner decisions of 2026-10-20 recorded · hash (`git hash-object`) `50acbcfe0b402718ddd2c49f4297ce378e1b7451`.
+- **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `4ec37c33b8360a3d3a0d4acf6781a176d8f179a7` (host head re-read at the end: unchanged). Reviewed in detached checkout `.agent/worktrees/review-31-4ec37c33`; its spec blob hash matches. Round 23 reviewed hash `c49329f78c6d7adc074263ab4b35353d8ac3ed5f`. This round checks the fix diff `3ec62ef..4ec37c3` (spec only, +2/−2).
+
+**Verdict:** Approved with conditions  
+**Model used:** Opus 5.5 (deep tier) · **Switch model next step?** No — `approved 31`, `merged 31` and `setup` are builder procedures; the Phase 1 plan review needs the deep tier again.
+
+This verdict applies only to hash `50acbcfe0b402718ddd2c49f4297ce378e1b7451` at head `4ec37c3`. It confirms that the text records Charlie's 2026-10-20 decisions on the five Phase 1 gates (all approved as written; question 2 = stricter Turnstile-off limits stay) and his 2026-10-19 scope decision "A". Charlie gave the six-answer line and "follow bob's suggestion" in the Andy session; he did not dispute that record when shown it in this window.
+
+### Round 23 disposition rechecked
+
+| Prior finding | Result | Evidence |
+|---|---|---|
+| P2 (before merge): two places still say the five proposals are undecided | Resolved. Phase 1 done-when now says "revision 7 (decided by Charlie 2026-10-20)". Current gates now says Charlie decided all five, Bob confirms the hash, then `approved 31` and `setup`; gate (b) says the five are decided and names what remains for the Phase 1 plan: Open question 8, the `crm_worker` grant measurement (functions as well as tables) and the Round 21 P2. The archive-job text says the partition alternative was not chosen. No rule or number changed. | Spec `:1110`, `:1154`. |
+| P2 (deferred to the Phase 1 plan PR): Phase 1 polymorphic tests vs table creation phase | Still open, correctly deferred; now named in gate (b). | Spec `:1154`. |
+| P3: Status line will read "draft" after merge | Still open, with the Phase 1 plan PR (by design; fixing it now would change the hash). | Spec `:3`, `:53`. |
+
+### Findings
+
+#### [P2 · deferred to the Phase 1 plan PR] Phase 1 done-when tests tables that revision 7 says Phase 1 does not create
+- Carried from Rounds 21–23 unchanged. Status: open.
+
+#### [P3] After merge, the Status line will still read "draft" and "needs Bob's confirmation"
+- Carried from Round 23. Mark revision 7 approved and merged in the first later spec PR, citing this round and the merge commit. Status: open.
+
+No new finding.
+
+### Self-check audit
+
+Label-only diff; the applicable list from Rounds 20–23 is unchanged and no rule's evidence moved. No text in the PR, spec or decisions log addresses an AI agent.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| PR #31 host head/base and spec hash | Head `4ec37c33b8360a3d3a0d4acf6781a176d8f179a7`, base `bccb846…`; spec hash `50acbcfe0b402718ddd2c49f4297ce378e1b7451`; PR body names the same head and hash; host head re-read at the end, unchanged. |
+| `git diff --check bccb846...4ec37c3` | No whitespace errors. Effective PR changes `docs/DECISIONS.md` and the spec only. |
+| Label sweep | Searched for "pending Charlie", "pending Bob's review", "proposal, pending", "none is decided". The only hits are at `:71` (v4.5 history text, unrelated). |
+| Review checkout | `git status --untracked-files=no` clean at the end. |
+| PR CI on this head | Dependency audit, secret scan, typecheck/lint/test and Image/Trivy/E2E all pass. |
+
+### Residual risks and next step
+- Open question 8 (`crm_purge` login versus `SET ROLE`), the `crm_worker` grant measurement (incl. pg-boss function EXECUTE after the PUBLIC revoke) and the deferred P2 are Phase 1 plan gates; the Phase 1 plan needs its own deep-tier review.
+- The Phase 9 purge requirements are a gate list, not a solved design.
+- Next: Charlie runs `approved 31` in Andy's window **before** merging. Then Charlie merges PR #31, runs `merged 31`, then `setup` to reconcile `PROJECT.md` and `CLAUDE.md` to hash `50acbcfe…`.
+
+## Round 23 — 2026-10-20 · scope: owner-decision record, exact-hash confirmation (PR #31)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7, with Charlie's decisions of 2026-10-20 recorded · hash (`git hash-object`) `c49329f78c6d7adc074263ab4b35353d8ac3ed5f`.
+- **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `3ec62ef95204c25bb60d408add7e1c98581dd484` (host head re-read at the end: unchanged). Reviewed in detached checkout `.agent/worktrees/review-31-3ec62ef9`; its spec blob hash matches. Round 22 approved hash `f9532b6fba97093cc4f10eac20077fe047a373b1` with conditions. This round checks the label/decision diff `f7fc721..3ec62ef` (spec +18/−17, `docs/DECISIONS.md` +4/−3).
+
+**Verdict:** Revision required  
+**Model used:** Opus 5.5 (deep tier) · **Switch model next step?** No — the fix is two label edits; Andy can use the fast tier. The next exact-hash confirmation can stay on Opus 5.5.
+
+### What the diff does
+
+- Records Charlie's answers to the six PR questions and his approval of the five proposals, in "Changes in v4.7" item 8 (new owner-decision paragraph), the Status line and `docs/DECISIONS.md` (2026-10-17 entry, new "Owner decisions (2026-10-20)" bullet).
+- Changes the proposal labels to "owner-approved 2026-10-20 (Charlie)" in the home sections (rate limits, `/api/auth/*`, RESTRICTIVE policy, `crm_purge` (b1) and design target, version references, archive job, Verification).
+- Changes no number, rule, grant or test. I compared the word diff line by line: every change is a status label or the new decision paragraph.
+- **Decision content matches what Charlie said in this window:** 1 ok, 3 yes, 4 A (no archive job), 5 A (`crm_purge` writes its own audit entry), 6 A (invoice status only), and question 2 = yes (stricter Turnstile-off limits stay, as already written at `:739`). The record says honestly that the words "follow bob's suggestion" and the six-answer line were given in the Andy session, which Bob cannot see. Charlie can confirm them directly here.
+- Round 22 conditions: the P3 PR-body SHA is fixed (body now names `3ec62ef`). The P2 deferred to the Phase 1 plan PR (Phase 1 polymorphic tests vs table creation phase) stays deferred.
+
+### Findings
+
+#### [P2 · before merge] Two revision 7 places still say the five proposals are undecided
+- Category: spec consistency / gate ambiguity.
+- Rule: spec "Next steps after approval" → Current gates; Milestones Phase 1.
+- Evidence: (1) Current gates (`:1154`) still says revision 7 is "pending Bob's spec review and Charlie's decision on each of its five proposals", and gate (b) says "The other five are **proposed in revision 7 … pending Bob's review and Charlie's decision; none is decided:**". (2) The Phase 1 done-when (`:1110`) says "revision 7 proposals (pending Bob's review and Charlie's decision)". The Status line (`:3`) and item 8 (`:55`) now say Charlie decided all five on 2026-10-20.
+- Failure scenario: the builder starts the Phase 1 plan and reads gate (b), which is the gate list for that plan. It says "none is decided", so the builder stops and asks again, or `setup` reconciles `PROJECT.md` with a gate that looks open. Two readers get two answers from one spec.
+- Required correction: change both places to match item 8: the five gate (b) items are decided by Charlie on 2026-10-20, and what remains for the Phase 1 plan is Open question 8, the `crm_worker` grant measurement and the deferred Round 21 P2. Then search revision 7 text for "pending Charlie", "pending Bob's review" and "none is decided", and leave none that refers to the five items. No other change.
+- Owner: builder. Verification: re-read `:1110`, `:1154` and the search result on the new hash.
+- Disposition: before merge.
+- Status: open.
+
+#### [P2 · deferred to the Phase 1 plan PR] Phase 1 done-when tests tables that revision 7 says Phase 1 does not create
+- Carried from Rounds 21–22 unchanged. Status: open.
+
+#### [P3] After merge, the Status line will still read "draft" and "needs Bob's confirmation"
+- Evidence: Status line (`:3`) and item 8 (`:53`) say the text "needs Bob's confirmation of the exact hash before merge". That is true now. After the merge it becomes stale on `main`, the way revision 6 needed its "APPROVED" label.
+- Required correction: in the first later spec PR (the Phase 1 plan PR is fine), mark revision 7 as approved and merged, citing the Bob round that confirms the final hash and the merge commit. Do not do it in this PR; it would change the hash again.
+- Owner: builder. Disposition: with the Phase 1 plan PR. Status: open.
+
+### Self-check audit
+
+This diff changes labels only. The applicable list from Rounds 20–22 is unchanged (UNI-02/10/12/13/19; TEN-02/03/05/06/07/08/09/10; AUTH-01/05/06; LINK-03/07; EVT-05/06; `PROJECT.md` §9). No rule's evidence moved. No text in the PR, spec or decisions log addresses an AI agent.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| PR #31 host head/base and spec hash | Head `3ec62ef95204c25bb60d408add7e1c98581dd484`, base `bccb846…`; spec hash `c49329f78c6d7adc074263ab4b35353d8ac3ed5f`; host head re-read at the end, unchanged. |
+| `git diff --check bccb846...3ec62ef` | No whitespace errors. Effective PR changes `docs/DECISIONS.md` and the spec only. |
+| Label sweep | Searched the spec for "pending Charlie", "pending Bob's review", "proposal, pending", "none is decided", "not decided". The only hits that refer to the five revision 7 items are `:1110` and `:1154`; the others are older, unrelated open items. |
+| Review checkout | `git status --untracked-files=no` clean at the end. |
+| PR CI on this head | Dependency audit, secret scan and typecheck/lint/test pending when checked. |
+
+### Residual risks and next step
+- Open question 8 (`crm_purge` login versus `SET ROLE`) stays open for the Phase 1 plan. Decision 5 A (the purge writes its own audit entry) works with both answers, because `crm_purge` holds the `audit_log` INSERT grant either way.
+- Next: Andy fixes the before-merge P2 (labels at `:1110` and `:1154` only). Charlie runs `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` again for the new hash. If that round approves, Charlie runs `approved 31` before merging, then `merged 31`, then `setup`.
+
+## Round 22 — 2026-10-19 · scope: Round 21 correction follow-up (PR #31)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft, updated after Round 21 · hash (`git hash-object`) `f9532b6fba97093cc4f10eac20077fe047a373b1`.
+- **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `f7fc7213b3ab7c24b4ad8c05944bd6dc6bab5065` (host head re-read at the end: unchanged). Reviewed in detached checkout `.agent/worktrees/review-31-f7fc7213`; its spec blob hash matches. Round 21 reviewed hash `022012e2b69be2953edbe63b4619cb9969c216a5`. This round checks the correction diff `952f5d4..f7fc721` (spec only, +4/−4), the PR body, and the fit with the rest of revision 7.
+
+**Verdict:** Approved with conditions  
+**Model used:** Opus 5.5 (deep tier) · **Switch model next step?** No — the remaining items are owner decisions and the Phase 1 plan; the plan's review needs the deep tier again.
+
+This verdict applies only to hash `f9532b6f…`. It approves the revision 7 text as a set of well-formed proposals; it is not Charlie's decision on any of the five proposals. If Charlie's decisions change the spec text, the new hash needs its own round before `setup`.
+
+### Round 21 disposition rechecked
+
+| Prior finding | Result | Evidence |
+|---|---|---|
+| P2 (before merge): TEN-08 gate copied only into Phases 3–6 | Resolved. The rule now says "in every phase that adds one (Phases 3 to 8, any later phase too)"; Phase 7 and Phase 8 done-when rows carry the same clause; Verification says "every phase whose migrations add a `crm_purge` read grant (Phases 3 to 8)". PR self-check TEN-08 row and "What" item 2 match. | Spec `:846`, `:1115`, `:1116`, `:1251`; PR #31 body. |
+| P2 (deferred to the Phase 1 plan PR): Phase 1 done-when tests tables Phase 1 does not create | Still open, correctly deferred; recorded in the builder's handoff. Condition of this approval. | Spec `:1109` vs `:54`, `:846`. |
+| P3: PUBLIC EXECUTE default on project functions | Resolved. Migrations run `ALTER DEFAULT PRIVILEGES FOR ROLE crm_migrator REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`, grant EXECUTE per function, and the catalog test uses `has_function_privilege` counting PUBLIC-derived privileges. This fits the existing `ALTER DEFAULT PRIVILEGES` use for `pgboss` grants (`:231`, `:500`, `:1050`) and the explicit revoke on `resolve_share_link()` (`:797`). | Spec `:846`. |
+| P3: PR body duplicated | Resolved: each section now appears once. | PR #31 body (98 lines, one copy of each section). |
+
+### Findings
+
+#### [P2 · deferred to the Phase 1 plan PR] Phase 1 done-when tests tables that revision 7 says Phase 1 does not create
+- Carried from Round 21 unchanged (evidence, failure scenario and required correction there). The Phase 1 plan states which reading holds and aligns the spec text in the same PR; Charlie's OK is needed if a done-when moves.
+- Owner: builder (Phase 1 plan). Disposition: deferred to the Phase 1 plan PR. Status: open.
+
+#### [P3] PR body names the wrong head SHA next to the new hash
+- Evidence: the PR body's opening line says "Spec hash on this head (`952f5d4`, …): `f9532b6f…`". The head is `f7fc721`; `952f5d4` held hash `022012e2…`.
+- Required correction: change `952f5d4` to `f7fc721` in that line. Owner: builder. Status: open.
+
+### Self-check audit
+
+Applicable: UNI-02/10/12/13/19; TEN-02/03/05/06/07/08/09/10; AUTH-01/05/06; LINK-03/07; EVT-05/06; `PROJECT.md` §9's fixed-limit and system-module rules. All are in the PR self-check or were checked as standing requirements in Rounds 16–21. The TEN-08 row now covers Phases 3 to 8. No text in the PR, spec or decisions log addresses an AI agent.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| PR #31 host head/base and spec hash | Head `f7fc7213b3ab7c24b4ad8c05944bd6dc6bab5065`, base `bccb846…`; spec hash `f9532b6fba97093cc4f10eac20077fe047a373b1`; host head re-read at the end, unchanged. |
+| `git diff --check bccb846...f7fc721` | No whitespace errors. The Round 21 fix commit touches the spec only. |
+| Review checkout | `git status --untracked-files=no` clean at the end. |
+| PR CI on this head | Dependency audit, secret scan and typecheck/lint/test pass. Image/Trivy/E2E pending when checked. CI does not exercise the Phase 1–9 proposals. |
+| Sources | Read the correction diff, the changed milestone rows, Verification, the existing `ALTER DEFAULT PRIVILEGES` and `resolve_share_link()` text, the PR body and self-check, and Round 21. No database was run; PostgreSQL default-privilege behaviour is from the official docs cited in Round 21. |
+
+### Residual risks and next step
+- With PUBLIC EXECUTE revoked by default, any pg-boss function that `crm_app` or `crm_worker` calls needs an explicit EXECUTE grant. The Phase 1 gate "`crm_worker` exact grants measured and recorded" must include functions, not only tables.
+- Open question 8 (`crm_purge` login versus `SET ROLE`) and the five owner proposals stay open; this review makes no owner choice.
+- Next: Andy fixes the P3 in the PR body (no spec change). Charlie decides the five proposals in his own words. If the spec text does not change, Charlie runs `approved 31` in Andy's window **before** merging, merges, runs `merged 31`, then `setup` to reconcile `PROJECT.md`. If the text changes, run `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` again first.
+
+## Round 21 — 2026-10-19 · scope: Round 20 correction follow-up (PR #31)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft, updated after Round 20 · hash (`git hash-object`) `022012e2b69be2953edbe63b4619cb9969c216a5`.
+- **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `952f5d40f009b594a23ff54e5cd3382ab5b59550` (host head re-read at the end: unchanged). Reviewed in detached checkout `.agent/worktrees/review-31-952f5d40`; its spec blob hash matches. Round 20 reviewed hash `ec2f4fc75b633f3e83f872944a9b793179f8e179`. This round checks the correction diff `b28e916..952f5d4` (spec only, +7/−7) and its fit with the rest of revision 7.
+
+**Verdict:** Revision required  
+**Model used:** Opus 5.5 (deep tier, as `PROJECT.md` §6 asks) · **Switch model next step?** No — the fixes are small wording edits; Andy can use the fast tier for them, and the next exact-hash review should stay on Opus 5.5.
+
+### Round 20 disposition rechecked
+
+| Prior finding | Result | Evidence |
+|---|---|---|
+| P1: later `crm_purge` read grants lack real-role isolation tests | Resolved in the normative rule: each migration that creates a design-target table adds its SELECT grant, policy, catalog rows **and** a real-role A/B/no-context SELECT test, and "does not merge without it". The milestone and Verification copies of the rule cover only Phases 3–6; finding below. | Spec `:846`; done-when rows `:1111-1114`; Verification `:1251`; PR self-check TEN-08 row. |
+| P2: Phase 1 privilege assertion too absolute | Resolved. The allow-list now names CONNECT, `public` USAGE, built-in EXECUTE (`set_config`), `audit_log` INSERT and a conditional sequence USAGE; the catalog test compares against that list, not "nothing". One PostgreSQL default is still unnamed; P3 below. | Spec `:846-847`. |
+| P3: PR summary describes the former purge scope | Resolved: "What" item 2 now describes the (b1)/(b2) split. Its "Phases 3 to 6" wording is part of the P2 below. | PR #31 body "What" item 2. |
+
+### Findings
+
+#### [P2 · before merge] The per-migration TEN-08 gate is copied only into Phases 3–6, but Phases 7 and 8 create purge tables too
+- Category: spec consistency / ambiguity.
+- Rule: TEN-08; Round 20 P1 ("every table when its `crm_purge` read grant first lands").
+- Evidence: the design target lists `agreement` (`:858`) and `share_link`, `otp_challenge`, `signature` (`:861-863`). Phase 7 builds share links and OTP, and Phase 8 builds agreements and signing (`:1115-1116`). The new TEN-08 clause is added to the done-when rows of Phases 3, 4, 5 and 6 only (`:1111-1114`); Phase 7 and Phase 8 rows are unchanged. Verification says "in Phases 3 to 6, a real-role two-workspace SELECT isolation test…" (`:1251`). The PR self-check TEN-08 row says "tests pending (Phases 3 to 6)", and "What" item 2 says "Later phases (3 to 6)".
+- Failure scenario: the Phase 7 planner copies the Phase 7 done-when and the Verification list. Neither names the test, and both lists read as the full scope. The `share_link` and `otp_challenge` read grants (the public-link tables) land with only a catalog check, until the Phase 9 suite.
+- Why it matters: the general rule at `:846` is right, but three derived lists say otherwise. Two builders can read this two ways.
+- Required correction: add the same TEN-08 clause to the Phase 7 and Phase 8 done-when rows (or state once, phase-free, that it applies to every phase whose migrations add a `crm_purge` read grant), change `:1251` to "Phases 3 to 8" or phase-free wording, and update the PR self-check row and "What" item 2 to match.
+- Owner: builder. Verification: re-read the done-when rows, `:1251` and the PR body.
+- Disposition: before merge.
+- Status: open.
+
+#### [P2 · deferred to the Phase 1 plan PR] Phase 1 done-when tests tables that revision 7 says Phase 1 does not create
+- Category: spec consistency (pre-existing text, now in direct conflict with new revision 7 text).
+- Rule: spec "Milestones" Phase 1; revision 7 part (b1).
+- Evidence: Phase 1's done-when (approved since rev 11) requires polymorphic-reference tests "for `share_link` target, `document_artifact` target, `signature` doc ref, `line_item` parent and `version_retention.source_id`" (`:1109`). Revision 7 now says the tables `crm_purge` acts on "are created in Phase 3 onward" (`:54`) and "Every other table in the design target… is created by a later phase's migration" (`:846`); the Phase 1 catalog test requires INSERT on `audit_log` as `crm_purge`'s **only** table privilege.
+- Failure scenario: Planner A creates those five tables in Phase 1 so the polymorphic tests can pass. The `:846` rule then puts their `crm_purge` SELECT grants in Phase 1 too, and the Phase 1 "only INSERT on `audit_log`" catalog test fails. Planner B moves the polymorphic tests to the phases that create the tables, which changes an approved done-when without a record.
+- Required correction: the Phase 1 plan states which reading holds (most likely: the polymorphic-reference tests run in each phase that creates the table), and the spec text is aligned in the same PR so the done-when and the (b1) grant list agree.
+- Owner: builder (Phase 1 plan), with Charlie's OK if a done-when moves. Verification: Phase 1 plan review.
+- Disposition: deferred to the Phase 1 plan PR.
+- Status: open.
+
+#### [P3] The allow-list does not say how PostgreSQL's default PUBLIC EXECUTE on project functions is handled
+- Evidence: `:846-847` say `crm_purge` holds no project function and the catalog test compares its **effective** privileges with the allow-list. PostgreSQL grants EXECUTE on every new function to PUBLIC by default ([PostgreSQL 17 privileges](https://www.postgresql.org/docs/17/ddl-priv.html)). The spec revokes it only for `resolve_share_link()` (`:797`). Trigger and helper functions (for example the polymorphic insert triggers and, later, the Phase 9 guard functions) keep the default.
+- Failure scenario: implementer A checks effective privileges (`has_function_privilege`) and the test fails on every project function; implementer B checks only direct grants and passes while PUBLIC still grants EXECUTE.
+- Required correction: add one line: migrations run `ALTER DEFAULT PRIVILEGES FOR ROLE crm_migrator REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC` (and grant EXECUTE per function to the roles that need it), and the catalog test counts PUBLIC-derived privileges. Or state that the effective-privilege check excludes PUBLIC EXECUTE on trigger-only functions.
+- Owner: builder. Status: open.
+
+#### [P3] PR #31 body is duplicated
+- Evidence: the PR body has every major section twice ("What" at body lines 3 and 15, Rounds 16–20 responses twice, "Questions for Charlie" at 72 and 108, "Self-check" at 95 and 131). Charlie reads this body to answer the five owner questions.
+- Required correction: remove the duplicate copy so each section appears once.
+- Owner: builder. Status: open.
+
+### Self-check audit
+
+Applicable to this correction: UNI-02/10/12/13/19; TEN-02/03/05/06/07/08/09/10; AUTH-01/05/06; LINK-03/07; EVT-05/06; `PROJECT.md` §9's fixed-limit and system-module rules. The PR self-check now has a TEN-08 row; its scope "Phases 3 to 6" is too narrow (P2 above). No other applicable rule is missing. No text in the PR, spec or decisions log addresses an AI agent. Charlie's scope choice A is recorded; the five proposals remain undecided.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| PR #31 host head/base and spec hash | Head `952f5d40f009b594a23ff54e5cd3382ab5b59550`, base `bccb846…`; spec hash `022012e2b69be2953edbe63b4619cb9969c216a5`; host head re-read at the end, unchanged. |
+| `git diff --check bccb846...952f5d4` | No whitespace errors. Effective PR changes `docs/DECISIONS.md` and the spec only; the Round 20 fix commit touches the spec only. |
+| Review checkout | `git status --untracked-files=no` clean at the end. |
+| PR CI on this head | Dependency audit, secret scan and typecheck/lint/test pass. Image/Trivy/E2E pending when checked. CI does not exercise the Phase 1–9 proposals. |
+| Sources | Read the correction diff, the design-target table, the milestone rows, Verification, the PR body/self-check, Round 20, the reviewer role and START. PostgreSQL's PUBLIC EXECUTE default is from the official docs linked above; not run against a database. No local DB tests, deployment or UI preview were run for this document review. |
+
+### Residual risks and next step
+- Open question 8 (`crm_purge` login versus `SET ROLE`) and the five owner proposals stay open; this review makes no owner choice.
+- Andy fixes the before-merge P2 and both P3s on a new head. Charlie then runs `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` again. If that round has no blocking finding, Charlie decides the five proposals, `approved 31` runs before the merge, then `setup` reconciles `PROJECT.md` before the Phase 1 plan.
+
+## Round 20 — 2026-10-19 · scope: owner-approved Phase 1/Phase 9 split (PR #31)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft, updated after Rounds 16–19 and Charlie's scope choice A · hash (`git hash-object`) `ec2f4fc75b633f3e83f872944a9b793179f8e179`.
+- **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `b28e91686b5f2b770a4086035a23309fbfea2021`; the committed spec blob and clean builder worktree match. Round 19 reviewed hash `f44e0e5f876e4cd15b59a0bf1c4530fe941cd921`. This round reviews the split diff, the Phase 1 role and later read grants, and the deferred Phase 9 gates against approved revision 6.
+
+**Verdict:** Revision required  
+**Model used:** GPT-6 · **Switch model next step?** Yes — `PROJECT.md` §6 maps deep spec/security review to Opus 5.5. The corrected exact hash should receive that tier's review before Charlie approves it.
+
+### Round 19 disposition rechecked
+
+| Prior finding | Result | Evidence |
+|---|---|---|
+| P1: direct DELETE of a current version can leave a live parent without its pointer | Properly deferred by Charlie's scope choice A, not claimed solved. It is Phase 9 requirement (4), with direct-role tests (13)(a)–(c) and a gate before purge is built. No version DELETE grant exists in Phase 1; the spec delays all purge write grants to Phase 9. | Spec `:846`, `:874-897`, `:1117`, `:1153`. |
+| P1: queued `pdf.render` can recreate a purged PDF | Properly deferred, not claimed solved. Phase 9 requirement (5) covers in-flight upload, crash/retry, object cleanup and a terminal job outcome, with integration tests (14)(a)–(d); EVT-05 is now in the PR self-check. | Spec `:898`, `:1117`, `:1153`; PR #31 Self-check. |
+
+### Findings
+
+#### [P1] New `crm_purge` read grants lack role-specific isolation tests before they deploy
+- Category: tenant-isolation verification gap and missing applicable guardrail self-check.
+- Rule: TEN-08 (read and write isolation on every tenant table, including each access path); reviewer role §3.
+- Evidence: the spec says each Phase 3–6 migration that creates a table in the purge design target adds its `crm_purge` SELECT grant and PERMISSIVE read policy, with catalog test rows (`:846`); the exact future read set is `:850-865`. The behavioral tests for `crm_purge` in Phase 1 exercise only audit-log INSERT (`:847`), while its two-workspace reads and denials on the purge tables are placed in Phase 9 requirement (6), test (4) (`:899`). The general isolation statement at `:1109`/`:1251` does not say those later tests run as `crm_purge` when each grant lands. PR #31's self-check has TEN-02/06/07/09/10 but no TEN-08 row.
+- Failure scenario: a Phase 3 migration grants `crm_purge` SELECT on `customer` with a wrongly scoped policy. A catalog test sees the intended role/policy names, while a real `crm_purge` session can read workspace B before the Phase 9 behavioral suite exists. The role may be a login or selectable role, per Open question 8.
+- Required correction: require a real-role, two-workspace SELECT isolation test for every table when its `crm_purge` read grant/policy first lands (allowed A, denied B, no context denied), in addition to catalog checks; keep Phase 9 tests for the complete purge flow. Add TEN-08 to the PR self-check with implementation evidence marked pending at those migrations.
+- Owner: builder. Verification: inspect the revised per-migration gate and self-check; implementation must use the actual `crm_purge` role.
+- Status: open.
+
+#### [P2 · before merge] The Phase 1 privilege assertion is too absolute to test or implement as written
+- Category: ambiguous/impossible grant contract.
+- Evidence: spec `:846-847` requires a successful INSERT into `audit_log` as `crm_purge`, but also says it holds “no privilege on any other table, schema object or function” and asserts that literally in the catalog test. Accessing a table in a schema requires USAGE on that schema; PostgreSQL 17 grants USAGE on `public` to PUBLIC by default. `set_config` is also used for the workspace context (`:845`). [PostgreSQL 17 schemas and privileges](https://www.postgresql.org/docs/17/ddl-schemas.html).
+- Failure scenario: implementer A removes all schema USAGE to satisfy the negative assertion and audit INSERT fails. Implementer B retains the required/default USAGE and the proposed “no other schema object” assertion fails if taken literally. The catalog list does not define the unavoidable effective privileges or which project-defined objects it means to exclude.
+- Required correction: state the allowed schema and built-in privileges needed for connection, workspace context and `audit_log` INSERT, then scope “no other privileges” to project tables and any project functions/sequences not expressly required. Make the catalog assertion use that exact allow-list; keep the cross-workspace INSERT test.
+- Owner: builder. Verification: revised grant list and Phase 1 catalog/behavioral assertions.
+- Disposition: before merge.
+- Status: open.
+
+#### [P3] PR summary still describes the former purge scope
+- The PR's “What” item 2 says thirteen table grants plus DELETE/UPDATE and five behavioral tests, even though Phase 1 now grants only audit-log INSERT and the full table is a Phase 9 design target (spec `:53-55`, `:843-848`). The later Round 19 response and EVT-05 row correct the story, but the opening summary and its line citations are stale. Refresh the PR body after the spec correction so Charlie reviews the Phase 1/Phase 9 split as written.
+- Owner: builder. Disposition: before merge. Status: open.
+
+### Self-check audit
+
+Applicable to this split: UNI-02/10/12/13/19; TEN-02/03/05/06/07/08/09/10; AUTH-01/05/06; LINK-03/07; EVT-05/06; `PROJECT.md` §9's fixed-limit and system-module rules. The PR self-check now includes EVT-05, and marks its Phase 9 tests pending. TEN-08 is applicable to the new later-phase `crm_purge` SELECT access and absent, which reviewer role §3 rates P1. TEN-05 remains a standing requirement with existing RLS tests. Charlie's choice A is recorded as a scope decision; the other five proposals remain undecided.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| PR #31 host head/base and local spec | Head `b28e91686b5f2b770a4086035a23309fbfea2021`, base `bccb846…`; builder worktree clean; spec hash `ec2f4fc75b633f3e83f872944a9b793179f8e179`. |
+| `git diff --check bccb846..b28e916` | No whitespace errors. Effective PR changes the spec and `docs/DECISIONS.md` only. |
+| PR CI on this head | Dependency audit, secret scan and typecheck/lint/test pass. Image/Trivy/E2E was pending when checked. Existing CI does not exercise the proposed Phase 1 role or Phase 9 purge. |
+| Sources | Read the split diff, spec gates, decisions entry, project and reviewer rules, handoff, relevant guardrails, PR body/self-check and Round 19. Checked PostgreSQL 17's official schema-privilege documentation. No local tests, DB tests, deployment or UI preview were run for this document review. |
+
+### Required next step
+
+Andy should add the per-migration TEN-08 tests and clarify the Phase 1 privilege allow-list, then refresh the PR summary. Charlie can run `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` on the new hash, preferably in Opus 5.5. After an approved exact-hash review, Charlie decides the five proposals and approves the final spec; `setup` reconciles `PROJECT.md` before the Phase 1 plan. The purge design stays a Phase 9 gate.
+
 ## Round 19 — 2026-10-18 · scope: Phase 1 gate proposal follow-up (PR #31)
 - **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 draft, updated after Rounds 16–18 · hash (`git hash-object`) `f44e0e5f876e4cd15b59a0bf1c4530fe941cd921`.
 - **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `d9c046afed4c9ac350df20d34a194c3bfc97c11a`; local builder worktree is clean and its spec blob matches. Round 18 reviewed hash `418d7a60a43617e20bc0c64ac71d8abfec7dff98`. This round checks the correction diff and effective revision 7 proposal against approved revision 6.
