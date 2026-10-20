@@ -18,7 +18,7 @@
 - **Scope / affects:** the Phase 1 plan (`docs/superpowers/plans/2026-10-20-phase-1-tenancy-security-jobs.md`); the spec Open question 8 and the Phase 1, 4, 5 and 7 done-when rows (edits in Task 30).
 - **Versions:** none.
 - **Exception to a rule?** no
-- **Decided by:** owner (Charlie, 2026-10-20, in his own words in the Andy session; Bob cannot see it). After the builder's question, Charlie pasted Bob's recommendation ("yes to both", suggesting the words "ASK 1: own login. ASK 2: yes, move the per-table tests to the phases that create those tables, with generic fixture tests in Phase 1.") and wrote: "follow bob's suggestions". The other seven ASK items (3 to 9) are not decided yet.
+- **Decided by:** owner (Charlie, 2026-10-20, in his own words in the Andy session; Bob cannot see it). After the builder's question, Charlie pasted Bob's recommendation ("yes to both", suggesting the words "ASK 1: own login. ASK 2: yes, move the per-table tests to the phases that create those tables, with generic fixture tests in Phase 1.") and wrote: "follow bob's suggestions". ASK 3 was answered later the same day (entry above); ASK 4 to 9 are not decided yet.
 
 ## 2026-10-17 — Phase 1 gate proposals (spec v4.7 revision 7, draft); all five approved by Charlie 2026-10-20
 - **Decision:** The five Phase 1 plan gates were **drafted as proposals on 2026-10-17 and approved by Charlie on 2026-10-20** (see "Owner decisions" below), in spec v4.7 revision 7 ("Changes in v4.7" item 8; each policy in full in its home section):
