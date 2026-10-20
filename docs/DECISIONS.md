@@ -2,6 +2,15 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-10-20 — Phase 1 plan: `crm_purge` own login; per-table polymorphic tests move to the creating phase
+- **Decision:** (1) ASK 1 / Open question 8: `crm_purge` connects with **its own login**; its credential goes only to the worker (from Phase 9). The alternative, `SET LOCAL ROLE` from a `crm_app` connection, is not chosen. (2) ASK 2: the per-table polymorphic-reference tests (`share_link`, `document_artifact`, `signature`, `line_item`, `version_retention`) move out of the Phase 1 done-when into the phase whose migration creates each table; Phase 1 keeps the generic trigger and constraint tests on fixture tables. The spec edits (plan E1 to E5) are made in the plan PR's Task 30, after Bob reviews the plan.
+- **Why:** The builder asked in plain text (Phase 1 plan PR #33, ASK 1 and ASK 2, with the reasons): `SET ROLE` would let any web connection switch to the purge role (TEN-02), and Phase 1 does not create the later tables, so their tests cannot run in Phase 1 (Bob spec Round 21 P2, Round 24). Bob (reviewer) recommended yes to both, in a note Charlie pasted into the Andy session.
+- **Alternatives rejected:** `SET LOCAL ROLE` for `crm_purge`; creating the five later-phase tables in Phase 1 so the tests pass there.
+- **Scope / affects:** the Phase 1 plan (`docs/superpowers/plans/2026-10-20-phase-1-tenancy-security-jobs.md`); the spec Open question 8 and the Phase 1, 4, 5 and 7 done-when rows (edits in Task 30).
+- **Versions:** none.
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-10-20, in his own words in the Andy session; Bob cannot see it). After the builder's question, Charlie pasted Bob's recommendation ("yes to both", suggesting the words "ASK 1: own login. ASK 2: yes, move the per-table tests to the phases that create those tables, with generic fixture tests in Phase 1.") and wrote: "follow bob's suggestions". The other seven ASK items (3 to 9) are not decided yet.
+
 ## 2026-10-17 — Phase 1 gate proposals (spec v4.7 revision 7, draft); all five approved by Charlie 2026-10-20
 - **Decision:** The five Phase 1 plan gates were **drafted as proposals on 2026-10-17 and approved by Charlie on 2026-10-20** (see "Owner decisions" below), in spec v4.7 revision 7 ("Changes in v4.7" item 8; each policy in full in its home section):
   - Rate limits and OTP re-issue cap: database-backed fixed-window counters per IP, account, link and contact, a uniform `429`, numbers in "Authentication and sessions" → "Rate limits" (e.g. OTP issue 3 per hour and 10 per day per link).
