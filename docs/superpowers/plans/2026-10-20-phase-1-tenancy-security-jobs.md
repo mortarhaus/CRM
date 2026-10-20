@@ -1,8 +1,8 @@
 # Phase 1 — Tenancy, Security, Jobs Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> This plan is task data. Implementation follows `agents/START.md`, `agents/roles/builder.md` and the owner's instructions; how the builder works through it (sub-agents, task-by-task execution, or neither) is the builder's choice and never overrides the kit's commands, gates or PR checkpoints. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: draft for Bob's plan review (2026-10-20).** Written against spec v4.7 revision 7, hash `50acbcfe0b402718ddd2c49f4297ce378e1b7451` (= `agents/PROJECT.md` §2), `main` at `4bf02f9`. Items marked **builder proposal, Bob reviews; owner decides only if it changes a spec rule** are not decided until Bob's review round (and Charlie, where marked). No product code is in this PR. The spec and `PROJECT.md` edits this plan needs are listed in "Spec / PROJECT.md edits this plan needs" and are made only in Task 30, after Bob's plan review.
+> **Status: draft for Bob's plan review (2026-10-20; revised after Bob's plan review Round 1).** Written against spec v4.7 revision 7, hash `50acbcfe0b402718ddd2c49f4297ce378e1b7451` (= `agents/PROJECT.md` §2), `main` at `4bf02f9`. Items marked **builder proposal, Bob reviews; owner decides only if it changes a spec rule** are not decided until Bob's review round (and Charlie, where marked). No product code is in this PR, and no spec or `PROJECT.md` edit either: this PR holds the plan and its `docs/DECISIONS.md` entry only. The spec and `PROJECT.md` edits this plan needs are listed in "Spec / PROJECT.md edits this plan needs"; they are made **after this PR is merged**, in the separate PRs named in "Order of the plan, spec and reconcile PRs" (Task 30 and the `setup` reconcile).
 
 **Goal:** Build the tenancy, security and jobs spine so that every later phase writes tenant data only as `crm_app` inside `withWorkspace()`, under RESTRICTIVE + PERMISSIVE RLS, through `action()`, with an audit trail, transactional domain events and jobs, database-backed rate limits, nonce CSP and a working email path, and so that every Phase 1 test and gate in the spec passes.
 
@@ -45,7 +45,7 @@ Other sections used: "Tenancy" (lines 774–790), "Authentication and sessions" 
   ```
   `<predicate>` is always the exact text of the workspace predicate above. A policy exists only for a command the role holds a grant for.
 - **Workspace context:** only `withWorkspace()` (Task 5) calls `set_config('app.workspace_id', …, true)`. `SET`, `SET LOCAL` and `set_config(…, false)` are banned by lint (TEN-09).
-- **Payloads:** `domain_event.payload` holds IDs and amounts only; pg-boss job data holds IDs only (spec "Domain events and jobs"). Job data is `{ workspaceId, … ids }`; see Settled item 5.
+- **Payloads:** `domain_event.payload` holds IDs and amounts only; pg-boss job data holds IDs only (spec "Domain events and jobs"). Job data is `{ workspaceId, … ids }`; see Settled item 5. Both are JSONB, which has no bigint: a money amount (bigint minor units) crosses the event boundary only as a canonical decimal string (`MinorUnits`, `minorUnits()`, Task 19), never as a raw `bigint` or a `number`.
 - **Values:** every number from the spec's rate-limit table and every other fixed security value goes into `packages/core/src/security/limits.ts` with its spec citation (UNI-02; `docs/DECISIONS.md` 2026-10-13). No other literal limit in code.
 - **Commands:** `pnpm test` (Vitest; Docker running), one file `pnpm vitest run <path>`, `pnpm test:e2e`, `pnpm lint`, `pnpm typecheck`, `pnpm build`. New in Task 19: `pnpm test:gates` (the 60 s+ pooler gate, excluded from `pnpm test`, run in CI).
 - **PR size:** the 400 LOC target excludes generated migration SQL, the committed pg-boss construction SQL and `pnpm-lock.yaml`. Where a PR still exceeds it, its PR body says by how much and why.
@@ -113,7 +113,7 @@ Expected creating phase (this plan's reading; each phase plan confirms it): `lin
 
 ### Settled item 4 — spec Status-line label
 
-Revision 7 is approved and merged: Bob's spec review **Round 24** (2026-10-20) returned **Approved with conditions** at hash `50acbcfe0b402718ddd2c49f4297ce378e1b7451` (PR #31 head `4ec37c3`), and PR #31 merged to `main` as **`7f7178a`**; `setup` reconciled `PROJECT.md` and `CLAUDE.md` in PR #32 (`d3bfff0`, merged `4bf02f9`). The spec still says "draft" and "pending Bob's confirmation" in its title (line 1), Status (line 3), the "Changes in v4.7" heading (line 11) and item 8's lead, and in Current gates (a) (line 1154). Exact edits: E7 to E10. They are made **only in Task 30**, after Bob's plan review, in this same PR; then Bob re-reviews the new spec hash and `setup` reconciles `PROJECT.md` §2 and §11 (P1 to P5).
+Revision 7 is approved and merged: Bob's spec review **Round 24** (2026-10-20) returned **Approved with conditions** at hash `50acbcfe0b402718ddd2c49f4297ce378e1b7451` (PR #31 head `4ec37c3`), and PR #31 merged to `main` as **`7f7178a`**; `setup` reconciled `PROJECT.md` and `CLAUDE.md` in PR #32 (`d3bfff0`, merged `4bf02f9`). The spec still says "draft" and "pending Bob's confirmation" in its title (line 1), Status (line 3), the "Changes in v4.7" heading (line 11) and item 8's lead, and in Current gates (a) (line 1154). Exact edits: E7 to E10. They are made **only in Task 30**, a separate spec PR opened after this plan PR (#33) is merged; Bob reviews that PR's exact spec hash, Charlie approves and merges it, and then `setup` reconciles `PROJECT.md` §2 and §11 (P1 to P5) in its own PR. The exact order is in "Order of the plan, spec and reconcile PRs".
 
 ### Settled item 5 — smaller choices the spec leaves to the plan
 
@@ -134,6 +134,8 @@ Revision 7 is approved and merged: Bob's spec review **Round 24** (2026-10-20) r
 3. **A forged `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `CF-Connecting-IP` or internal client-IP header** on `/api/auth/*` and through a form. Expected: the key is the edge-set IP; rotating the forged value never gets past the cap. Owner: Task 22.
 4. **A transaction that emits an event and rolls back.** Expected: no `domain_event` row and no job, ever. Owner: Task 19.
 5. **pg-boss maintenance through PgBouncer as `crm_worker` for a full cycle.** Expected: no `42501`, no error event, expired jobs failed and old jobs deleted. Owner: Task 20.
+6. **A mutating server action outside `action()`**: in a `"use server"` file with any name or path, or as an extra export beside a named Better Auth forwarder. Expected: `pnpm lint` fails; a new mutating `route.ts` fails the entry-point test. Owner: Task 15.
+7. **A money amount above 2^53 in an event payload.** Expected: it is stored and read back as the exact decimal string; a raw `bigint` is refused before any write. Owner: Task 19.
 
 ---
 
@@ -157,6 +159,7 @@ packages/core/src/security/limits.ts          (modify) rate-limit numbers, idemp
 packages/core/src/security/limits.test.ts     (modify)
 packages/core/src/audit/redact.ts, redact.test.ts      redactPii()
 packages/core/src/events/names.ts, names.test.ts       Part 1 event-name set, EventName type
+packages/core/src/events/payload.ts, payload.test.ts   EventPayload, MinorUnits, minorUnits(), parseMinorUnits()
 apps/web/package.json                         (modify) pg-boss, nodemailer, @react-email/render; scripts
 apps/web/vitest.config.mts                    (modify) exclude *.gate.test.ts
 apps/web/vitest.gates.config.mts              the pooler gate project
@@ -190,6 +193,9 @@ apps/web/src/db/schema-fk.test.ts                        composite-FK catalog te
 apps/web/src/db/poly-ref.test.ts                         polymorphic helper on fixture tables
 apps/web/src/db/purge-role.test.ts                       crm_purge part (b1) catalog + behavioural
 apps/web/src/db/lint-rules.test.ts                       lint fixtures (TEN-09, TEN-10, AUTH-01, pg ban)
+apps/web/eslint/server-action-wrapper.mjs                AUTH-01 local lint rule (every "use server" export)
+apps/web/eslint/forwarding-actions.mjs                   named Better Auth forwarding exports (AUTH-01 exemptions)
+apps/web/src/app/entry-points.test.ts                    classification of every route.ts / proxy entry point
 apps/web/src/db/schema/index.ts               (modify) barrel
 apps/web/src/db/schema/auth.ts                (modify, regenerated) organization.billing_account_id
 apps/web/src/db/schema/tenancy.ts             workspace_settings
@@ -244,14 +250,14 @@ apps/web/playwright.config.ts                 (modify) worker as a second webSer
 
 ## PR checkpoints
 
-One logical change per PR. Stop at each checkpoint: push, open the PR (what, why, test plan, drafting model, self-check table), wait for Bob's review, `approved <n>`, Charlie's merge and `merged <n>`, then cut the next branch from the updated `main`. PR 1 is the first PR of the milestone and of a new module, so the builder asks Charlie before starting it (`roles/builder.md` §8).
+One logical change per PR. Stop at each checkpoint: push, open the PR (what, why, test plan, drafting model, self-check table), wait for Bob's review, `approved <n>`, Charlie's merge and `merged <n>`, then cut the next branch from the updated `main`. PR 1 is the first PR of the milestone and of a new module, so the builder asks Charlie before starting it (`roles/builder.md` §8), and only after the plan, spec and reconcile PRs below are merged.
 
 | PR | Branch | Tasks | Model (`PROJECT.md` §6) | Verification delivered |
 |---|---|---|---|---|
 | 1 | `feat/p1-db-roles` | 1–3 | Opus 5.5 (roles, grants) | no-`BYPASSRLS` `pg_roles` test; effective-privilege manifest test (Better Auth tables); PUBLIC EXECUTE revoke; TEN-01/02 Phase 0 exception closed |
 | 2 | `feat/p1-rls` | 4–7 | Opus 5.5 (RLS) | policy lint (`nullif`); RESTRICTIVE-policy catalog test; `set_config` + `nullif` bare-query test on a reused connection; `withWorkspace` lint rule; isolation test on every tenant table |
 | 3 | `feat/p1-system-module` | 8–11 | Opus 5.5 (auth, tenancy); Sonnet 5 allowed for Task 9's schema typing | no-RLS allow-list test; TEN-10 lint fixture; system-module authorization tests over two workspaces; composite-FK schema test; polymorphic helper on fixtures |
-| 4 | `feat/p1-action-audit` | 12–15 | Opus 5.5 (auth, roles) | audit PII redaction; `crm_purge` (b1) catalog + behavioural tests; no DELETE/UPDATE/TRUNCATE on `audit_log` (Scalability, part 1); idempotency replay; AUTH-01 lint |
+| 4 | `feat/p1-action-audit` | 12–15 (+ 31 if ASK 3 = (a)) | Opus 5.5 (auth, roles) | audit PII redaction; `crm_purge` (b1) catalog + behavioural tests; no DELETE/UPDATE/TRUNCATE on `audit_log` (Scalability, part 1); idempotency replay; AUTH-01 lint (every `"use server"` export) and entry-point classification; sign-in / 2FA audit rows (Task 31, pending ASK 3) |
 | 5 | `feat/p1-pgboss` | 16–18 | Opus 5.5 (grants) | pg-boss installed by migration; `crm_app` cannot read job payloads; `crm_worker` exact grants measured and recorded; retry and dead-letter; `pg` ban |
 | 6 | `feat/p1-events` | 19–20 | Opus 5.5 | rolled-back transaction leaves no event and no job; no DELETE/UPDATE/TRUNCATE on `domain_event` (Scalability, part 2); pooler maintenance gate (60 s+); `/api/health` queue |
 | 7 | `feat/p1-rate-limits` | 21–24 | Opus 5.5 (auth) | Verification "Rate limits and `/api/auth/*`", every Phase 1 part |
@@ -259,7 +265,24 @@ One logical change per PR. Stop at each checkpoint: push, open the PR (what, why
 
 Dependency order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8. PR 7 needs PR 5–6 (the cleanup jobs run in the worker) and PR 4 (idempotency table for its cleanup). PR 8 needs PR 4 (`action()`) and PR 6 (jobs).
 
-The plan PR itself (`docs/phase-1-plan`) has one more task, **Task 30** (spec and `PROJECT.md` label edits), done only after Bob's plan review.
+### Order of the plan, spec and reconcile PRs
+
+PR 1 above does not start until steps 1–4 below are done, in this order. Each step names the commit or hash it uses; a step whose commit differs from the one named stops and goes back to the owner.
+
+1. **Plan PR #33** (branch `docs/phase-1-plan`). Contains this plan and its `docs/DECISIONS.md` entry only — no spec, `PROJECT.md` or `CLAUDE.md` change (check: `git diff --stat origin/main...HEAD` lists exactly those two files). Uses spec hash `50acbcfe0b402718ddd2c49f4297ce378e1b7451` (unchanged by this PR).
+   1. The builder pushes the fixes; the PR's **final head** `<H33>` is the host's head SHA.
+   2. Bob runs `review 33` on `<H33>`; the newest round in `.agent/reviews/PR-33.md` records `<H33>` and says Approved or Approved with conditions. Any new commit means a new round on the new head.
+   3. Charlie runs `approved 33` **before merging**: it checks that the round's head equals the host's head `<H33>` and that the PR is open, archives the review and writes the receipt for `<H33>` on the log branch.
+   4. Charlie merges PR #33 (merge commit `<M33>` on `main`).
+   5. `merged 33` writes the PR log; it must find the receipt for `<H33>` written before the merge time.
+2. **Spec PR — Task 30** (branch `docs/spec-v4.7-rev8-phase1-plan-alignment`, cut from `main` at `<M33>`; PR number `<N>`). Contains spec revision 8 (edits E1–E11, plus any spec edit ASK 3's answer needs) and its `docs/DECISIONS.md` entry; nothing else.
+   1. The builder makes Task 30's commits and pushes; the PR's final head is `<HN>` and `git hash-object docs/superpowers/specs/2026-09-27-core-sales-design.md` at `<HN>` is `<S8>`. Both go in the PR body.
+   2. Bob runs `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` on the checkout of `<HN>`; the round in `.agent/reviews/SPEC-core-sales-design.md` records hash `<S8>` and pins PR head `<HN>` (as Rounds 22–24 did for PR #31). A fix commit changes `<HN>` and usually `<S8>`; Bob reviews the new pair.
+   3. The owner decisions revision 8 records are in the spec and DECISIONS **before** Bob's final round, so `<S8>` already holds them: ASK 1 and ASK 2 (answered 2026-10-20, quoted in Task 30), and ASK 3 if Charlie's answer changes the spec. After Bob's Approved round, Charlie approves revision 8 at `<S8>`.
+   4. Charlie runs `approved <N>` **before merging**, on head `<HN>` (the receipt names the SPEC review file and `<S8>`, as `PR-31.receipt` did).
+   5. Charlie merges (merge commit `<MN>`); `merged <N>` writes the log and checks the receipt for `<HN>`.
+3. **`setup` reconcile PR** (branch `chore/setup-reconcile-v4-7-rev8`, cut from `main` at `<MN>`; PR number `<R>`). First check `git hash-object` of the spec on `<MN>` equals `<S8>` (the merged blob is the reviewed blob); otherwise stop. `setup` (Part B reconcile) makes P1, P2 (§2 hash = `<S8>`), P3 and P5 in `agents/PROJECT.md` and the `CLAUDE.md` Status line; P4, P6 and P7 wait for the PRs named in them. Then `review <R>` on its final head, `approved <R>` before merge, merge, `merged <R>`, as for PR #32.
+4. **PR 1 of the build** (`feat/p1-db-roles`, from `main` after `<R>` merged). `build` runs its two gates against `main`: the spec gate (an Approved round in the SPEC review file for `<S8>`) and the reconcile gate (`<S8>` = **Spec hash at last reconcile** in `PROJECT.md` §2). Both pass only after steps 2 and 3. Then the builder asks Charlie before starting PR 1 (`roles/builder.md` §8).
 
 ---
 
@@ -488,7 +511,7 @@ Open PR 1. Self-check rows: TEN-01, TEN-02, TEN-03 (n-a until `audit_log`), UNI-
 - [ ] **Step 5: Run.** `pnpm vitest run apps/web/src/db` → PASS.
 - [ ] **Step 6: Commit and PR checkpoint.** `git commit -m "feat(db): composite-FK schema test and polymorphic-reference triggers tested on fixtures" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"`; push; open PR 3. The PR body states Settled item 3 and that the per-table tests land with each table (spec edits E1, E2, E4, E5 pending Charlie's OK).
 
-## PR 4 — `feat/p1-action-audit` (Tasks 12–15)
+## PR 4 — `feat/p1-action-audit` (Tasks 12–15, and Task 31 pending ASK 3)
 
 **Guardrails:** AUTH-01 (hard), AUTH-02, AUTH-03, TEN-02 (hard), TEN-03, TEN-06, TEN-07, TEN-08, TEN-09 (hard), TEN-11 (hard), UNI-03, UNI-09, UNI-10. §9 `crm_purge` Phase 1 scope (b1).
 
@@ -552,12 +575,61 @@ Order, fixed in code and tested: (1) session (`getCurrentSession`; none → `UNA
 
 ### Task 15: AUTH-01 lint — every mutating server action goes through `action()`
 
-**Files:** Modify `eslint.config.mjs`, `apps/web/src/db/lint-rules.test.ts`.
+**Files:** Create `apps/web/eslint/server-action-wrapper.mjs` (local rule), `apps/web/eslint/forwarding-actions.mjs` (the named exemptions), `apps/web/src/app/entry-points.test.ts`; modify `eslint.config.mjs`, `apps/web/src/db/lint-rules.test.ts`.
 
-- [ ] **Step 1: Failing fixtures.** A file with `"use server"` under `apps/web/src/app/(app)/**` that exports `export async function doThing() {}` reports the rule; `export const doThing = action({ … })` is clean. The auth form actions that only forward to Better Auth (`(auth)/sign-in`, `(auth)/sign-up`, `(auth)/two-factor`, `(app)/actions.ts` set-active and sign-out, `(app)/settings/security/actions.ts`, `(app)/workspaces/actions.ts`) are an explicit allow-list in the config, each with the comment-free reason in the PR body: they are the `/api/auth/*` surface reached through `postToAuth` (spec "Better Auth endpoints": not routed through `action()`).
-- [ ] **Step 2: Rule.** For files matching `apps/web/src/app/**/actions.ts` minus the allow-list: `no-restricted-syntax` selectors `ExportNamedDeclaration > FunctionDeclaration` and `ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[init.type!='CallExpression']`, plus `…[init.callee.name!='action']`, message "Server actions go through action() (AUTH-01)".
-- [ ] **Step 3: Run.** `pnpm vitest run apps/web/src/db/lint-rules.test.ts && pnpm lint` → PASS / exit 0.
-- [ ] **Step 4: Commit and PR checkpoint.** `git commit -m "chore(lint): server actions must use action() (AUTH-01)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"`; push; open PR 4.
+**Scope (the rule follows the directive, not the file name).** A server action is any function Next.js exposes to the client because of a `"use server"` directive: (i) every export of a module whose directive prologue contains `"use server"`, wherever the file is and whatever it is called; (ii) any function whose body starts with a `"use server"` directive (inline action, e.g. inside a server component). The rule is registered for `apps/web/**/*.{ts,tsx}` with **no** `files` narrowing by name and no whole-file ignore; it is a no-op on modules without the directive.
+
+**Exemptions are named functions, not files.** `forwarding-actions.mjs` exports `FORWARDING_ACTIONS`, a map from repo-relative file path to the export **names** that only forward to Better Auth through `postToAuth` (spec "Better Auth endpoints": the `/api/auth/*` surface is not routed through `action()`, revision 7 (d)). The Phase 0 set, read from the tree on 2026-10-20:
+
+| File | Exempt exports (only these) | Better Auth path |
+|---|---|---|
+| `apps/web/src/app/(auth)/sign-in/actions.ts` | `signInAction` | `/sign-in/email` |
+| `apps/web/src/app/(auth)/sign-up/actions.ts` | `signUpAction` | `/sign-up/email` |
+| `apps/web/src/app/(auth)/two-factor/actions.ts` | `verifyTwoFactorAction` | `/two-factor/verify-totp`, `/two-factor/verify-backup-code` |
+| `apps/web/src/app/(app)/actions.ts` | `setActiveWorkspaceAction`, `signOutAction` | `/organization/set-active`, `/sign-out` |
+| `apps/web/src/app/(app)/settings/security/actions.ts` | `startTwoFactorAction`, `confirmTwoFactorAction` | `/two-factor/enable`, `/two-factor/verify-totp` |
+| `apps/web/src/app/(app)/workspaces/actions.ts` | `createWorkspaceAction` | `/organization/create` |
+
+A type-only export (`export interface`, `export type`) is not a server action and is ignored. Every other export of these files is checked like any other.
+
+- [ ] **Step 1: Failing fixtures** (`lint-rules.test.ts`, `lintText` with the given `filePath`; each "reports" case expects the message "Server actions go through action() (AUTH-01)"):
+  - `apps/web/src/app/(app)/settings/email/actions.ts`, `"use server"`, `export async function doThing() {}` → reports; `export const doThing = action({ … })` → clean.
+  - **Differently named file:** `apps/web/src/app/(app)/settings/email/mutations.ts`, `"use server"`, `export async function saveEmailSettings(form: FormData) { await withWorkspace(id, (tx) => tx.insert(workspaceSettings).values({ … })); }` (a mutating export that writes the database directly) → reports.
+  - **Outside `src/app`:** the same body at `apps/web/src/lib/settings-mutations.ts` → reports.
+  - **Extra export in an exempt file:** `apps/web/src/app/(app)/workspaces/actions.ts` with the real `createWorkspaceAction` plus `export async function renameWorkspaceAction(form: FormData) { … }` → reports on `renameWorkspaceAction` only; `createWorkspaceAction` stays clean.
+  - **Other export shapes in a `"use server"` module:** `export default async function (…) {}`, `export const x = async () => {}`, `export const x = wrap(async () => {})` (a call that is not `action`), `const x = …; export { x }`, `export { x as y }` of a local non-`action()` binding, and `export * from "./other"` / `export { x } from "./other"` (re-exports cannot be checked, so they are refused) → each reports.
+  - **Inline action:** `async function inline() { "use server"; … }` inside `apps/web/src/app/(app)/settings/email/page.tsx` → reports (Phase 1 has no inline actions; one needs `action()` or a named exemption).
+  - **Known forwarding actions:** each of the eight exempt exports above, at its real path with its real body → clean. The same function name at a different path (e.g. `signInAction` in `mutations.ts`) → reports.
+- [ ] **Step 2: Rule.** `server-action-wrapper.mjs`: on `Program`, read the directive prologue; if it has `"use server"`, walk every `ExportNamedDeclaration`, `ExportDefaultDeclaration`, `ExportAllDeclaration` and `ExportSpecifier`; an export is clean only if its binding is `const <name> = action({ … })` (callee identifier `action` imported from `@/lib/auth/action`) or `FORWARDING_ACTIONS[<file>]` lists `<name>`. On any `FunctionDeclaration`, `FunctionExpression` or `ArrowFunctionExpression` whose body's directive prologue has `"use server"`, report unless it is the initializer of a listed forwarding export. Register it in `eslint.config.mjs` as an inline plugin (`plugins: { crm: { rules: { "server-action-wrapper": … } } }`) for `apps/web/**/*.{ts,tsx}`.
+- [ ] **Step 3: Classify every other mutating entry point** (`entry-points.test.ts`). It walks `apps/web/src/app/**/route.ts` and `apps/web/proxy.ts` and compares, per file, the exported HTTP method names with a committed table; an unlisted `route.ts`, or a listed one exporting a method not in its row, fails with "classify this entry point (AUTH-01)":
+
+  | Entry point | Methods | How it is covered |
+  |---|---|---|
+  | `apps/web/src/app/api/auth/[...all]/route.ts` | GET, POST | The named `/api/auth/*` exception (revision 7 (d)): not through `action()`; DB rate limits, uniform 429, enabled-path allow-list — `rate-limit.test.ts`, `enabled-paths.test.ts` (Tasks 23, 24). |
+  | `apps/web/src/app/api/health/route.ts` | GET only | Read-only, unauthenticated by design (UNI-19); `health.test.ts` (Task 20). The test fails if it ever exports POST, PUT, PATCH or DELETE. |
+  | `apps/web/proxy.ts` (Task 25) | `proxy` | Sets headers only, reads no database (AUTH-11); `security-headers.test.ts`. Not a mutation path. |
+  | any other `route.ts` exporting POST, PUT, PATCH or DELETE | — | None exists in Phase 1. The test fails until the new route is added to the table with its wrapper and test (a later phase decides, e.g. `linkAction()` for client link routes, §9 AUTH-01 ruling). |
+
+  Not HTTP entry points, recorded in the same test file as a list the test does not walk: pg-boss job handlers (`apps/web/src/jobs/*`; they run in the worker under `withWorkspace(data.workspaceId)` and re-check membership where they act for a user, Task 27 Step 2; EVT rules), the CLI scripts `db:bootstrap` and `jobs:retry` (operator commands with admin or `crm_worker` credentials, never reachable over HTTP; runbooks).
+- [ ] **Step 4: Run.** `pnpm vitest run apps/web/src/db/lint-rules.test.ts apps/web/src/app/entry-points.test.ts && pnpm lint` → PASS / exit 0 on the real tree (the eight forwarding exports pass by name; no other `"use server"` module exists yet).
+- [ ] **Step 5: Commit and PR checkpoint.** `git commit -m "chore(lint): every server action uses action() or is a named Better Auth forwarder (AUTH-01)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"`; push; open PR 4 (with Task 31 first, if ASK 3 = (a)).
+
+### Task 31 (outline, not final — pending ASK 3): audit rows for sign-in and 2FA changes, option (a)
+
+Numbered 31 so Tasks 16–30 keep their numbers. Written only if Charlie picks ASK 3 option (a); it then runs in PR 4 after Task 15 and before the PR 4 checkpoint. For (b) it is rewritten for `auth_audit_log` after revision 8 is approved; for (c) it is removed and the Done-when row moves with the spec. Bob reviews the final version.
+
+**Files (outline):** modify `apps/web/src/lib/auth/config.ts` (Better Auth hooks), `apps/web/src/db/system/workspaces.ts` (`listMemberWorkspaceIds(db, userId)`), `apps/web/src/lib/audit.ts` (`recordUserAuthEvent()`); create `apps/web/src/lib/auth/auth-audit.test.ts`.
+
+**Outline:**
+- Events: `auth.sign_in` (a session is created: `databaseHooks.session.create.after`, which also covers the second step of a 2FA sign-in), `auth.two_factor_enabled` (enrolment confirmed by `/two-factor/verify-totp` on an unverified 2FA), `auth.two_factor_disabled`, `auth.backup_codes_regenerated` (exact 1.7.6 hook names and the "enrolment confirmed" signal verified in the installed types first, as in Task 7).
+- `recordUserAuthEvent(db, { userId, action, ip })`: `listMemberWorkspaceIds(db, userId)` through the system module (TEN-10), then for each id `runInWorkspace(db, id, tx => recordAudit(tx, { actorUserId: userId, action, targetType: "user", targetId: userId, ip }))` — `workspace_id` from the transaction setting (TEN-11); no email, name or code in `before`/`after` (PII rule).
+- Open point for Bob: whether a failed audit write fails the auth request (proposal: yes, 5xx, so no login goes unaudited) — part of the review of the final task.
+
+**Test shape (`auth-audit.test.ts`, Testcontainers, `crm_app`, real Better Auth instance as in `auth.test.ts`; rows read through `adminUrl` and, for isolation, as `crm_app` per workspace):**
+- **User with no workspace:** sign-up then sign-in → the sign-in succeeds and **0** `audit_log` rows exist for that user in any workspace; 2FA enable and disable for that user → still **0** rows (the documented gap of option (a)).
+- **User in two workspaces** (W1, W2): sign-in → exactly one `auth.sign_in` row in W1 and one in W2, `actor_user_id` = the user, `target_id` = the user, `ip` = the derived client IP (Task 22, placeholder before PR 7); read as `crm_app` inside `runInWorkspace(W1)` it sees only the W1 row; 2FA enable, disable and backup-code regeneration → one row per event per workspace; a 2FA sign-in (password then TOTP) → one `auth.sign_in` per workspace, written at the TOTP step, none at the password step.
+- **Member of W1 only, W2 created later:** the earlier sign-in row exists in W1 only; W2 has none.
+- No row contains the email, the TOTP code or a backup code (string search over `before`, `after`, `action`).
 
 ## PR 5 — `feat/p1-pgboss` (Tasks 16–18)
 
@@ -617,15 +689,24 @@ Order, fixed in code and tested: (1) session (`getCurrentSession`; none → `UNA
 
 ## PR 6 — `feat/p1-events` (Tasks 19–20)
 
-**Guardrails:** EVT-01, EVT-02 (n-a: no relay), EVT-03, EVT-05, EVT-06, TEN-03, TEN-05–09, TEN-08, UNI-10, UNI-19. Known risks R6, R7.
+**Guardrails:** EVT-01, EVT-02 (n-a: no relay), EVT-03, EVT-05, EVT-06, TEN-03, TEN-05–09, TEN-08, UNI-03, UNI-09, UNI-10, UNI-19, MON-03 (money in event payloads as decimal strings). Known risks R6, R7.
 
 ### Task 19: `domain_event`, transactional enqueue, dispatch, `notification`
 
-**Files:** Create `packages/core/src/events/names.ts`, `packages/core/src/events/names.test.ts`, `apps/web/src/db/schema/events.ts`, `apps/web/drizzle/0012_domain_event_notification.sql`, `apps/web/drizzle/0013_rls_domain_event_notification.sql` (custom), `apps/web/src/jobs/enqueue.ts`, `apps/web/src/jobs/domain-event.ts`, `apps/web/src/jobs/enqueue.test.ts`; modify `packages/core/package.json` (export `./events`), `apps/web/src/jobs/handlers.ts`, `apps/web/src/db/privileges.ts`, `apps/web/src/db/isolation.test.ts`, `apps/web/src/db/privileges.test.ts`.
+**Files:** Create `packages/core/src/events/names.ts`, `packages/core/src/events/names.test.ts`, `packages/core/src/events/payload.ts`, `packages/core/src/events/payload.test.ts`, `apps/web/src/db/schema/events.ts`, `apps/web/drizzle/0012_domain_event_notification.sql`, `apps/web/drizzle/0013_rls_domain_event_notification.sql` (custom), `apps/web/src/jobs/enqueue.ts`, `apps/web/src/jobs/domain-event.ts`, `apps/web/src/jobs/enqueue.test.ts`; modify `packages/core/package.json` (export `./events`), `apps/web/src/jobs/handlers.ts`, `apps/web/src/db/privileges.ts`, `apps/web/src/db/isolation.test.ts`, `apps/web/src/db/privileges.test.ts`.
 
 **Interfaces:**
-- core: `EVENT_NAMES` = the spec's Part 1 event set (23 names, "Domain events and jobs"), `type EventName`; `EventPayload = Record<string, string | number | bigint>` (IDs and amounts only; enforced by the type and by a Zod check in `emitEvent`).
-- web: `emitEvent(tx: Tx, event: { name: EventName; version: number; payload: EventPayload }): Promise<string>` — inserts the row (workspace from the transaction setting), then `await (await getSendBoss()).send("domain_event", { workspaceId, eventId }, { db: fromDrizzle(tx, sql), id: eventId })`; returns `eventId`. `enqueueJob(tx, queue, data: Record<string, string>)` — same `fromDrizzle(tx, sql)` pattern, for non-event jobs (`email.send`).
+- core: `EVENT_NAMES` = the spec's Part 1 event set (23 names, "Domain events and jobs"), `type EventName`.
+- core (`payload.ts`), the JSON-safe event boundary. JSON has no bigint (`JSON.stringify(1n)` throws), and money is `bigint` minor units, so **money crosses the event boundary as a decimal string**:
+  ```ts
+  export type MinorUnits = string & { readonly __brand: "MinorUnits" };   // canonical base-10 integer, e.g. "9007199254740993"
+  export function minorUnits(amount: bigint): MinorUnits;                  // amount.toString(); throws RangeError on a negative amount (spec Money rules: no negatives)
+  export function parseMinorUnits(value: string): bigint;                  // accepts only /^(0|[1-9][0-9]*)$/, else throws; BigInt(value)
+  export type EventPayloadValue = string /* uuid */ | MinorUnits | number /* safe integer only, e.g. a count */;
+  export type EventPayload = Readonly<Record<string, EventPayloadValue>>;  // IDs and amounts only; no bigint member
+  ```
+  Producers write `{ invoiceId, amount: minorUnits(total) }`; consumers read `parseMinorUnits(payload.amount)`. A `number` is never used for money.
+- web: `emitEvent(tx: Tx, event: { name: EventName; version: number; payload: EventPayload }): Promise<string>` — **first** validates the payload with `eventPayloadSchema` (Zod, in `enqueue.ts`): each value is a uuid string, a canonical decimal string (`/^(0|[1-9][0-9]*)$/`) or `z.number().int().safe()`; a raw `bigint` value (from an untyped or `as` caller) is refused before any SQL with `EventPayloadError("payload.<field> is a bigint; encode money with minorUnits()")`, and any other value with `EventPayloadError("payload.<field> is not an ID or amount")` (field name only, never the value, UNI-09). Then it inserts the row (workspace from the transaction setting), then `await (await getSendBoss()).send("domain_event", { workspaceId, eventId }, { db: fromDrizzle(tx, sql), id: eventId })`; returns `eventId`. `enqueueJob(tx, queue, data: Record<string, string>)` — same `fromDrizzle(tx, sql)` pattern, for non-event jobs (`email.send`).
 - worker: the `domain_event` handler runs `withWorkspace(data.workspaceId, tx => load event by id)`; unknown payload fields are ignored (EVT-03); not found → throws (job retries, then dead letter). Core handlers registry is empty in Phase 1.
 
 - [ ] **Step 0: Branch** `feat/p1-events`.
@@ -635,11 +716,15 @@ Order, fixed in code and tested: (1) session (`getCurrentSession`; none → `UNA
   - **commit**: one row and one job whose id equals the event id; the worker's `domain_event` handler receives it and loads the row under A;
   - **invisible before commit**: while the transaction is open, a second connection (`adminUrl`) sees no job and the worker fetches nothing;
   - **same id twice** → one job;
-  - **payload guard**: `emitEvent` with a string field holding an email (`a@x`) is refused by the payload Zod check (`z.union([uuid, numeric string, number, bigint])`), so a payload carries IDs and amounts only;
+  - **payload guard**: `emitEvent` with a string field holding an email (`a@x`) is refused by `eventPayloadSchema`, so a payload carries IDs and amounts only; so are a non-canonical amount (`"007"`, `"1.5"`, `"-1"`) and an unsafe number (`2 ** 53`);
+  - **raw bigint refused before the transaction writes**: inside `withWorkspace(A, tx => …)`, `emitEvent(tx, { …, payload: { amount: 1n } as unknown as EventPayload })` rejects with `EventPayloadError` naming `payload.amount` and "minorUnits()"; a spy on `tx.execute`/`tx.insert` shows no statement after the `set_config`, and afterwards there are 0 `domain_event` rows and 0 jobs; the same call in a `.ts` fixture without the cast is a type error (`// @ts-expect-error` line in `enqueue.test.ts`, checked by `pnpm typecheck`);
+  - **large amount round-trips exactly**: `emitEvent` with `{ invoiceId, amount: minorUnits(9007199254740993n) }` (2^53 + 1, beyond `Number.MAX_SAFE_INTEGER`) commits; through `adminUrl`, `select jsonb_typeof(payload->'amount'), payload->>'amount' from domain_event` returns `string`, `9007199254740993`; the worker's `domain_event` handler loads the row under A and `parseMinorUnits(row.payload.amount) === 9007199254740993n`; no step goes through `Number`;
+  - **atomic with the large amount**: the same emit followed by a throw in the same `withWorkspace` → 0 `domain_event` rows and 0 jobs; the committed case → exactly one row and one job with `job.id = event.id` (event and job never apart);
   - **unknown fields**: a job data object with an extra field is processed (EVT-03);
   - **cross-workspace**: job data with workspace B and an event id from A → handler throws "event not found" (RLS hides it), job retries;
   - **crm_app cannot read payloads** (repeated from Task 16 next to the producer).
   - `privileges.test.ts`, TEN-03 / UNI-10 part 2: no runtime role or PUBLIC holds DELETE, UPDATE or TRUNCATE on `domain_event`; owner is `crm_migrator`.
+  - core `payload.test.ts`: `minorUnits(0n)` = `"0"`; `minorUnits(9007199254740993n)` = `"9007199254740993"`; `minorUnits(-1n)` throws; `parseMinorUnits` round-trips `2n ** 63n - 1n` exactly and refuses `""`, `"01"`, `"1e3"`, `" 1"`, `"-1"`.
 - [ ] **Step 3: Implement**; run `pnpm vitest run apps/web/src/jobs apps/web/src/db packages/core/src/events` → PASS.
 - [ ] **Step 4: Commit.** `git commit -m "feat(events): domain_event with transactional pg-boss enqueue; notification table" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"`
 
@@ -657,7 +742,7 @@ Order, fixed in code and tested: (1) session (`getCurrentSession`; none → `UNA
 
 ## PR 7 — `feat/p1-rate-limits` (Tasks 21–24)
 
-**Guardrails:** AUTH-01 (hard; `/api/auth/*` is the named exception, revision 7 (d)), AUTH-05, AUTH-06, AUTH-11, UNI-02, UNI-03, UNI-09, UNI-16, UNI-19, TEN-10, EVT-06. LINK-03 and LINK-07 are **n-a in Phase 1** (link and OTP limits ship in Phase 7; the spec's Verification says so). Spec "Rate limits" (storage and keys, system module, client IP, atomic consume, numbers, response) and "Better Auth endpoints".
+**Guardrails:** AUTH-01 (hard; `/api/auth/*` is the named exception, revision 7 (d)), AUTH-05, AUTH-06, AUTH-07 (check only, Task 24 Step 2), AUTH-11, UNI-02, UNI-03, UNI-09, UNI-16, UNI-19, TEN-10, EVT-06. LINK-03 and LINK-07 are **n-a in Phase 1** (link and OTP limits ship in Phase 7; the spec's Verification says so). Spec "Rate limits" (storage and keys, system module, client IP, atomic consume, numbers, response) and "Better Auth endpoints".
 
 ### Task 21: Limits, the `rate_limit` table and the atomic consume
 
@@ -731,7 +816,7 @@ Order, fixed in code and tested: (1) session (`getCurrentSession`; none → `UNA
 **Files:** Create `apps/web/src/lib/auth/enabled-paths.ts`, `apps/web/src/lib/auth/enabled-paths.test.ts`, `apps/web/src/jobs/cleanup.ts`, `apps/web/src/jobs/cleanup.test.ts`; modify `apps/web/src/lib/auth/config.ts`, `apps/web/src/lib/auth/handle.ts`, `apps/web/src/jobs/handlers.ts`, `apps/web/src/worker/start.ts`, `docs/runbooks/phase-1-security.md` (new), `docs/DECISIONS.md`.
 
 - [ ] **Step 1: Enabled set.** `PHASE1_ENABLED_AUTH_PATHS` = the spec's list ("Enabled in Phase 1") mapped to 1.7.6 paths, read from `Object.values(auth.api)` endpoint `path` values in the installed version and committed: `/sign-up/email`, `/sign-in/email`, `/sign-out`, `/get-session`, `/list-sessions`, `/revoke-session`, `/revoke-sessions`, `/revoke-other-sessions`, `/change-password`, `/update-user`, `/two-factor/enable`, `/two-factor/disable`, `/two-factor/verify-totp`, `/two-factor/verify-backup-code`, `/two-factor/generate-backup-codes`, `/two-factor/get-totp-uri` (only if the enrolment UI calls it; check), `/organization/create`, `/organization/update`, `/organization/set-active`, `/organization/list` (the exact strings are whatever 1.7.6 exposes for these features; record any rename in the PR). Config: `disabledPaths` = every endpoint path of the built instance minus this set (computed once in `createAuth` from the instance's endpoints, so a new upstream path is disabled by default). `handleAuthRequest` also answers 404 to any path not in the set before calling Better Auth (second layer, and it covers `auth.api` paths with no HTTP route).
-- [ ] **Step 2: Tests** (`enabled-paths.test.ts`, `next start` against Testcontainers): every path the installed version exposes is requested (POST and GET); exactly the enabled set answers non-404 and every other path answers 404; a snapshot of the full path list is committed so an upgrade that adds a path fails the test until it is classified; a cross-origin `POST /api/auth/sign-in/email` (`Origin: https://evil.example`) is refused (Better Auth CSRF, 403); the input-limits refusals (`PASSWORD_TOO_LONG`, `NAME_TOO_LONG`) answer identically for an existing and an unknown email (AUTH-05).
+- [ ] **Step 2: Tests** (`enabled-paths.test.ts`, `next start` against Testcontainers): every path the installed version exposes is requested (POST and GET); exactly the enabled set answers non-404 and every other path answers 404; a snapshot of the full path list is committed so an upgrade that adds a path fails the test until it is classified; a cross-origin `POST /api/auth/sign-in/email` (`Origin: https://evil.example`) is refused (Better Auth CSRF, 403); the input-limits refusals (`PASSWORD_TOO_LONG`, `NAME_TOO_LONG`) answer identically for an existing and an unknown email (AUTH-05); **AUTH-07**: a user signed in twice (sessions S1, S2) changes the password through S1 → S2's `/get-session` returns no session; the same after S1 enables 2FA and after S1 disables it (if 1.7.6 does not do this as configured, stop and raise it before PR 7, see the self-check).
 - [ ] **Step 3: Cleanup jobs** (EVT-06: worker-owned, no HTTP route). `startWorker` calls `boss.schedule("rate_limit.cleanup", RATE_LIMIT_CLEANUP_CRON)` and `boss.schedule("idempotency.cleanup", IDEMPOTENCY_CLEANUP_CRON)` (both daily at a fixed UTC minute; operational constants in `cleanup.ts`, recorded in DECISIONS). `rate_limit.cleanup` → `cleanupExpired(null)` through the system module as `crm_app` (no workspace context: system table). `idempotency.cleanup` → for each workspace id from the system module (`listWorkspaceIds()`), `withWorkspace(id, tx => delete from idempotency_key where expires_at < clock_timestamp())`.
 - [ ] **Step 4: Tests** (`cleanup.test.ts`): after the job runs, only expired counter rows are gone; only expired idempotency rows are gone, in every workspace, and no other workspace's rows are touched by a single `withWorkspace`; the schedules are registered by `startWorker` (`boss.getSchedules()` lists both); a test walks `apps/web/src/app/**/route.ts` and asserts no route imports `src/jobs/cleanup` (no HTTP trigger).
 - [ ] **Step 5: Runbook** `docs/runbooks/phase-1-security.md`: the limits table with numbers from `limits.ts`; `TRUSTED_CLIENT_IP_HEADER` per deployment (SaaS behind the Tunnel: `cf-connecting-ip`; self-host behind Caddy: `x-forwarded-for` with Caddy overwriting, not appending, and stripping `Forwarded`, `X-Real-IP`, `CF-Connecting-IP`; the web container reachable only through the edge); what a fallback warning means; that rotating `AUTH_SECRET` resets account counters.
@@ -739,7 +824,7 @@ Order, fixed in code and tested: (1) session (`getCurrentSession`; none → `UNA
 
 ## PR 8 — `feat/p1-headers-email` (Tasks 25–29)
 
-**Guardrails:** UNI-17, UNI-18, UNI-09, UNI-11, UNI-16, UNI-06, AUTH-01 (hard), EVT-01, EVT-05; the frontend pack (FE rules and `FRONTEND_STANDARDS.md`) for the one new page in Task 27. FILE rules n-a (no uploads).
+**Guardrails:** UNI-17, UNI-18, UNI-09, UNI-11, UNI-16, UNI-06, AUTH-01 (hard), AUTH-02, AUTH-03, EVT-01, EVT-05; for the `/settings/email` page and nav link in Task 27 (audited row by row in the self-check): FE-01, FE-02, FE-05 (hard), FE-06, FE-07, FE-13, FE-14, FE-22, FE-23, FE-31, FE-32, FE-50, FE-70, FE-71 and A11Y-01 to A11Y-06, with `FRONTEND_STANDARDS.md`. FILE rules n-a (no uploads).
 
 ### Task 25: Nonce CSP and security headers
 
@@ -752,13 +837,13 @@ Order, fixed in code and tested: (1) session (`getCurrentSession`; none → `UNA
 - [ ] **Step 0: Branch** `feat/p1-headers-email`.
 - [ ] **Step 1: Failing unit test.** `buildCsp` returns, in this order, `default-src 'self'; script-src 'self' 'nonce-<n>' 'strict-dynamic'; style-src 'self' 'nonce-<n>'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests` (Next 16 docs pattern); in dev it adds `'unsafe-eval'` to `script-src` and uses `'unsafe-inline'` for `style-src` (docs: React dev tooling); no `'unsafe-inline'` in production. `STATIC_SECURITY_HEADERS` = `Strict-Transport-Security` (value from ASK 6), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, and for non-HTML responses `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`.
 - [ ] **Step 2: Implement.** `proxy.ts` (Next 16 `proxy` export): nonce = base64 of 16 bytes from `crypto.getRandomValues`; sets `x-nonce` and `Content-Security-Policy` on the request and the response; matcher excludes `_next/static`, `_next/image`, `favicon.ico` and prefetches (docs). It reads no database (AUTH-11). `next.config.ts` `headers()` applies `STATIC_SECURITY_HEADERS` to `/(.*)` and the `default-src 'none'` CSP to `/api/(.*)`. The root layout calls `await connection()` so every page renders dynamically (docs: nonces need dynamic rendering; Risk 9). Cookies: Phase 0 already sets `Secure` for non-loopback origins, `HttpOnly` and `SameSite=Lax` through Better Auth; the E2E asserts them (UNI-18).
-- [ ] **Step 3: E2E** (`security-headers.spec.ts`, project `chromium`; `mobile-chrome` is added by the first test that needs it, spec Verification): on `/sign-in` and an authenticated page, the response has the CSP with a nonce that differs between two loads, every `<script>` carries that nonce, and the page records **zero** `securitypolicyviolation` events and zero console CSP errors through sign-in, 2FA enrolment and workspace switching; `/api/health` has `default-src 'none'`; the session cookie has `HttpOnly`, `SameSite=Lax` and (behind `https` in the image job) `Secure`.
+- [ ] **Step 3: E2E** (`security-headers.spec.ts`; runs in the existing `chromium`, `tablet-768` and `mobile-320` projects): on `/sign-in` and an authenticated page, the response has the CSP with a nonce that differs between two loads, every `<script>` carries that nonce, and the page records **zero** `securitypolicyviolation` events and zero console CSP errors through sign-in, 2FA enrolment and workspace switching; `/api/health` has `default-src 'none'`; the session cookie has `HttpOnly`, `SameSite=Lax` and (behind `https` in the image job) `Secure`.
 - [ ] **Step 4: Decisions (UNI-17):** where each header is applied (proxy for page CSP; `next.config.ts` for static headers; Cloudflare/Caddy add nothing that conflicts), and the HSTS values from ASK 6.
 - [ ] **Step 5: Run** `pnpm vitest run apps/web/src/lib/security-headers.test.ts && pnpm test:e2e` → PASS. Commit: `git commit -m "feat(web): nonce CSP via proxy and static security headers" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"`
 
 ### Task 26: Email adapter (SMTP, Resend), React Email, Mailpit
 
-**Files:** Create `apps/web/src/adapters/email/index.ts`, `smtp.ts`, `resend.ts`, `contract.test.ts`, `apps/web/src/emails/test-email.tsx`; modify `apps/web/package.json`, `pnpm-lock.yaml`, `apps/web/src/lib/env.ts`, `apps/web/src/lib/env.test.ts`, `.env.example`, `docker/compose.dev.yml`, `docs/DECISIONS.md`.
+**Files:** Create `apps/web/src/adapters/email/index.ts`, `smtp.ts`, `resend.ts`, `contract.test.ts`, `apps/web/src/emails/test-email.tsx`; modify `apps/web/package.json`, `pnpm-lock.yaml`, `apps/web/src/lib/env.ts`, `apps/web/src/lib/env.test.ts`, `.env.example`, `docker/compose.dev.yml`, `docs/runbooks/phase-1-security.md`, `docs/DECISIONS.md`.
 
 **Interfaces:**
 ```ts
@@ -772,16 +857,27 @@ Env (worker only; web never sends): `EMAIL_PROVIDER: "smtp" | "resend"`, `EMAIL_
 - [ ] **Step 2: Mailpit.** Compose service `mailpit` (`axllent/mailpit:<tag>@sha256:<digest>`, resolved with `docker buildx imagetools inspect` and recorded), ports `127.0.0.1:8025:8025` (UI/API) and internal 1025 (SMTP); `worker` env `EMAIL_PROVIDER: smtp`, `SMTP_URL: smtp://mailpit:1025`, `EMAIL_FROM: "CRM Dev <dev@localhost>"` (dev only).
 - [ ] **Step 3: Failing contract test** (`contract.test.ts`, one `describe.each` over both adapters): SMTP against a Mailpit Testcontainer — `send` returns an id and Mailpit's API shows one message with the same `to`, `subject`, `text`, and HTML; Resend against a local `http` server standing in for `https://api.resend.com/emails` (base URL injectable; no real Resend call, UNI-11) — the request is `POST /emails` with `Authorization: Bearer <key>`, JSON `{ from, to: [to], subject, html, text }`, and a `{ id }` response becomes `providerId`; a non-2xx response throws `EmailSendError` whose message has the status but not the key or the address (UNI-09).
 - [ ] **Step 4: Template.** `test-email.tsx` renders a plain React element tree (`html`, `body`, `p`) to HTML and text with `@react-email/render` (`render(el)` and `render(el, { plainText: true })`). Its words are **ASK 8** (draft: subject "Test email from CRM", body "This is a test email sent from your CRM workspace settings. If you received it, email delivery works."); the draft ships only after Charlie's OK.
-- [ ] **Step 5: Run** `pnpm vitest run apps/web/src/adapters` → PASS. Commit: `git commit -m "feat(email): SMTP and Resend adapters with contract tests; React Email render; Mailpit in dev" -m "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"`
+- [ ] **Step 5: Runbook (UNI-16).** `docs/runbooks/phase-1-security.md` gains an "Email" section in this PR: the four env vars and which container gets them (worker only), dev Mailpit (`http://localhost:8025`), switching `EMAIL_PROVIDER`, rotating `RESEND_API_KEY` (host secret store, restart `worker`), and the sending domain's SPF/DKIM/DMARC (production value: ASK 7).
+- [ ] **Step 6: Run** `pnpm vitest run apps/web/src/adapters` → PASS. Commit: `git commit -m "feat(email): SMTP and Resend adapters with contract tests; React Email render; Mailpit in dev" -m "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"`
 
 ### Task 27: Test email — web → job → Mailpit
 
-**Files:** Create `apps/web/src/app/(app)/settings/email/page.tsx`, `actions.ts`, `send-test-email-form.tsx`, `apps/web/src/jobs/email-send.ts`, `apps/web/src/jobs/email-send.test.ts`, `apps/web/src/db/system/users.ts`, `apps/web/src/test/mailpit.ts`, `apps/web/e2e/test-email.spec.ts`; modify `apps/web/src/app/(app)/nav-links.tsx`, `apps/web/src/jobs/handlers.ts`, `apps/web/playwright.config.ts`.
+**Files:** Create `apps/web/src/app/(app)/settings/email/page.tsx`, `actions.ts`, `send-test-email-form.tsx`, `apps/web/src/jobs/email-send.ts`, `apps/web/src/jobs/email-send.test.ts`, `apps/web/src/db/system/users.ts`, `apps/web/src/test/mailpit.ts`, `apps/web/e2e/test-email.spec.ts`; modify `apps/web/src/app/(app)/nav-links.tsx`, `apps/web/src/lib/auth/messages.ts`, `apps/web/src/jobs/handlers.ts`, `apps/web/playwright.config.ts`, `apps/web/e2e/accessibility.spec.ts`, `apps/web/e2e/no-javascript.spec.ts`, `apps/web/e2e/helpers.ts` (set a member's role through the test database).
 
 - [ ] **Step 1: Action** (`actions.ts`): `export const sendTestEmail = action({ name: "email.sendTest", minRole: "admin", input: z.object({}), idempotent: true, handler: async ({ tx, userId, workspaceId }) => { await enqueueJob(tx, "email.send", { workspaceId, userId, kind: "test" }); await recordAudit(tx, { actorUserId: userId, action: "email.test_requested", targetType: "user", targetId: userId }); return { queued: true }; } })`. `kind` is a fixed enum value, not personal data (flagged for Bob under Settled item 5). Admin and Owner only (builder proposal: the matrix gives "email settings" to Admin and Owner).
 - [ ] **Step 2: Handler** (`email-send.ts`): `withWorkspace(data.workspaceId, …)` checks the user is still a member (system module); `getUserEmail(userId)` (system module, `users.ts`); renders the template; `adapter.send`; records an audit entry `email.test_sent` with `targetId` = user id and no address. Unknown `kind` → throws (dead letter after retries). Test (`email-send.test.ts`): job → one Mailpit message to the user; a user no longer a member → no message, job fails.
-- [ ] **Step 3: Page** (`/settings/email`, server component, one `<h1>Email</h1>`, a `<form action>` with a submit button "Send a test email" that works without JavaScript (FE-31/32), the idempotency key as a hidden field generated per render, a polite live region for "Test email queued." or the error message; hidden from Staff in the nav, and refused by `action()` regardless (AUTH-02). Nav link "Email" added with `aria-current`. Follow `FRONTEND_STANDARDS.md` (semantic HTML, labelled controls, tokens, `cn()`).
-- [ ] **Step 4: E2E** (`test-email.spec.ts`): Playwright `webServer` gets a second entry `pnpm worker:dev` (with `.env` email settings pointing at the dev Mailpit). Sign up, create a workspace, open `/settings/email`, click "Send a test email", see "Test email queued.", then poll `apps/web/src/test/mailpit.ts` (`GET http://localhost:8025/api/v1/search?query=to:<email>`) until one message arrives (timeout 30 s); axe scan clean in light and dark (existing `e2e/a11y.ts`); keyboard: Tab reaches the button with visible focus, Enter submits. Run it also in the CI `image` job (compose stack has `worker` and `mailpit`).
+- [ ] **Step 3: Page** (`/settings/email`), following `FRONTEND_STANDARDS.md` and the Phase 0 form pattern (`workspace-switcher.tsx`, `sign-out-button.tsx`, `two-factor-setup.tsx`):
+  - **Structure (FE-01, FE-06, FE-07):** a server component inside the existing app layout (its one `<main>`); one `<h1>Email</h1>`; a short `<p>` saying what the button does; no `<section>` unless it has a heading (FE-02).
+  - **Form (FE-05, FE-31, FE-32):** a `<form action={…}>` whose only control is a `<button type="submit">` "Send a test email" (its text is its accessible name; there is no input to label, A11Y-03 applies to the button's description and the messages below). The idempotency key is a hidden `<input type="hidden" name="idempotencyKey">` generated per render (not a user control). It works without JavaScript (plain form post to the server action, server-rendered result). `send-test-email-form.tsx` is the only client component, and only for `useActionState` pending state (button `disabled` + "Sending…" while pending), the smallest component that owns that state (FE-31).
+  - **Messages (A11Y-03):** success "Test email queued." in a `<p role="status">`; an error in a `<p id="send-test-email-error" role="alert">` with the button's `aria-describedby="send-test-email-error"` while it shows, as in Phase 0. Error texts map the `action()` results: `FORBIDDEN` → "Only an Admin or Owner can send a test email."; `UNAUTHENTICATED` → redirect to `/sign-in` (as Phase 0); a network or server failure → the form is wrapped in the existing `SubmitFailureBoundary` and shows its own retry message (new constant in `messages.ts`, e.g. "We couldn't send the test email. Try again.", same style as `WORKSPACE_SWITCH_FAILED`) in the same `role="alert"` element. All wording is part of **ASK 8**.
+  - **Focus and styling (A11Y-01, FE-13, FE-23):** the existing `components/ui/button.tsx` (visible focus ring, tokens); `cn()` for variants; no literal colours.
+  - **Authorization (AUTH-02, AUTH-03):** the nav link "Email" (with `aria-current="page"` when active) is shown only to Admin and Owner; the page itself checks the role server-side and shows the `FORBIDDEN` text instead of the form to Staff; `action()` refuses Staff regardless (`minRole: "admin"`). Neither the hidden link nor the page check is the gate.
+- [ ] **Step 4: E2E** — every spec below runs in the three existing Playwright projects, `chromium` (desktop 1280), `tablet-768` and `mobile-320` (FE-70), with `respectRateLimit` as the other specs do:
+  - `test-email.spec.ts` (flow): Playwright `webServer` gets a second entry `pnpm worker:dev` (with `.env` email settings pointing at the dev Mailpit). Sign up, create a workspace, open `/settings/email`, click "Send a test email", see the `status` "Test email queued.", then poll `apps/web/src/test/mailpit.ts` (`GET http://localhost:8025/api/v1/search?query=to:<email>`) until one message arrives (timeout 30 s). **Error paths:** with `failServerActions(page, "server")` and then `"network"` (existing helper) the click shows the error in `getByRole("alert")`, the button's `aria-describedby` points at it, and no message reaches Mailpit; **Staff:** the user's `member.role` set to `staff` by a new `e2e/helpers.ts` function (connects with `DATABASE_MIGRATOR_URL`; `crm_migrator` owns the no-RLS `member` table), the nav has no "Email" link, `/settings/email` shows the `FORBIDDEN` text and no form, and a replayed form post from the earlier page answers `FORBIDDEN` (AUTH-02). **Loading:** with the server-action request held by a `page.route` handler until released, the button shows "Sending…" and is disabled, then the `status` text appears after release. Zero unhandled page errors (`page.on("pageerror")` empty) in every case.
+  - `accessibility.spec.ts` (add a case): `/settings/email` in its initial, success and error states → `expectAccessible` (axe WCAG A/AA in light and dark, plus no horizontal overflow at the project's width); **keyboard only** (A11Y-01, FE-05): from the page start, `tabTo` the button (every control passed shows visible focus; `expectVisibleFocus` on the button), `Enter` submits, the `status` text appears, and focus stays on or returns to a visible element.
+  - `no-javascript.spec.ts` (add a case, JavaScript disabled): the form posts, the server-rendered page shows "Test email queued.", and the job is enqueued (FE-31/32).
+  - A11Y-06: these are real-browser checks (keyboard + axe), not markup inspection; the PR body lists them per project.
+  Run all of it also in the CI `image` job (compose stack has `worker` and `mailpit`).
 - [ ] **Step 5: Run** `pnpm test && pnpm test:e2e` → PASS; `pnpm stack:up`, then `E2E_BASE_URL=http://localhost:3000 E2E_RATE_LIMITED=1 pnpm test:e2e` → PASS (spec Verification: "Run via `pnpm dev` and `docker compose up`; … emails (Mailpit) verified in both"). Commit: `git commit -m "feat(email): test email from settings through the worker to Mailpit" -m "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"` (Opus 5.5 reviews the `action()` and handler code before push).
 
 ### Task 28: CI and compose wiring check
@@ -795,20 +891,23 @@ Env (worker only; web never sends): `EMAIL_PROVIDER: "smtp" | "resend"`, `EMAIL_
 
 **Files:** modify `docs/runbooks/phase-0-auth-database.md`, `docs/runbooks/phase-1-database-roles.md`, `docs/runbooks/phase-1-security.md`, `CLAUDE.md` (Commands table only, outside the kit markers: add `pnpm db:bootstrap`, `pnpm test:gates`, `pnpm --filter @crm/web jobs:retry`), `docs/DECISIONS.md`.
 
-- [ ] **Step 1: Done-when run.** On a clean clone: `pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm test && pnpm test:gates && pnpm build && pnpm test:e2e`, then the image path. Paste each command's result into the PR body against the "Done-when and Verification map" rows below; every row must show a passing test name.
+- [ ] **Step 1: Done-when run.** On a clean clone: `pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm test && pnpm test:gates && pnpm build && pnpm test:e2e`, then the image path. Paste each command's result into the PR body against the "Done-when and Verification map" rows below; every row must show a passing test name, or (for the logins/2FA audit row) the approved spec revision that moved it. If ASK 3 is still unanswered here, stop: Phase 1 is not done.
 - [ ] **Step 2: Allow-list completeness.** `rls.test.ts` asserts every `NO_RLS_ALLOW_LIST` table exists (all ten now do).
 - [ ] **Step 3: Commit and PR checkpoint.** `git commit -m "docs: Phase 1 runbooks and commands" -m "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"`; push; open PR 8. After it merges, `setup` reconciles `PROJECT.md` §7 (isolation tests now run under `pnpm test`; `pnpm test:gates`) and §9 (UNI-04 `pg` ban in place; `crm_worker` grants measured: see the runbook) — items P6 and P7 below.
 
 ---
 
-## Task 30 (this plan PR only): spec and `PROJECT.md` label edits — after Bob's plan review
+## Task 30 (separate spec PR, after plan PR #33 is merged): spec revision 8
 
-**Do not start before** Bob's plan review round on this PR is Approved or Approved with conditions **and** Charlie has answered ASK 1 (Open question 8) and ASK 2 (moving the polymorphic done-when). Edits E1–E5 need ASK 2 = yes; E3 needs ASK 1 = yes; E6–E11 are labels and accuracy fixes and need neither.
+This is step 2 of "Order of the plan, spec and reconcile PRs". It is **not** part of PR #33 and never adds a commit to it.
 
-- [ ] **Step 1:** apply E1–E11 (section "Spec / PROJECT.md edits this plan needs") to `docs/superpowers/specs/2026-09-27-core-sales-design.md`, as revision 8 (labels, the moved done-when clause and two accuracy fixes; no other rule changes). Add a "Changes in v4.7 revision 8" item listing them and quoting Charlie's answers to ASK 1 and ASK 2 in his own words.
-- [ ] **Step 2:** `docs/DECISIONS.md` entry for Open question 8 (Charlie's words) and for the moved done-when (Charlie's words).
-- [ ] **Step 3:** `git diff --check`; `git hash-object docs/superpowers/specs/2026-09-27-core-sales-design.md` → put the new hash in the PR body.
-- [ ] **Step 4:** commit `docs(spec): revision 8 — revision 7 marked approved and merged; Phase 1 plan resolutions` with the trailer; push. Then Bob runs `review spec` on the new hash, Charlie approves, and `setup` makes P1–P5 in `agents/PROJECT.md` (and `CLAUDE.md` Status) in its own reconcile PR, as it did in PR #32.
+**Do not start before** `merged 33` has pushed PR #33's log (step 1.5). Owner answers it uses, already given: **ASK 1** — Charlie, 2026-10-20: "follow bob's suggestions", adopting Bob's wording "ASK 1: own login."; **ASK 2** — the same message, adopting "ASK 2: yes, move the per-table tests to the phases that create those tables, with generic fixture tests in Phase 1." (`docs/DECISIONS.md` 2026-10-20). Edits E1, E2, E4 and E5 rest on ASK 2; E3 on ASK 1; E5b and E6–E11 are labels and accuracy fixes and need neither. If Charlie's answer to ASK 3 is (b) or (c), its spec edit is added here as E12 before Bob's review; answer (a) needs no spec edit.
+
+- [ ] **Step 0: Branch.** `git switch main && git pull --ff-only` (HEAD = `<M33>`, the PR #33 merge commit); `git switch -c docs/spec-v4.7-rev8-phase1-plan-alignment`.
+- [ ] **Step 1:** apply E1–E11 (section "Spec / PROJECT.md edits this plan needs"; line numbers are for hash `50acbcfe…`, which `<M33>` still has) to `docs/superpowers/specs/2026-09-27-core-sales-design.md`, as revision 8 (labels, the moved done-when clause and two accuracy fixes; no other rule changes). Add a "Changes in v4.7 revision 8" item listing them and quoting Charlie's answers to ASK 1 and ASK 2 exactly as above.
+- [ ] **Step 2:** `docs/DECISIONS.md` entry "Spec v4.7 revision 8 (Phase 1 plan alignment)" citing the 2026-10-20 entry for ASK 1 and ASK 2 (Charlie's words) and stating that no other rule changes.
+- [ ] **Step 3:** `git diff --check`; `git diff --stat origin/main...HEAD` lists only the spec and `docs/DECISIONS.md`; `git hash-object docs/superpowers/specs/2026-09-27-core-sales-design.md` → `<S8>`.
+- [ ] **Step 4:** commit `docs(spec): revision 8 — revision 7 marked approved and merged; Phase 1 plan resolutions` with the trailer; push; open PR `<N>` with `<S8>` and the head `<HN>` in the body. Then steps 2.2–2.5 of the order: Bob `review spec` on `<S8>` at `<HN>`, Charlie's approval, `approved <N>` before merge, merge, `merged <N>`. Then step 3: `setup` reconciles P1, P2, P3, P5 (and `CLAUDE.md` Status) in its own PR, as it did in PR #32.
 
 ---
 
@@ -849,6 +948,8 @@ Every clause of the Phase 1 done-when (spec line 1110) and every Phase 1 part of
 | Verification: CI typecheck, lint + boundaries, tests, `pnpm audit`, secret scan, Trivy | `.github/workflows/ci.yml` (+ `test:gates`) | 6 / 20; 8 / 28 |
 | Deliverable: nonce CSP + headers (UNI-17 test) | `security-headers.test.ts`; `e2e/security-headers.spec.ts` | 8 / 25 |
 | Deliverable: audit log PII-redacted | `packages/core/src/audit/redact.test.ts`; `apps/web/src/lib/audit.test.ts` | 4 / 12 |
+| Spec "Audit, logging, privacy": the audit log records logins and 2FA | **Open — pending ASK 3.** (a): `apps/web/src/lib/auth/auth-audit.test.ts` (no-workspace user, two-workspace user, 2FA sign-in); (b): the same cases on `auth_audit_log` after revision 8; (c): no Phase 1 test, the clause moves to the named phase by revision 8 (E12). Phase 1 is not signed off while this row is open. | 4 / 31 (pending ASK 3) |
+| Deliverable: transactional `domain_event` with JSON-safe amounts (MON-03, EVT-01) | `enqueue.test.ts` → "raw bigint refused", "large amount round-trips exactly", "atomic with the large amount"; `packages/core/src/events/payload.test.ts` | 6 / 19 |
 | Deliverable: `/api/health` (DB + queue) | `apps/web/src/lib/health.test.ts` | 6 / 20 |
 | Deliverable: `notification` table | `isolation.test.ts` fixture; `privileges.test.ts` | 6 / 19 |
 
@@ -856,12 +957,17 @@ Every clause of the Phase 1 done-when (spec line 1110) and every Phase 1 part of
 
 1. **ANSWERED 2026-10-20 (Charlie: "follow bob's suggestions"; own login; `docs/DECISIONS.md` 2026-10-20).** *Original:* **Open question 8** — confirm `crm_purge` connects with **its own login** (Settled item 1), alternative `SET LOCAL ROLE` from a `crm_app` connection. Needed because `PROJECT.md` §11 makes every open-question choice Charlie's. Blocks: E3 only (Phase 1 code works either way until Phase 9, but Task 13's behavioural test is written for own login).
 2. **ANSWERED 2026-10-20 (Charlie: "follow bob's suggestions"; yes, move; `docs/DECISIONS.md` 2026-10-20).** *Original:* **Move the polymorphic-reference and `version_retention` tests** from the Phase 1 done-when to the phase that creates each table, with Phase 1 testing the generic helper on fixtures (Settled item 3). Blocks: E1, E2, E4, E5, and Phase 1's done-when sign-off.
-3. **Audit of user-level auth events.** The spec says the audit log "records logins, 2FA, … member changes", and `audit_log` is a tenant table with a non-null `workspace_id`; a sign-in or 2FA change belongs to a user, not a workspace. Options: (a) write one entry per workspace the user is a member of at that moment (no entry for a user with no workspace); (b) a new no-RLS system table `auth_audit_log` (changes the spec's no-RLS allow-list: a reviewed spec revision); (c) defer auth-event auditing to a later phase. Builder pick: (a). Phase 1 ships `recordAudit` and uses it for the test email only; the auth-event wiring waits for this answer.
+3. **Audit of user-level auth events (open; Bob plan Round 1 P1).** The spec ("Audit, logging, privacy") says the audit log "records logins, 2FA, … member changes", and `audit_log` is a tenant table with a non-null `workspace_id` under RLS; a sign-in or a 2FA change belongs to a user, not a workspace. **Phase 1 cannot be signed off until Charlie picks one of these and the plan (and, for (b) or (c), the spec) carries it:**
+   - **(a) One audit row per workspace the user belongs to at that moment — builder pick.** No spec change. Each sign-in and 2FA change writes one `audit_log` row in every workspace where the user is a member when it happens, each in its own `withWorkspace()` transaction. Known gap: a user with **no** workspace (just signed up) leaves no audit record, and a workspace joined later does not see earlier events. Outline: Task 31 (pending ASK 3), in PR 4.
+   - **(b) A new no-RLS system table `auth_audit_log`** (user-keyed: `user_id`, `action`, `ip`, `created_at`; append-only; reached only through the system module). Records every event, including for a user with no workspace. **Changes the spec**: the no-RLS allow-list (Tenancy, §9 of `PROJECT.md`), the data model and the Phase 1 deliverable — added to revision 8 as E12 in Task 30 and reviewed with it; then the plan gains a task like Task 31 for the new table, its grants (`crm_app` INSERT, SELECT; manifest), its TEN-03 append-only catalog test and the same event tests.
+   - **(c) Defer auth-event auditing to a named later phase** (for example Phase 3, with member changes and invitations, which have the same user-vs-workspace question). **Changes the spec**: an approved revision (E12 in Task 30) moves "logins, 2FA" out of the Phase 1 audit deliverable and into that phase's done-when; Phase 1 then ships `recordAudit` for the test email only.
+
+   Until the answer, Phase 1 ships `recordAudit` (Task 12) and uses it for the test email (Task 27); Task 31 stays an outline and the Done-when map row "Audit log records logins and 2FA" is open.
 4. **Idempotency key expiry** (`IDEMPOTENCY_KEY_EXPIRY_SECONDS`): not in the spec. Builder proposal: 24 hours. Blocks Task 14 Step 4 onwards.
 5. **`billing_account.status` values.** Not in the spec. Builder proposal for Part 1: only `active` (CHECK), more states with plans in Part 3.
 6. **HSTS:** `max-age` (proposal 31536000), `includeSubDomains` (proposal: no, because it would also bind other subdomains of the domain to HTTPS), `preload` (proposal: no). Blocks Task 25.
 7. **Production `EMAIL_FROM`** address and display name for the SaaS (and the sending domain's SPF/DKIM/DMARC owner). Dev uses `CRM Dev <dev@localhost>`. Blocks only the production runbook line.
-8. **Test-email wording** (subject and body; draft in Task 26 Step 4). Blocks Task 27's commit.
+8. **Test-email wording** (subject and body; draft in Task 26 Step 4) **and the `/settings/email` page copy** (intro line, button, "Test email queued.", the `FORBIDDEN` and failure messages; drafts in Task 27 Step 3). Blocks Task 27's commit.
 9. **`require_2fa` enforcement**: the Phase 0 plan listed it for Phase 1, the spec's Phase 1 row does not. Builder proposal: Phase 2 (with the settings page that sets it). Confirm.
 
 ## Risks
@@ -881,31 +987,116 @@ Every clause of the Phase 1 done-when (spec line 1110) and every Phase 1 part of
 
 ## Self-check for this plan PR (plan-only)
 
+Built from every pack ticked in `PROJECT.md` §8 and the §9 constraints, rule by rule (not by "pack relevant or not"). `plan-only` means the task and its test are specified here; the runtime pass is claimed in the implementing PR. `pass` is claimed only for what this docs PR itself does.
+
+**Universal**
+
 | Rule | Status | Evidence / why |
 |---|---|---|
+| UNI-01 | plan-only, all PRs | Strict TypeScript unchanged. The one deliberate cast, `as unknown as EventPayload` in `enqueue.test.ts` (Task 19, raw-bigint case), exists to test the runtime guard and carries a why-comment; the `@ts-expect-error` twin proves the type refuses it. |
+| UNI-02 | plan-only, PRs 4, 5, 7, 8 | Every spec number goes to `limits.ts` (Task 21 Step 1; Task 14 for idempotency expiry); values the spec lacks are ASK 4–6 or recorded operational defaults (queue retries Task 16 Step 4, cleanup cron Task 24 Step 3). |
+| UNI-03 | plan-only, PRs 1, 4, 6, 7, 8 | Validation at each boundary, each tested: bootstrap CLI env (Zod, Task 1 Step 4); web and worker env (`parseEnv`/`parseWorkerEnv`, Task 2 Step 1, Task 22, Task 26 → `env.test.ts`); server-action input (Zod inside `action()`, Task 14 → `action.test.ts` "invalid input"); event payloads (`eventPayloadSchema`, Task 19 → `enqueue.test.ts` "payload guard", "raw bigint refused"); job data in handlers (Task 19 `domain_event` cross-workspace case, Task 27 Step 2 unknown `kind`); client IP header (`deriveClientIp`, Task 22 → `client-ip.test.ts`); sign-in body for the account key (Task 23 Step 2 → `rate-limit.test.ts`). Internal calls are not re-validated. |
+| UNI-04 | plan-only, PRs 2, 3, 4, 5, 6 | Every §9 boundary this plan adds is a lint rule with failing fixtures in `lint-rules.test.ts`, run by `pnpm lint` in CI: TEN-09 `set_config`/`SET` ban (Task 5 Step 4), TEN-10 system-module imports (Task 8 Step 2), AUTH-01 server-action wrapper (Task 15), `pg` ban in `apps/web` (Task 18 Step 2). New core entries go through package `exports` (`./audit` Task 12, `./events` Task 19) under the existing core boundary lint. |
+| UNI-05 | plan-only, all PRs | Nothing built before its user: `stepUp()` (Phase 2), reset/link/OTP limits, `DATABASE_PURGE_URL` (Phase 9) and invitation grants are not added (Settled items 1, 5; Task 21 Step 1). `notification` ships without a producer because it is a named Phase 1 deliverable (Task 19 Step 1). |
+| UNI-06 | plan-only, PRs 5, 8 | Three packages named with version, licence and why (Tasks 16 Step 1, 26 Step 1); `resend` SDK, `@react-email/components`, `pino` not added. |
 | UNI-07 (hard) | pass | Only dev-only fixed passwords named for compose and tests (same pattern as Phase 0); no secret, token or `.env` content in the plan; `git diff --check` clean; secret-scan pattern run on the diff. |
+| UNI-08 | plan-only, PRs 1, 8 | Production DB passwords from the host's secret store (Task 1 Step 4, Task 2 Steps 4 and 6 runbook); `RESEND_API_KEY` likewise (Task 26 Step 5). |
+| UNI-09 | plan-only, PRs 1, 4, 6, 7, 8 | No PII or secret in logs or errors, each with a test: bootstrap never logs a statement (Task 1 Step 3); env and CLI errors list names, never values (Task 1 Step 4, Task 2 Step 1 → `env.test.ts`); client-IP fallback warning without the value (Task 22 → `client-ip.test.ts`); `EmailSendError` without key or address (Task 26 → `contract.test.ts`); `EventPayloadError` names the field only (Task 19); health returns no error text (Task 20 Step 5 → `health.test.ts`); audit `"[pii]"` and no address in `email.test_sent` (Tasks 12, 27). |
+| UNI-10 / TEN-03 | plan-only, PRs 4, 6 | Append-only catalog tests on `audit_log` (Task 12 Step 4) and `domain_event` (Task 19 Step 2). |
+| UNI-11 | plan-only, PR 8 | The Resend adapter is tested against a local stand-in server, never the real API (Task 26 Step 3); Mailpit is local. No project data leaves the machine in tests or CI. |
 | UNI-12 | pass | Files written only in `.agent/worktrees/docs-phase-1-plan` (the plan) and the session scratchpad (draft parts, outside the repo); tarballs read in the scratchpad, not installed. |
-| UNI-13 | plan-only | CI gates unchanged by this PR (docs only); PR 6 adds `test:gates`, PR 8 Trivy covers the new packages. |
-| UNI-02 | plan-only, PRs 4, 5, 7, 8 | Every spec number goes to `limits.ts`; values the spec lacks are ASK 4–6 or recorded operational defaults (queue retries, cleanup cron). |
-| UNI-06 | plan-only, PRs 5, 8 | Three packages named with version, licence and why; `resend` SDK, `@react-email/components`, `pino` not added. |
-| UNI-10 / TEN-03 | plan-only, PRs 4, 6 | Append-only catalog tests on `audit_log` and `domain_event`. |
-| UNI-17 / UNI-18 | plan-only, PR 8 | Task 25. |
-| UNI-19 | plan-only, PR 7 | Enabled-path tests; only `/api/health` and `/api/auth/*` unauthenticated in Phase 1. |
-| TEN-01, TEN-02 (hard) | plan-only, PRs 1, 3, 4, 5 | Bootstrap, manifest, `crm_worker` no `public` privilege, own-login `crm_purge`. |
-| TEN-04–08 | plan-only, PRs 2–4, 6 | Policy template, catalog tests, isolation harness that fails on a missing fixture. |
-| TEN-09 (hard) | plan-only, PR 2 | `withWorkspace` + lint. |
-| TEN-10 | plan-only, PRs 3, 7 | System-module lint + fixtures. |
-| TEN-11 (hard) | plan-only, PRs 4, 6 | Workspace from session in `action()`; from the transaction setting in `recordAudit`/`emitEvent`. |
-| AUTH-01 (hard) | plan-only, PR 4 | `action()` order test + lint; `/api/auth/*` exception per revision 7 (d). |
-| AUTH-05, AUTH-06 | plan-only, PR 7 | Uniform 429, database counters shared across processes. |
-| AUTH-11 | plan-only, PR 8 | `proxy.ts` reads no database. |
-| EVT-01, EVT-03, EVT-05, EVT-06 | plan-only, PRs 5–7 | Rollback test, unknown-field test, retry/dead-letter + `jobs:retry`, worker-owned schedules. EVT-02 n-a (no relay); EVT-04, EVT-07–12 n-a until Part 3. |
-| LINK-03, LINK-07 | n-a | Link and OTP limits ship in Phase 7 (spec Verification). |
-| Packs judged not relevant | — | money, finalized-records, payments, files-templates: no money, issued records, payments or uploads in Phase 1. frontend: one small page (Task 27) and headers (Task 25) only. |
+| UNI-13 | plan-only | CI gates unchanged by this PR (docs only); PR 6 adds `test:gates` (Task 20 Step 4); PR 8's image job runs Trivy over the new packages (Task 28). |
+| UNI-14 | plan-only, PRs 5, 6, 8 | `pnpm-lock.yaml` is committed with each dependency change (Task 16, Task 26 Files); every new package is an exact version (Global Constraints "Pins"); the PgBouncer and Mailpit images are pinned by tag **and** digest, recorded in DECISIONS (Task 20 Step 1, Task 26 Step 2). |
+| UNI-15 | plan-only, PRs 1–7 | Every migration creates a table, policy, function, queue or grant (Tasks 3, 6, 9, 11, 12, 14, 16, 17, 19, 21); none drops or rewrites a column. `organization.billing_account_id` is nullable so the change is additive (Task 9 Step 2); `workspace_settings` gains its settings later, additively (Task 6 Step 3). Migration 0001's `REVOKE TEMPORARY … FROM PUBLIC` removes a privilege no code uses (Settled item 2). The Phase 0 dev-volume reset (Task 2 Step 6, Risk 5) is a dev step, not a migration. |
+| UNI-16 | plan-only, PRs 1, 5, 7, 8 | Runbook in the same PR as each change: roles, bootstrap, role URLs and rotation (Task 2 Step 6, PR 1); `crm_worker` grants (Task 17 Step 5, PR 5); rate limits, `TRUSTED_CLIENT_IP_HEADER`, `AUTH_SECRET` rotation effect (Task 24 Step 5, PR 7 — Task 22's env var lands in the same PR); headers and HSTS (Task 25 Files, PR 8); email env and provider switch (Task 26 Step 5, PR 8); commands (Task 29). |
+| UNI-17 / UNI-18 | plan-only, PR 8 | Task 25 (`security-headers.test.ts`, `e2e/security-headers.spec.ts`; DECISIONS records where each header is applied). |
+| UNI-19 | plan-only, PRs 4, 7 | Enabled-path tests (Task 24); only `/api/health` and `/api/auth/*` unauthenticated in Phase 1, and the entry-point classification test fails on any new mutating route (Task 15 Step 3); cleanup runs in the worker, no HTTP trigger (Task 24 Step 4). |
 
-## Spec / PROJECT.md edits this plan needs (not made in this commit)
+**Tenancy and RLS**
 
-Applied in Task 30 after Bob's plan review (spec) and by `setup` after the spec is approved (`PROJECT.md`). Line numbers are for hash `50acbcfe…`.
+| Rule | Status | Evidence / why |
+|---|---|---|
+| TEN-01, TEN-02 (hard) | plan-only, PRs 1, 3, 4, 5 | Bootstrap (Task 1), manifest (Task 3), `crm_worker` no `public` privilege (Task 17 Step 4), own-login `crm_purge` (Task 13). Ends the Phase 0 exception (Task 2 Step 7). |
+| TEN-04–08 | plan-only, PRs 2–4, 6 | Policy template, catalog tests (Task 4), isolation harness that fails on a missing fixture (Task 6, extended in Tasks 12, 14, 19). |
+| TEN-09 (hard) | plan-only, PR 2 | `withWorkspace` + lint (Task 5). |
+| TEN-10 | plan-only, PRs 3, 7 | System-module lint + fixtures (Task 8); `rate_limit` only through `system/rate-limit.ts` (Task 21). |
+| TEN-11 (hard) | plan-only, PRs 4, 6 | Workspace from session in `action()` (Task 14, "`raw = { workspaceId: W2 }`" case); from the transaction setting in `recordAudit`/`emitEvent` (Tasks 12, 19). |
+| TEN-12 | n-a | No bypass helper exists or is added (§8 "Admin/bypass helper: none"). |
+
+**Auth**
+
+| Rule | Status | Evidence / why |
+|---|---|---|
+| AUTH-01 (hard) | plan-only, PR 4 | `action()` order test (Task 14); lint on **every** `"use server"` export and inline action, regardless of file name, with exemptions limited to eight named Better Auth forwarding exports, and bypass fixtures (differently named file, extra export in an exempt file) (Task 15 Steps 1–2); every `route.ts` and `proxy.ts` classified by a test (Task 15 Step 3); `/api/auth/*` exception per revision 7 (d). |
+| AUTH-02 | plan-only, PRs 4, 8 | `proxy.ts` only sets headers and never authorizes (Task 25 Step 2); every action re-authorizes in `action()` (Task 14 tests: no session, stale workspace, role). Task 27: the nav hides "Email" from Staff, but the page checks the role server-side and `action()` refuses Staff — `test-email.spec.ts` Staff case posts the form anyway and gets `FORBIDDEN` (Task 27 Step 4). |
+| AUTH-03 | plan-only, PRs 3, 4, 8 | The only permission Phase 1 adds is "email settings" → Admin and Owner (spec matrix row "Templates, numbering, email settings, catalog"): `minRole: "admin"` (Task 27 Step 1), tested for Owner (allowed) and Staff (refused) in Task 27 Step 4 and for role order in `action.test.ts` (Task 14). Unknown stored roles fail closed (Task 10 → `authorization.test.ts`). |
+| AUTH-04 | n-a (unchanged) | Phase 0 Argon2id hashing (`@crm/core/password`) is not touched. |
+| AUTH-05, AUTH-06 | plan-only, PR 7 | Uniform 429 and input-limit uniformity for existing vs unknown email (Tasks 23, 24); database counters shared across two processes and restarts (Task 21, Task 23 Step 4). |
+| AUTH-07 | plan-only, PR 7 | `/change-password` and `/two-factor/enable`/`disable` are in the Phase 1 enabled set, and no Phase 0 test shows other sessions ending on those changes. Task 24 Step 2 adds that test (a second session of the same user is refused after each change). If Better Auth 1.7.6 as configured does not revoke, the builder stops and raises it with Bob and Charlie before PR 7 (the fix may be a config option or an action-side call, not decided here). Email change is not enabled. |
+| AUTH-08 | n-a | Reset and invitation endpoints stay disabled in Phase 1 (Task 24 Step 1; 404 asserted in Task 10 and Task 24 Step 2). |
+| AUTH-09 | n-a | `stepUp()` has no user in Phase 1 (Settled item 5; first user Phase 2). |
+| AUTH-10 | n-a | No OAuth until Part 3 (§8). |
+| AUTH-11 | plan-only, PR 8 | `proxy.ts` reads no database (Task 25 Step 2). |
+| AUTH-12 | plan-only, PRs 3, 4, 8 | Database sessions, not JWT; the role is read from `member` on every action (`getMembership`, Tasks 10, 14) and the nav reads the same membership per request (Task 27 Step 3), so a role change applies on the next request on both. |
+| AUTH-13 | n-a (unchanged) | Phase 0 sign-out (`signOutAction`, `sign-out.spec.ts`) is unchanged; it stays a named forwarder (Task 15). |
+
+**Events and jobs; money**
+
+| Rule | Status | Evidence / why |
+|---|---|---|
+| EVT-01 | plan-only, PR 6 | Rollback test ×50, commit test, invisible-before-commit, and the large-amount atomic case (Task 19 Step 2). |
+| EVT-03, EVT-05, EVT-06 | plan-only, PRs 5–7 | Unknown-field test (Task 19); retry/dead-letter + `jobs:retry` (Tasks 17, 18); worker-owned schedules (Task 24). |
+| EVT-02, EVT-04, EVT-07–12 | n-a | EVT-02: no relay (jobs enqueued in the same transaction). EVT-04, EVT-07–12: no extensions until Part 3 (§8). |
+| MON-03 | plan-only, PR 6 | Money crosses the event boundary as a canonical decimal string (`MinorUnits`, `minorUnits()`, `parseMinorUnits()`), never a float or raw bigint; tests: raw bigint refused before any write, 2^53 + 1 round-trips exactly through JSONB and the handler, atomic with the job (Task 19 → `enqueue.test.ts`, `payload.test.ts`). |
+| MON-01, MON-02, MON-04–07 | n-a | No amount is stored or computed in Phase 1 (first money tables in Phase 4). |
+
+**Frontend and accessibility (Task 27 `/settings/email` page and nav link; Task 25 headers)**
+
+| Rule | Status | Evidence / why |
+|---|---|---|
+| FE-01, FE-02, FE-06, FE-07 | plan-only, PR 8 | One `<h1>`, the app layout's single `<main>`, a real `<form>` and `<button>`, no unnamed `<section>` (Task 27 Step 3); axe scan per state (Task 27 Step 4, `accessibility.spec.ts`). |
+| FE-04 | plan-only, PR 8 | The "Email" link joins the existing nav list in `nav-links.tsx` (Task 27 Step 3). |
+| FE-05 (hard) | plan-only, PR 8 | The button submits the form (no click handler on a non-control); the nav link has a real `href` and `aria-current`; keyboard-only case reaches and submits with visible focus (`tabTo`, `expectVisibleFocus`, Task 27 Step 4). |
+| FE-13, FE-23 | plan-only, PR 8 | Existing `components/ui/button.tsx`, semantic tokens, `cn()`; no literal colours (Task 27 Step 3). |
+| FE-14 | plan-only, PR 8 | `expectAccessible` asserts no horizontal overflow in each state at 320, 768 and desktop width (Task 27 Step 4). |
+| FE-22 | plan-only, PR 8 | Page copy lives in `messages.ts` constants, not inline (Task 27 Step 3; wording ASK 8). |
+| FE-31, FE-32 | plan-only, PR 8 | Server component page; one small client component for pending state only; the form works with JavaScript disabled (`no-javascript.spec.ts` case, Task 27 Step 4). |
+| FE-34 | plan-only, PR 8 | The page reads the membership at its own server boundary, uncached (Task 27 Step 3). |
+| FE-24, FE-40, FE-41, FE-42 | n-a | No business-logic component (FE-24); no new UI package or registry component — the page reuses the existing button (FE-40–42). |
+| FE-50 | plan-only, PRs 1–8 | `pnpm typecheck && pnpm lint && pnpm build` in each PR's run step (e.g. Task 24 Step 6, Task 27 Step 5, Task 29 Step 1). |
+| FE-51, FE-52 | plan-only, all PRs | No comments by default (Global Constraints); flat guard clauses in `action()` (fixed order, Task 14). |
+| FE-70 | plan-only, PR 8 | All three Playwright projects (`chromium` desktop, `tablet-768`, `mobile-320`): no overflow, keyboard path, success, error (server and network failure), Staff refusal, loading (held request), zero unhandled page errors (Task 27 Step 4). Empty state n-a (no list on the page). |
+| FE-71 | plan-only, PR 8 | The longest message (failure text) is scanned for overflow at 320 px in its error state (Task 27 Step 4). One locale (en) in Phase 1; no images or prices on the page. |
+| A11Y-01 | plan-only, PR 8 | Keyboard-only case with visible focus on every stop and logical order (Task 27 Step 4). |
+| A11Y-02 | plan-only, PR 8 | axe WCAG AA contrast checks in light and dark on the page's states (Task 27 Step 4); existing tokens. |
+| A11Y-03 | plan-only, PR 8 | Errors in `role="alert"`, linked to the button with `aria-describedby`; success in `role="status"` (Task 27 Step 3); asserted by `getByRole("alert")` and the `aria-describedby` check (Step 4). The form has no visible input to label; the hidden idempotency field is not a user control. |
+| A11Y-04 | n-a | No new animation; the shared button's colour transition is existing Phase 0 code. |
+| A11Y-05 | n-a | No images on the page. |
+| A11Y-06 | plan-only, PR 8 | Real-browser keyboard and axe checks in Playwright on all three projects, not markup inspection (Task 27 Step 4); Task 25's E2E also checks zero CSP violations in the browser. |
+
+**Other ticked packs**
+
+| Rule | Status | Evidence / why |
+|---|---|---|
+| LINK-03, LINK-07 | n-a | Link and OTP limits ship in Phase 7 (spec Verification). Other LINK rules: no client links in Phase 1. |
+| finalized-records (REC-*), payments (PAY-*), files-templates (FILE-*) | n-a | No issued records, numbering, payments, uploads, PDFs or user templates in Phase 1. The React Email template (Task 26) has no user-editable fields and no placeholder substitution (FILE-05 n-a). |
+
+**`PROJECT.md` §9 constraints**
+
+| Constraint | Status | Evidence / why |
+|---|---|---|
+| Five roles, none `BYPASSRLS`; `crm_worker` `pgboss.*` only; `crm_purge` Phase 1 scope (b1) | plan-only, PRs 1, 4, 5 | Tasks 1, 3, 13, 17. |
+| Workspace context via `set_config(…, true)`; policies with `nullif` | plan-only, PR 2 | Tasks 4, 5. |
+| Better Auth tables and `billing_account` no RLS, only through the system module; `billing_account.plan = free` | plan-only, PR 3 | Tasks 8, 9 (CHECK), 10. |
+| pg-boss installed by `crm_migrator` in migrations; app instances `migrate`/`createSchema` false; web `supervise`/`schedule` false; `notify` off | plan-only, PR 5 | Tasks 16, 18 (`boss.test.ts`). |
+| Job payloads IDs only; `domain_event` payloads IDs and amounts only | plan-only, PR 6 | Task 19 payload guard; Settled item 5 and Risk 10 for `workspaceId`/`kind`. |
+| `pg` only inside pg-boss; postgres.js + Drizzle `prepare: false` | plan-only, PR 5 | Task 18 lint; existing client unchanged. |
+| No cron endpoints; worker owns schedules | plan-only, PR 7 | Task 24 Steps 3–4. |
+| Spec "Audit, logging, privacy": logins and 2FA audited | **open — pending ASK 3** | Options (a)/(b)/(c) in ASK 3; Task 31 outline for (a) with the no-workspace and two-workspace tests. Phase 1 is not signed off until Charlie picks one and the plan or spec carries it. |
+
+## Spec / PROJECT.md edits this plan needs (not made in this PR)
+
+Applied in Task 30, the separate spec PR made after PR #33 is merged (spec), and by `setup` in its own reconcile PR after revision 8 is approved and merged (`PROJECT.md`); order and hashes in "Order of the plan, spec and reconcile PRs". Line numbers are for hash `50acbcfe…`.
 
 **Spec (`docs/superpowers/specs/2026-09-27-core-sales-design.md`):**
 - **E1 (needs ASK 2) — line 1110, Phase 1 done-when.** Replace "polymorphic-reference tests pass for `share_link` target, `document_artifact` target, `signature` doc ref, `line_item` parent and `version_retention.source_id` (cross-workspace INSERT rejected; RETARGET UPDATE rejected, incl. to another workspace's row; for the append-only tables both by the missing grant as `crm_app` and by the trigger); `version_retention` duplicate insert rejected per target type by its partial unique index, and neither/both targets rejected by the CHECK;" with "the generic polymorphic-reference triggers and the retention-style uniqueness pattern pass their tests on test-only fixture tables (cross-workspace INSERT rejected; RETARGET UPDATE rejected, incl. to another workspace's row; for an append-only fixture both by the missing grant as `crm_app` and by the trigger; duplicate per target type rejected by the partial unique indexes; neither/both targets rejected by the CHECK); the per-table tests run in the phase whose migration creates each table (revision 8);".
