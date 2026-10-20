@@ -1,0 +1,8 @@
+pr: 31
+reviewed_head_sha: 4ec37c33b8360a3d3a0d4acf6781a176d8f179a7
+review_file: reviews/SPEC-core-sales-design.md (spec review; no PR-31.md exists)
+review_file_hash: 10e3f3977d649577ca79466600524ccdeef2ed49
+log_branch_commit_with_review: 9cf861ba642f3ef92b8b4bc587214e97f6b0c959
+verdict: Approved with conditions (spec Round 24, spec hash 50acbcfe0b402718ddd2c49f4297ce378e1b7451)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-20T02:05:39Z
