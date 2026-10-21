@@ -63,7 +63,7 @@ Spec wins for *what we should build*. If two of these disagree, stop and ask Cha
 
 ## 4. Repository
 
-- **Remote:** https://github.com/charliekhc/CRM (private) <!-- `pending remote` is a valid value until the owner creates the repository; the builder asks for it before the first PR -->
+- **Remote:** https://github.com/mortarhaus/CRM (private; moved from `charliekhc/CRM` on 2026-10-21, see `docs/DECISIONS.md`) <!-- `pending remote` is a valid value until the owner creates the repository; the builder asks for it before the first PR -->
 - **Default branch:** `main` <!-- usually main -->
 - **Merge policy:** Bob approves → Charlie merges. The builder never merges. The reviewer never merges.
 - **Commit trailer:** `Co-Authored-By: Claude <model> <noreply@anthropic.com>` — `<model>` is the name of the model that actually did the work (e.g. `Claude Opus 5.5`, `Claude Sonnet 5`), never fixed text copied from a plan. <!-- e.g. "Co-Authored-By: <agent> <model> <email>", or "none" -->

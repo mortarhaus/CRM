@@ -2,6 +2,15 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-10-21 — Repository moved to the `mortarhaus` organization (separate GitHub Actions quota)
+- **Decision:** The repository moved from `https://github.com/charliekhc/CRM` to `https://github.com/mortarhaus/CRM` (private, same branches and history; GitHub redirects the old URL). `agents/PROJECT.md` §4 names the new remote.
+- **Why:** On 2026-10-21 the CI jobs on PR #33 did not start ("recent account payments have failed or your spending limit needs to be increased"). The personal account's Actions minutes were used up or its billing failed; the 26-minute image job is the main cost. The builder said a transfer to an organization would give a separate quota. After the move the jobs started (Secret scan, Typecheck/lint/test passed on `b088fe4`).
+- **Alternatives rejected:** raising the personal spending limit; waiting for the monthly reset. Not rejected, still open: skipping the image job on docs-only PRs.
+- **Scope / affects:** the git remote (`origin`) of every checkout and worktree; `agents/PROJECT.md` §4; PR and log links written earlier still work through GitHub redirects. Branch protection is not available on this plan (private repo).
+- **Versions:** none.
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-10-21, in his own words in the Andy session; Bob cannot see it). After the builder explained the option he asked "can i move it to org so that it has a separate action usage quota?" and then wrote "i have migrated to https://github.com/mortarhaus/CRM" and "i have updated the repo to https://github.com/mortarhaus/CRM/ please check and update the necessary".
+
 ## 2026-10-17 — Phase 1 gate proposals (spec v4.7 revision 7, draft); all five approved by Charlie 2026-10-20
 - **Decision:** The five Phase 1 plan gates were **drafted as proposals on 2026-10-17 and approved by Charlie on 2026-10-20** (see "Owner decisions" below), in spec v4.7 revision 7 ("Changes in v4.7" item 8; each policy in full in its home section):
   - Rate limits and OTP re-issue cap: database-backed fixed-window counters per IP, account, link and contact, a uniform `429`, numbers in "Authentication and sessions" → "Rate limits" (e.g. OTP issue 3 per hour and 10 per day per link).
