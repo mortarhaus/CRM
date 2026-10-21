@@ -2,6 +2,15 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-10-21 — Two Macs: dev databases are disposable; real data lives on the server; handoff copy on `agent-logs`
+- **Decision:** (1) Charlie works on two Macs (a Mac mini at home, a MacBook on the move). Each Mac keeps its own local dev database holding only throwaway test data; no database is synced between Macs. Real data (the studio's own use) lives in the deployed app on the server (Stage 2 of the hosting plan), which both Macs reach. If sample data is wanted in dev, a seed script gives both Macs the same data. (2) The builder keeps a copy of `.agent/handoff.md` on the `agent-logs` branch at `handoff/handoff.md` (with a `handoff/README.md`) so the second Mac can resume; git and the PR host stay the source of truth for code state.
+- **Why:** The local database holds only test-run data (83 users, all `@example.test`, test workspace names), so a dump and restore gains nothing, and a stale dump could silently overwrite newer data. Code, specs and plans already travel through git; the git-ignored handoff did not.
+- **Alternatives rejected:** one shared dev database reached from the other Mac through a private tunnel (works only while the first Mac is on, and a dev database is not a safe home for real client records); the `sync-export.sh` / `sync-import.sh` scripts (they are not in the repo and will not work after Phase 1 creates the five database roles, which `pg_dump` does not carry).
+- **Scope / affects:** how the builder hands over work between Macs (`handoff` command refreshes the copy on `agent-logs`); a seed script and a repo-visibility rule are not decided here.
+- **Versions:** none.
+- **Exception to a rule?** no (the handoff copy sits outside `PROJECT.md` §2's `.agent/handoff.md` source; it is a copy only)
+- **Decided by:** owner (Charlie, 2026-10-21, in his own words in the Andy session; Bob cannot see it). After the builder explained the options he wrote: "A, and yes put the handoff on agent-logs".
+
 ## 2026-10-21 — Repository moved to the `mortarhaus` organization (separate GitHub Actions quota)
 - **Decision:** The repository moved from `https://github.com/charliekhc/CRM` to `https://github.com/mortarhaus/CRM` (private, same branches and history; GitHub redirects the old URL). `agents/PROJECT.md` §4 names the new remote.
 - **Why:** On 2026-10-21 the CI jobs on PR #33 did not start ("recent account payments have failed or your spending limit needs to be increased"). The personal account's Actions minutes were used up or its billing failed; the 26-minute image job is the main cost. The builder said a transfer to an organization would give a separate quota. After the move the jobs started (Secret scan, Typecheck/lint/test passed on `b088fe4`).
