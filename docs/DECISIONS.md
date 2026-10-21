@@ -2,6 +2,15 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-10-21 — Pin transitive vite to 8.3.4 (GHSA-587h-7wmj-h5pm) (UNI-13, UNI-14)
+- **Decision:** `pnpm-workspace.yaml` gets `overrides: vite: 8.3.4`. A high advisory (vite `>=8.3.0 <=8.3.2`, the `launch-editor` file-existence check) was published after the last green audit; `pnpm audit --audit-level high` then failed on `main` and on every PR (seen on PR #33, a docs-only PR; Bob's review Rounds 4 and 5). `vite` is a transitive dev-tooling dependency (`vitest` > `@vitest/mocker`); the override moves its single resolution from 8.3.1 to the patched 8.3.4. The lockfile also moves the packages vite itself depends on (`rolldown` 1.2.11 to 1.2.14, `postcss`, `nanoid`).
+- **Why:** UNI-13 requires a passing dependency audit. A patched version exists. 8.3.5 is newer but was published 4 hours before this change, so it is inside pnpm's minimum release age; 8.3.4 (published 2026-10-08) satisfies the age rule, so no `minimumReleaseAgeExclude` entry was added.
+- **Alternatives rejected:** an audit ignore (a patched version exists); 8.3.5 with a release-age exception (weakens the supply-chain control for no need); fixing it inside PR #33 (a docs-only plan PR; dependency changes go in their own PR).
+- **Scope / affects:** `pnpm-workspace.yaml`, `pnpm-lock.yaml`, rules UNI-13, UNI-14. No application code. `pnpm audit --audit-level high` now exits 0 (one high is the existing braces exception; one moderate esbuild advisory remains below the gate).
+- **Versions:** vite 8.3.4 (was 8.3.1); pnpm 11.6.0; Node 24.21.0.
+- **Exception to a rule?** no
+- **Decided by:** builder (dependency pin; same pattern as the 2026-10-09 handlebars pin); owner review through the PR.
+
 ## 2026-10-20 — Phase 1 plan: user-level auth events go to a new no-RLS `auth_audit_log` table (ASK 3 = B)
 - **Decision:** ASK 3 of the Phase 1 plan: sign-ins and 2FA events, which belong to a user and not to a workspace, are recorded in a **new table `auth_audit_log`** (one row per event, keyed by user; append-only; no RLS; on the no-RLS allow-list; written only through the system module). Every login is recorded, including for a user with no workspace, and an event is not copied into each workspace. `audit_log` (tenant table, `workspace_id` required) keeps the workspace events, including member changes. The plan only proposes the table's design (Task 31). The spec change it needs (a no-RLS system table in the Tenancy / TEN-10 no-RLS allow-list, the "Audit, logging, privacy" section, the data model, the Phase 1 row and Verification; plan edit E12) is made in the separate spec revision 8 PR (the plan's Task 30), and Bob reviews it there with the rest of revision 8.
 - **Why:** Bob's plan review Rounds 1 and 2 (P1): the spec ("Audit, logging, privacy") says the audit log records logins and 2FA, but `audit_log.workspace_id` is required, and option A records nothing for a user with no workspace (for example just after sign-up), so the spec clause would not hold.

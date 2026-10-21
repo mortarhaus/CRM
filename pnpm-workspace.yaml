@@ -14,6 +14,8 @@ overrides:
   source-map-js: 1.2.2
   # GHSA-8r5x-fm3f-whwj and GHSA-p8wg-vrv2-v86f (handlebars <= 4.7.9, critical); transitive via eslint-plugin-boundaries. See docs/DECISIONS.md.
   handlebars: 4.7.10
+  # GHSA-587h-7wmj-h5pm (vite >=8.3.0 <=8.3.2, high; launch-editor); transitive via vitest. See docs/DECISIONS.md.
+  vite: 8.3.4
 auditConfig:
   # Time-limited exception, see docs/DECISIONS.md "braces audit exception".
   # No patched braces exists (CVE-2026-93687); dev-tooling chain only. Remove when a patch ships.
