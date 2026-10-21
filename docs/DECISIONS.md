@@ -2,6 +2,15 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-10-21 — Pin transitive vite to 8.3.4 (GHSA-587h-7wmj-h5pm) (UNI-13, UNI-14)
+- **Decision:** `pnpm-workspace.yaml` gets `overrides: vite: 8.3.4`. A high advisory (vite `>=8.3.0 <=8.3.2`, the `launch-editor` file-existence check) was published after the last green audit; `pnpm audit --audit-level high` then failed on `main` and on every PR (seen on PR #33, a docs-only PR; Bob's review Rounds 4 and 5). `vite` is a transitive dev-tooling dependency (`vitest` > `@vitest/mocker`); the override moves its single resolution from 8.3.1 to the patched 8.3.4. The lockfile also moves the packages vite itself depends on (`rolldown` 1.2.11 to 1.2.14, `postcss`, `nanoid`).
+- **Why:** UNI-13 requires a passing dependency audit. A patched version exists. 8.3.5 is newer but was published 4 hours before this change, so it is inside pnpm's minimum release age; 8.3.4 (published 2026-10-08) satisfies the age rule, so no `minimumReleaseAgeExclude` entry was added.
+- **Alternatives rejected:** an audit ignore (a patched version exists); 8.3.5 with a release-age exception (weakens the supply-chain control for no need); fixing it inside PR #33 (a docs-only plan PR; dependency changes go in their own PR).
+- **Scope / affects:** `pnpm-workspace.yaml`, `pnpm-lock.yaml`, rules UNI-13, UNI-14. No application code. `pnpm audit --audit-level high` now exits 0 (one high is the existing braces exception; one moderate esbuild advisory remains below the gate).
+- **Versions:** vite 8.3.4 (was 8.3.1); pnpm 11.6.0; Node 24.21.0.
+- **Exception to a rule?** no
+- **Decided by:** builder (dependency pin; same pattern as the 2026-10-09 handlebars pin); owner review through the PR.
+
 ## 2026-10-17 — Phase 1 gate proposals (spec v4.7 revision 7, draft); all five approved by Charlie 2026-10-20
 - **Decision:** The five Phase 1 plan gates were **drafted as proposals on 2026-10-17 and approved by Charlie on 2026-10-20** (see "Owner decisions" below), in spec v4.7 revision 7 ("Changes in v4.7" item 8; each policy in full in its home section):
   - Rate limits and OTP re-issue cap: database-backed fixed-window counters per IP, account, link and contact, a uniform `429`, numbers in "Authentication and sessions" → "Rate limits" (e.g. OTP issue 3 per hour and 10 per day per link).
