@@ -155,3 +155,5 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - 2026-10-21 PR 33 head now 41c8e32 (merged main, DECISIONS conflict resolved keeping both). Awaiting CI + Bob review.
 
 - 2026-10-21 PR 33 Bob R6 (2 P1) fixed at plan level, pushed 8902e44 (trust cookies migration+guard; single-read 2FA flag). Next: review 33 on new head; image job must pass.
+
+- 2026-10-21 Charlie: "A, and yes put the handoff on agent-logs" -> dev DB disposable, real data on server; handoff copy at agent-logs handoff/handoff.md (7c22d74); DECISIONS entry added to PR #34 (332d3c5). PR 33 awaiting Bob review of 8902e44; PR 34 awaiting review. Repo-visibility rule still unanswered (A/B).
