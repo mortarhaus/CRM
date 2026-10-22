@@ -157,3 +157,13 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - 2026-10-21 PR 33 Bob R6 (2 P1) fixed at plan level, pushed 8902e44 (trust cookies migration+guard; single-read 2FA flag). Next: review 33 on new head; image job must pass.
 
 - 2026-10-21 Charlie: "A, and yes put the handoff on agent-logs" -> dev DB disposable, real data on server; handoff copy at agent-logs handoff/handoff.md (7c22d74); DECISIONS entry added to PR #34 (332d3c5). PR 33 awaiting Bob review of 8902e44; PR 34 awaiting review. Repo-visibility rule still unanswered (A/B).
+
+- 2026-10-21 PR 33 Bob R7 P1 fixed at plan level, pushed 4cf983e (sign-in FOR SHARE check + revoke-sessions trigger). Next: review 33. PR 34 awaiting review.
+
+- 2026-10-22 Charlie chose B (design moves to PR 4 spike). Plan restructured: 31.A R1-R14, 31.B T1-T14, 31.C spike, 31.E candidate designs; pushed 0556cef. Next: review 33.
+
+- 2026-10-22 PR 33 Bob R9 fixed (R15/T15 legacy session cutover; 2FA-change list), pushed 84c492a. Next: review 33.
+
+- 2026-10-22 approved 33 (Round 10 Approved, head 84c492a): review archived, receipt pushed; PR body P3 fixed. Plan line 5 reviewer-directed wording still to fix later (non-blocking). Charlie may merge PR #33; I detect the merge and write the log. Then Task 30 spec revision 8 PR.
+
+- 2026-10-22 merged 33: log log/2026-10-22_PR33_phase-1-plan.md pushed (3e4568c). main ff 999b9c4. No breach. Plan worktree+branch removed. Next: Task 30 = separate spec revision 8 PR (E1-E12), asking Charlie. Plan line-5 reviewer-directed wording to fix in next plan edit. PR 34 open (will conflict in DECISIONS). ASK 4-9 open.
