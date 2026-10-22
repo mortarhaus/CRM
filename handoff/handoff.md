@@ -167,3 +167,25 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - 2026-10-22 approved 33 (Round 10 Approved, head 84c492a): review archived, receipt pushed; PR body P3 fixed. Plan line 5 reviewer-directed wording still to fix later (non-blocking). Charlie may merge PR #33; I detect the merge and write the log. Then Task 30 spec revision 8 PR.
 
 - 2026-10-22 merged 33: log log/2026-10-22_PR33_phase-1-plan.md pushed (3e4568c). main ff 999b9c4. No breach. Plan worktree+branch removed. Next: Task 30 = separate spec revision 8 PR (E1-E12), asking Charlie. Plan line-5 reviewer-directed wording to fix in next plan edit. PR 34 open (will conflict in DECISIONS). ASK 4-9 open.
+
+- 2026-10-22 Task 30: spec rev 8 draft PR opened (branch docs/spec-v4.7-rev8-phase1-plan-alignment, head 3ec71a4, spec hash 132747c701604754aafad92fe03e1f8cc1bd6625). Needs Bob: review spec + review N. Open for Charlie: points A, F, G (labelled proposals). PR 34 still waiting for Bob.
+
+- 2026-10-22 PR 36 Bob R25 fixed, pushed e015e58 hash b81d8350b1337583b9d3cb6ca6bbdd7679304c3c. WAITING on Charlie: F (recovery-code sign-in) and G (Phase 0 session cutover) before re-review. PR 34 waiting for Bob.
+
+- 2026-10-22 Charlie: "F A, G A". Recorded; PR 36 head 40f2777, spec hash 846b772e493464672f103c99bf8a4c39a9627085. Next: Bob review spec + review 36 (exact hash/head). PR 34 still unreviewed.
+
+- 2026-10-22 PR 36 Bob R26 fixed, pushed 4714f04 spec hash 733cc0e9ce4af0771bdd2769720e3f228caf8855; body rewritten. Next: review spec + review 36.
+
+- 2026-10-22 Bob spec Round 27: APPROVED hash 733cc0e9 (UNI-15 conforming). Two P3 fixed, PR 36 head 5748d9b. Next: review 36 on 5748d9b, then Charlie approval of rev 8 recorded in DECISIONS + PR body only (not spec), approved 36, merge.
+
+- 2026-10-22 approved 36 procedure done (Bob PR Round 1 Approved head 5748d9b; spec Round 27 approved 733cc0e9; CI green). Review archived + receipt pushed. STILL NEEDED before merge: Charlie plain approval of revision 8 (record in PR body, no commit). Then merge; then setup PR also fixes DECISIONS scope line (plan too) and records rev 8 approval + spec Status line.
+
+- 2026-10-22 approved 36 procedure done (Bob PR Round 1 Approved head 5748d9b; spec Round 27 approved 733cc0e9; CI green). Review archived + receipt pushed. STILL NEEDED before merge: Charlie plain approval of revision 8 (record in PR body, no commit). After merge: setup PR also fixes DECISIONS scope line, records rev 8 approval + spec Status line.
+
+- 2026-10-22 Charlie: "I approve spec revision 8" recorded in PR 36 body (no commit). Ready to merge PR 36 (head 5748d9b, receipt 7055e80). After merge: merged 36 log, then setup PR (PROJECT.md P1-P9, DECISIONS approval + scope line, spec Status rev 8 approved+merged).
+
+## 2026-10-22 — merged 36 done
+- PR #36 (spec v4.7 revision 8 + plan alignment) merged: 36b5592. Log on agent-logs: log/2026-10-22_PR36_spec-v4-7-rev8-phase1-plan-alignment.md (remote aae7c1b). No gate breach.
+- Worktree docs-spec-rev8 and its local branch removed. Main fast-forwarded to 36b5592. Spec hash on main: 733cc0e9ce4af0771bdd2769720e3f228caf8855.
+- NEXT (ask Charlie "Shall I do it?"): `setup` reconcile PR: agents/PROJECT.md hash 733cc0e9… + plan P1-P9; CLAUDE.md status; DECISIONS: record "I approve spec revision 8", fix revision 8 "Scope / affects" to "the spec and the merged Phase 1 plan"; spec Status line: revision 8 approved and merged. Then Bob `review spec` (exact hash) + `review <N>`.
+- Still open: PR #34 (unreviewed), repo visibility question (I recommend A: keep private), ASK 4-9 at their tasks.
