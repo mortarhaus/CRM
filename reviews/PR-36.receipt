@@ -1,0 +1,8 @@
+pr: 36
+reviewed_head_sha: 5748d9b1aad7a1a5bfb65fcf3290aef3073c1ec5
+review_file: reviews/PR-36.md
+review_file_hash: b5af8b9670bf557a318e41521210c709b18454f2
+log_branch_commit_with_review: dfcf4f63a6a5bbda48c5bfcdade8024d849ddde2
+verdict: Approved (Round 1); spec hash 733cc0e9ce4af0771bdd2769720e3f228caf8855 approved in spec Round 27
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-22T11:45:06Z
