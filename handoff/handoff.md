@@ -203,3 +203,10 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - 2a: PR 34 local commit c1ba65e: PROJECT.md §2 row + "Handoff copy (two Macs)" refresh/restore steps (accepted exception to builder §11); DECISIONS "Two Macs" scope + exception=yes.
 - PR 34 commits 63cef10, 5e9a629, c1ba65e NOT pushed on purpose: the audit fails until #37 merges, and each push runs the ~26-min image job. Uncommitted: none.
 - Next: Charlie runs `review 37` (Bob); `approved 37` BEFORE merge; merge; `merged 37`. Then I merge main into PR 34, push, write the PR 34 body (UNI-11 row: Charlie's authorization, destination agent-logs handoff/handoff.md, allowed data = in-flight state only, secret scan 0 hits; new head; Round 1 response), wait for green CI, then Charlie runs `review 34`.
+
+## 2026-10-23 — fix (Bob PR #37 Round 1, Revision required, 1 P2 before merge)
+- Review archived on agent-logs f757669 (hash e7552db7).
+- P2 fixed in f64d010 (DECISIONS only: nanoid 3.3.20 edge disclosed, next-code-frame fix listed, advisory ranges incl. both GHSA-2464 lower bounds). Lockfile unchanged. Pushed; PR 37 body rebuilt with Round 1 response. CI re-running on f64d010.
+- Bob asked that the re-review use Opus 5.5 (deep tier; security dependency gate).
+- PR 34 still waits (local commits 63cef10, 5e9a629, c1ba65e not pushed). Uncommitted: none.
+- Next: Charlie runs `review 37` (Bob, Opus 5.5) on f64d010; `approved 37` BEFORE merge; merge; `merged 37`; then PR 34 merge-main + push + body.
