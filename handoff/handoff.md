@@ -263,3 +263,9 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Deviations to tell Bob/Charlie: Invitation table granted; UPDATE grants per column; some proposed grants left out (fail closed until Task 24); ci.yml edited; env.ts restructured. ASK: accept the narrower measured grant set.
 - After the fix: I re-verify myself (typecheck, lint, test, build, audit), fill "#<PR number>" in DECISIONS, push, open PR 1, Charlie runs `review <N>`.
 - Uncommitted: none (worktree .agent/worktrees/build-feat-p1-db-roles).
+
+## 2026-10-24 — Phase 1 PR 1 opened: PR #39
+- https://github.com/mortarhaus/CRM/pull/39 · branch feat/p1-db-roles · worktree .agent/worktrees/build-feat-p1-db-roles · head ebcc651 (1 commit on main 065d9a2, 27 files). Helper fix for UNI-09 included (SCRAM verifier + SET LOCAL log guards, 5 tests). I reran typecheck, lint, test (187), build, audit: all exit 0. E2E (84) ran only on the earlier commit 7482990; CI image job runs it on ebcc651.
+- ASK for Bob/Charlie: accept the measured crm_app grant set (narrower than the plan; invitation granted; per-column UPDATE).
+- Next: wait for CI green; Charlie runs `review 39` (Bob, Opus 5.5); `fix` if needed; `approved 39` BEFORE merge; merge; `merged 39`; then PR 2 (feat/p1-rls, Tasks 4-7).
+- Uncommitted: none. Helper agent a35d5be9c4e14d085 finished.
