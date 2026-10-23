@@ -241,3 +241,7 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - handoff/README.md on agent-logs updated for the newer-copy check (not in PR 38).
 - Next: CI green -> Charlie runs `review 38` (Bob); `approved 38` BEFORE merge; merge; `merged 38`; then `build` (Phase 1 PR 1, database roles; ask Charlie first).
 - Open: repo visibility (I pick A: private); untracked on main, not mine: .playwright-mcp/, docker/sync-export.sh, docker/sync-import.sh. Uncommitted: none.
+
+## 2026-10-24 — approved 38 done
+- Bob PR #38 Round 1 Approved with conditions at head cb20fc6 = PR head; CI green. Nothing required before merge. Deferred, due 2026-11-06, next PR that edits agents/PROJECT.md (with handoff/README.md on agent-logs): P2 an owner answer "remote is newer" must adopt the remote copy (write .agent/handoff.synced and the file) so the next refresh does not overwrite it; P3 three spots still call revision 7 current / revision 8 pending (see review). Review archived, receipt PR-38.receipt pushed.
+- Next: Charlie merges PR #38, then `merged 38`; then `build` (Phase 1 PR 1), ask first.
