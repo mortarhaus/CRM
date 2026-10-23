@@ -224,3 +224,7 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Merged main f9d1454 into PR 34 branch; pushed head 00fc620 (mergeable). Audit exit 0. All 4 P1 fixed: conflict (63cef10, 5e9a629, 00fc620), handoff steps in PROJECT.md §2 (c1ba65e), audit via PR #37, UNI-11 row in PR body (rewritten with Round 1 response). CI running on 00fc620 (~26 min image job).
 - Worktree .agent/worktrees/chore-repo-moved clean. Uncommitted: none.
 - Next: when CI is green, Charlie runs `review 34` (Bob). Then `approved 34` BEFORE merge; merge; `merged 34`. Then `setup` reconcile PR (spec rev 8 hash 733cc0e9, P1-P9, DECISIONS approval) and Phase 1 PR 1.
+
+## 2026-10-23 — approved 34 done
+- Bob PR #34 Round 2 Approved with conditions (Opus 5.5) at head 00fc620 = PR head; CI green. Nothing required before merge. Deferred: P2 + P3 (see review) in the next PR that edits agents/PROJECT.md, no later than 2026-11-06. Review archived, receipt reviews/PR-34.receipt pushed on agent-logs.
+- Next: Charlie merges PR #34, then `merged 34`; then `setup` reconcile PR (carry the deferred P2/P3 there).
