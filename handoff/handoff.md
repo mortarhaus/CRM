@@ -245,3 +245,9 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 ## 2026-10-24 — approved 38 done
 - Bob PR #38 Round 1 Approved with conditions at head cb20fc6 = PR head; CI green. Nothing required before merge. Deferred, due 2026-11-06, next PR that edits agents/PROJECT.md (with handoff/README.md on agent-logs): P2 an owner answer "remote is newer" must adopt the remote copy (write .agent/handoff.synced and the file) so the next refresh does not overwrite it; P3 three spots still call revision 7 current / revision 8 pending (see review). Review archived, receipt PR-38.receipt pushed.
 - Next: Charlie merges PR #38, then `merged 38`; then `build` (Phase 1 PR 1), ask first.
+
+## 2026-10-24 — merged 38 done
+- PR #38 merged 065d9a2 (2026-10-23T16:55:02Z). Log log/2026-10-23_PR38_setup-reconcile-v4-7-rev8.md on agent-logs (6305f0d). No gate breach (receipt 12 min before merge). Worktree + local branch removed; main ff to 065d9a2. Log gate clear. Spec gate (SPEC Round 27, 733cc0e9) and reconcile gate (PROJECT.md §2 = 733cc0e9 = spec on main) pass.
+- Deferred, due 2026-11-06, next PR that edits agents/PROJECT.md (+ handoff/README.md on agent-logs): P2 owner answer "remote is newer" must copy the remote over .agent/handoff.md, then write .agent/handoff.synced, restart refresh from step 1; P3 CLAUDE.md line 6, PROJECT.md §11 "decided in revision 7", DECISIONS rev 8 Decision/Scope pending sentences. Interim: if a builder asks "which is newer?" and remote is newer, tell it to copy the remote into .agent/handoff.md first.
+- Next (ask Charlie): `build` = Phase 1 PR 1 (database roles) per the Phase 1 plan; use Opus 5.5 (RLS/roles). Ask Charlie before starting.
+- Open: repo visibility (I pick A: private); untracked on main, not mine: .playwright-mcp/, docker/sync-export.sh, docker/sync-import.sh. Uncommitted: none.
