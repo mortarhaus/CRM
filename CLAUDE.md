@@ -11,9 +11,9 @@ medium creative agencies. Dogfooded by Charlie's studio. Sold as hosted SaaS and
 
 ## Status
 
-- Spec v4.7 (revision 7, the five Phase 1 plan gates) approved by Charlie on 2026-10-20 (merged as PR #31, `7f7178a`). It builds on revision 6 (hosting wording only, approved 2026-10-16, PR #29, `cc3afd7`) and revision 4, approved by Charlie on 2026-10-11 (reviewed blob merged at `9b95910`, PR #18; approval recorded by the PR #19 merge `98f8675`), and supersedes v4.6 (approved 2026-10-09) and v4.5 (approved 2026-09-30 at `8989d59`, PR #2). Both Phase 1 spikes passed on 2026-09-29.
+- Spec v4.7 (revision 8, Phase 1 plan alignment) approved by Charlie on 2026-10-22 (merged as PR #36, `36b5592`). It builds on revision 7 (the five Phase 1 plan gates, approved 2026-10-20, PR #31, `7f7178a`) and revision 6 (hosting wording only, approved 2026-10-16, PR #29, `cc3afd7`) and revision 4, approved by Charlie on 2026-10-11 (reviewed blob merged at `9b95910`, PR #18; approval recorded by the PR #19 merge `98f8675`), and supersedes v4.6 (approved 2026-10-09) and v4.5 (approved 2026-09-30 at `8989d59`, PR #2). Both Phase 1 spikes passed on 2026-09-29.
 - Phase 0 PRs 1-3 merged: PR 1 (Tasks 1-5, tooling) on 2026-09-30 (`97cfaab`), PR 2 (Tasks 6-10, env, DB, Better Auth) as PR #22 on 2026-10-13 (`ce4bbf2`), PR 3 (Tasks 11-14, health, auth UI, 2FA, workspaces) as PR #26 on 2026-10-15 (`074018f`). PR 4 (Tasks 15-17: worker stub, Docker image, CI image job) as PR #27 on 2026-10-15 (`b90dc48`). Phase 0 is complete.
-- The Phase 0 plan (`docs/superpowers/plans/2026-09-29-phase-0-foundation.md`) is patched for v4.5; v4.6 and v4.7 change no Phase 0 task. Next: the Phase 1 plan (tenancy, five roles, RLS, pg-boss + transactional events). All Phase 1 gates in the spec ("Next steps after approval" → Current gates (b)) are decided; what the plan itself must settle is listed in `agents/PROJECT.md` §11.
+- The Phase 0 plan (`docs/superpowers/plans/2026-09-29-phase-0-foundation.md`) is patched for v4.5; v4.6 and v4.7 change no Phase 0 task. The Phase 1 plan (`docs/superpowers/plans/2026-10-20-phase-1-tenancy-security-jobs.md`, tenancy, five roles, RLS, pg-boss + transactional events) is merged (PR #33, `999b9c4`). Next: Phase 1 PR 1 (database roles). The `crm_worker` grants are still to be measured in PR 5; see `agents/PROJECT.md` §11.
 
 ## Commands
 
