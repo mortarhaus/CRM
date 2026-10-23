@@ -228,3 +228,9 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 ## 2026-10-23 — approved 34 done
 - Bob PR #34 Round 2 Approved with conditions (Opus 5.5) at head 00fc620 = PR head; CI green. Nothing required before merge. Deferred: P2 + P3 (see review) in the next PR that edits agents/PROJECT.md, no later than 2026-11-06. Review archived, receipt reviews/PR-34.receipt pushed on agent-logs.
 - Next: Charlie merges PR #34, then `merged 34`; then `setup` reconcile PR (carry the deferred P2/P3 there).
+
+## 2026-10-23 — merged 34 done
+- PR #34 merged 9e965f1 (2026-10-23T15:23:40Z). Log log/2026-10-23_PR34_repo-move-and-two-mac-handoff-copy.md on agent-logs (f6902c5). No gate breach (receipt 35 s before merge). Worktree + local branch removed; main ff to 9e965f1. Log gate clear.
+- Deferred (Bob R2, due 2026-11-06): P2 refresh must not overwrite a newer remote handoff copy (compare last-pushed hash, else ask); P3 restore cites builder §1 step 2. Do both in the next PR that edits agents/PROJECT.md (the setup reconcile PR) and in handoff/README.md on agent-logs.
+- Next (ask Charlie): `setup` reconcile PR: PROJECT.md spec hash 733cc0e9 + plan P1-P9; CLAUDE.md status; DECISIONS revision 8 approval record + scope line fix; spec Status line rev 8 approved+merged; plus the P2/P3 above. Then Bob review spec + review N; Phase 1 PR 1.
+- Open: repo visibility (I pick A: keep private). Untracked on main, not mine: .playwright-mcp/, docker/sync-export.sh, docker/sync-import.sh (decision rejected the scripts; Charlie decides). Uncommitted: none.
