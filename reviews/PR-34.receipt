@@ -1,0 +1,8 @@
+pr: 34
+reviewed_head_sha: 00fc6204f3ee9f0f20709839bdc038a5ce72d404
+review_file: reviews/PR-34.md
+review_file_hash: 7af7fa14561f71c84a96f30c79ac9f21de2de3c7
+log_branch_commit_with_review: 623f690bb437a730e3862dc5b252941e51eb4cb9
+verdict: Approved with conditions (Round 2, Opus 5.5)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-23T15:23:05Z
