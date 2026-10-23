@@ -1,0 +1,229 @@
+# PR 34 — chore: record the repository move to mortarhaus/CRM and the two-Mac data decision
+
+- **Merged:** 2026-10-23T15:23:40Z · **Merge commit:** 9e965f18a2160eccba55d3a38c3254fdf3850079 · **Branch:** chore/repo-moved-to-mortarhaus
+- **Gate breaches:** none
+- **Approval receipt:** `reviews/PR-34.receipt` on `agent-logs` (written 2026-10-23T15:23:05Z, 35 seconds before the merge; reviewed head `00fc6204f3ee9f0f20709839bdc038a5ce72d404`; review file hash `7af7fa14561f71c84a96f30c79ac9f21de2de3c7`, equal to the local review file; log-branch commit holding the review `623f690`).
+- **Merge evidence:** `gh pr view 34 --repo mortarhaus/CRM` state MERGED, mergedAt 2026-10-23T15:23:40Z, merge commit above; `git merge-base --is-ancestor` shows it reachable from the fetched `origin/main`. Final head `00fc620` equals the head in Bob's Round 2. All CI jobs passed on that head.
+- **Drafted by:** Sonnet 5.5 (builder; earlier commits Opus 5.5) · **Final verdict:** Approved with conditions (round 2, Opus 5.5)
+- **Spec:** none (docs only) · **Plan:** none · **Milestone:** Phase 1 prep (repo and two-Mac housekeeping)
+
+## What changed
+`agents/PROJECT.md` §4 names the new remote `https://github.com/mortarhaus/CRM`. `agents/PROJECT.md` §2 gets a "Handoff copy (two Macs)" procedure (refresh, restore, allowed content) for the copy of `.agent/handoff.md` on `agent-logs` at `handoff/handoff.md`, recorded as an owner-accepted exception to `roles/builder.md` §11. `docs/DECISIONS.md` has two 2026-10-21 entries (repo move; two Macs).
+
+## Why
+CI jobs did not start on PR #33 (billing message on the personal account); Charlie moved the repo to an organization for a separate Actions quota. With two Macs, dev databases are disposable, real data lives on the server, and the git-ignored handoff needed a copy the second Mac can restore.
+
+## Review rounds
+- R1 (head `332d3c5`, Revision required): [P1] PR conflicted with `main` → `main` merged, all decision entries kept; [P1] handoff-mirror behavior only in the decisions log → steps added to `PROJECT.md` §2 as an accepted exception (Charlie "2a"); [P1] audit failed and no CI → PR #37 (Next.js 16.4.2) merged and brought in; [P1] UNI-11 missing from the self-check → row added to the PR body.
+- R2: Approved with conditions (Opus 5.5) on `00fc620`; all four R1 findings resolved.
+
+## Deferred conditions
+- [P2] A refresh can overwrite a newer copy pushed from the other Mac (last writer wins): before refresh step 3, compare the fetched remote `handoff/handoff.md` with the hash this Mac last pushed or restored; if the remote moved, don't push and use the restore "both differ, ask" path. Say the same in `handoff/README.md` on `agent-logs`. → next PR that edits `agents/PROJECT.md`, no later than **2026-11-06**. Interim: start a new builder session (or run the restore check) after switching Macs.
+- [P3] Restore is cited against the wrong section: say "before builder §1 step 2 (load the handoff)" instead of "before builder §1 'Resume'". → fixed with the P2.
+
+## Decisions worth keeping
+- Charlie: "A, and yes put the handoff on agent-logs" (2026-10-21); "i have migrated to https://github.com/mortarhaus/CRM" (2026-10-21); "1a, 2a" (2026-10-23, separate Next.js PR; steps live in `PROJECT.md`).
+- Each Mac keeps its own throwaway dev database; no database is synced. Real data lives on the server.
+- Repo-visibility rule still undecided (builder recommends A: keep private).
+
+## Follow-ups
+- The `setup` reconcile PR also fixes the P2 and P3 above (deadline 2026-11-06), the DECISIONS revision 8 scope line and approval record, and the spec Status line.
+- Then Phase 1 PR 1 (database roles) per the plan; ASK 4 to 9 are asked at the task that needs each.
+- `docker/sync-export.sh` and `docker/sync-import.sh` are untracked on `main` and not in the repo; the decision rejected them. Charlie decides whether to delete them.
+
+## Appendix — final review rounds
+
+<!-- Newest round at the top. Keep earlier rounds as history. Only the reviewer writes this file. -->
+
+## Round 2 — 2026-10-23 · scope: slice
+- **Code review:** base (merge base) `f9d145460149b4fb44f0c89e6ea3f1c8ed8b5615` (= `origin/main`, PR #37 merge) · head `00fc6204f3ee9f0f20709839bdc038a5ce72d404` · head re-checked at end: yes (still `00fc620`, OPEN, MERGEABLE)
+- **Spec reference:** v4.7 revision 7 (approved) · hash `50acbcfe0b402718ddd2c49f4297ce378e1b7451`. This PR changes no spec.
+- **Checkout mode:** detached worktree `.agent/worktrees/review-34-00fc6204` at the exact head; no build output created; clean at the end; removed without `--force`.
+
+**Verdict:** Approved with conditions
+**Model used:** Opus 5.5 · **Switch model next step?** No — `approved 34` / `merged 34` are builder procedures.
+
+### Round 1 findings (re-inspected, not taken from the builder's table)
+
+- **[P1] Rebase and keep both decision-log histories — resolved.** GitHub: `MERGEABLE`. Three-dot diff against `f9d1454` adds only this PR's two entries. `docs/DECISIONS.md` headings run newest first: 2026-10-23 Next.js (l.5), 2026-10-22 revision 8 (l.14), then this PR's two 2026-10-21 entries (l.25, l.34), then the older 2026-10-21 entries (l.43, l.52). Nothing from `main` is lost.
+- **[P1] Handoff-mirror behaviour not in an authoritative source — resolved.** The refresh, restore and allowed-content steps are in `agents/PROJECT.md` §2 "Handoff copy (two Macs)", which `START.md` names as an instruction source. It records Charlie's acceptance of the exception to `roles/builder.md` §11 ("2a", 2026-10-23), and `docs/DECISIONS.md` says "Exception to a rule? yes". Traced: `handoff` → update `.agent/handoff.md` → redact + scan → log worktree clean/fast-forward → byte copy → commit, push, remote hash check → reply line. Two gaps remain; see the new P2 and P3 below.
+- **[P1] Dependency audit fails, no CI — resolved.** PR #37 (Next.js 16.4.2) is merged and is in this head. CI on `00fc620`: Typecheck/lint/test pass, Dependency audit pass, Secret scan pass, Image/Trivy/E2E pass.
+- **[P1] UNI-11 missing from the self-check — resolved.** The row names Charlie's authorization, the exact destination (`agent-logs` → `handoff/handoff.md` in the private `mortarhaus/CRM`), the allowed data and the evidence. I checked the evidence: the remote copy's blob `d45a58be` equals `git hash-object .agent/handoff.md`. The §7 secret pattern finds 0 hits in it, and it holds no e-mail addresses or tokens. The only URL is an old PR link, and the only path is the local project path, which is already in `PROJECT.md` §3.
+
+### Findings
+
+### [P2] A refresh can overwrite a newer copy pushed from the other Mac
+- Category: material risk
+- Rule: `PROJECT.md` §2 "Handoff copy (two Macs)", refresh step 3; UNI-11 data handling
+- Evidence: step 3 copies `.agent/handoff.md` over `handoff/handoff.md` with no check that the fetched remote copy is the one this Mac last pushed or restored. The "both differ → ask" guard exists only in the restore step, which runs only at "session start".
+- Failure scenario: Charlie works on the MacBook, and its refresh pushes copy B. Back home, a Mac mini session that is still open (no new session start, so no restore) runs `build` or `fix`. Its last step pushes the Mac mini's older handoff over copy B. Next time on the MacBook, the restore check finds a difference and asks, so nothing is lost silently. But the mirror on `agent-logs` held the stale state in between, and the Mac mini builder worked from stale in-flight state without being told.
+- Why it matters: the copy exists so the second Mac resumes from the newest state. Last-writer-wins defeats that in the exact situation it is for (switching Macs).
+- Required correction: in refresh step 3, before copying, compare the fetched remote `handoff/handoff.md` with the blob hash this Mac last pushed or restored (record that hash in the handoff, or in a git-ignored `.agent/` file). If the remote moved, don't push: run the restore "both differ → ask the owner" path. Say the same in `handoff/README.md` on `agent-logs`, whose resume line currently says to copy over `.agent/handoff.md` with no such check.
+- Owner: builder
+- Verification: read the new step and trace the scenario above. The second Mac must stop and ask, not push.
+- Disposition: deferred to the next PR that edits `agents/PROJECT.md`, and no later than 2026-11-06. Interim: Charlie starts a new builder session (or runs the restore check) after switching Macs. The MacBook's local file still holds copy B, so nothing is lost.
+- Status: open
+
+### [P3] Restore is cited against the wrong builder section
+- Category: defect (wording)
+- Evidence: `agents/PROJECT.md` §2 says restore runs "before builder §1 'Resume'". "Resume" is in `roles/builder.md` §2 "Startup check". Builder §1 step 2 already reads the handoff and says "If missing, nothing is in flight".
+- Failure scenario: on a fresh Mac, the builder loads `PROJECT.md`, reaches §1 step 2 with no local handoff and concludes that nothing is in flight before the restore step runs.
+- Required correction: say "before builder §1 step 2 (load the handoff)".
+- Owner: builder · Fix with the P2 above.
+- Status: open
+
+### Self-check audit
+
+Independent applicability list: UNI-07, UNI-11, UNI-12, UNI-13, decision provenance, command authority, owner decision on `PROJECT.md`. n-a: UNI-01–06, 08–10, 14–19 and every other pack (no code, dependency, schema, UI, auth, money, record, link, file, job or payment change).
+
+| Rule | Applies? | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| UNI-07 | yes | pass | pass | added lines and the remote handoff copy: 0 secret-pattern hits; CI Secret scan pass | no |
+| UNI-11 | yes — handoff content goes to GitHub | pass | pass, with the P2 data-handling gap | Charlie's words recorded; destination private; copy hash matches and is clean | partly (P2) |
+| UNI-12 | yes | pass | pass | two files in repo | no |
+| UNI-13 | yes | audit pass, CI pending | pass | all four CI jobs green on `00fc620` | no |
+| Decision provenance | yes | pass | pass as recorded (Charlie's words are in the Andy session, which Bob cannot see) | `docs/DECISIONS.md:25-42` | no |
+| Command authority | yes | pass | pass, with P2/P3 gaps | `agents/PROJECT.md` §2 | partly |
+| Owner decision on `PROJECT.md` | yes | pass | pass | §4 remote is now correct; the only `charliekhc` refs left are history (Phase 0 plan, the decision entry) | no |
+
+No injection text found in the diff or the PR body.
+
+### Verification performed
+
+| Command / check | Result |
+|---|---|
+| `git fetch origin`; `git cat-file -e`; `git merge-base origin/main 00fc620` | commit present; merge base `f9d1454` |
+| Three-dot `--stat`, log, full diff | 2 files, +42 −1; 6 commits (2 merges of `main`); reviewed in full |
+| `git diff --check f9d1454...00fc620` | clean |
+| `git grep charliekhc HEAD` | only history refs (Phase 0 plan l.171, decision entry, §4 "moved from") |
+| `docs/DECISIONS.md` heading order | newest first; all `main` entries kept |
+| `origin/agent-logs:handoff/handoff.md` vs `.agent/handoff.md` | same blob `d45a58be`; 0 secret-pattern hits; no e-mails or tokens |
+| Commit trailers | all four new commits carry `Co-Authored-By: Claude …` |
+| CI on `00fc620` | Typecheck/lint/test, Dependency audit, Secret scan, Image/Trivy/E2E: all pass |
+| Local install/audit/tests | not run: the diff is two docs files, the lockfile equals `main` (reviewed in PR #37 Round 2), and exact-head CI is green |
+| End check | host head still `00fc620`, OPEN, MERGEABLE |
+
+### Residual risks and test gaps
+- The P2 race exists until the follow-up lands; the interim step above covers it.
+- No branch protection on this plan (recorded in the repo-move entry); the Bob → `approved` → Charlie merge order stays a process gate, not a host gate.
+
+### Required before merge
+- None.
+
+### Deferred conditions
+- P2 + P3 above: next PR that edits `agents/PROJECT.md`, no later than 2026-11-06.
+
+### Optional improvements
+- None.
+
+## Round 1 — 2026-10-23 · scope: slice
+- **Code review:** base (merge base) `4bf02f9ef936e071ead180330ee923730524183f` · head `332d3c5c114c5f5d68a16fbf372b451ce7bf1947` · head re-checked at end: yes
+- **Spec reference:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7 · hash (`git hash-object`) `50acbcfe0b402718ddd2c49f4297ce378e1b7451`
+- **Checkout mode:** exact-commit snapshot (the sandbox refused Git's `.git/worktrees` metadata write); archive file list matched the commit and the end fingerprint matched the initial fingerprint.
+
+**Verdict:** Revision required
+**Model used:** GPT-5 Codex · **Switch model next step?** No — the required corrections and re-review are deterministic documentation/delivery checks.
+
+### Findings
+
+### [P1] Rebase the PR and preserve both decision-log histories
+- Category: defect
+- Rule: delivery gate / review target must be mergeable
+- Evidence: GitHub reports PR #34 as `CONFLICTING`; `git merge-tree 4bf02f9 origin/main 332d3c5c` produces conflict markers at the top of `docs/DECISIONS.md`, where newer revision-8 decisions on `main` and this PR's two 2026-10-21 entries both insert after the header.
+- Failure scenario: Charlie attempts to merge the approved head, but GitHub cannot merge it; an incorrect manual resolution can drop either the newer revision-8 decisions or the two decisions introduced here.
+- Why it matters: the PR is not deliverable and the decisions log is a source of truth whose history must not be lost.
+- Required correction: update the branch from current `main`, resolve `docs/DECISIONS.md` by retaining every entry in newest-first order, and push the resulting head for a fresh review.
+- Owner: builder
+- Verification: fetch; confirm `gh pr view 34 --json mergeable,headRefOid` is no longer `CONFLICTING`; inspect the new three-dot diff and verify both sets of entries remain.
+- Status: open
+
+### [P1] The recorded handoff-mirror behavior is not in an authoritative command source
+- Category: defect
+- Rule: owner decision at `docs/DECISIONS.md:6-12`; trust boundary and `handoff` command at `agents/START.md:259-263`
+- Evidence: `docs/DECISIONS.md:9` states that the `handoff` command refreshes `handoff/handoff.md` on `agent-logs`, but `agents/START.md:259-263` tells the builder only to update `.agent/handoff.md` and then stop. `agents/PROJECT.md:33` names only the local handoff, and this PR changes only the remote field there (`agents/PROJECT.md:66`). The existing remote mirror is currently byte-for-byte current, but it was refreshed by separate log-branch commits, not by the defined command.
+- Failure scenario: on the next `handoff`, the builder follows the authoritative command, updates only the ignored local file, and stops. The second Mac restores a stale mirror despite the decision claiming the command maintains it.
+- Why it matters: the central purpose of the two-Mac decision is reliable resume state; recording behavior in the decisions log does not make it executable because the trust boundary treats that log as data, not instructions.
+- Required correction: put the project-specific mirror path and refresh/restore procedure in an authoritative project instruction source (normally `PROJECT.md`), including copy, commit/push on `agent-logs`, remote hash verification, and redaction. If the generic command's terminal “then stop” prevents the project extension, add optional mirror support to the master kit first and recopy it; do not leave the behavior only in `docs/DECISIONS.md` or `handoff/README.md`.
+- Owner: builder
+- Verification: re-read `START.md` plus `PROJECT.md` and trace a `handoff` command from local update through verified remote mirror; confirm a new-machine restore path is also authoritative.
+- Status: open
+
+### [P1] Mandatory CI is absent and the pinned head fails the dependency audit
+- Category: guardrail mismatch
+- Rule: UNI-13
+- Evidence: the end-of-review host query returned an empty `statusCheckRollup` for head `332d3c5c`. The workflow at `.github/workflows/ci.yml:3-5` triggers on every pull request. Locally, with Node `v24.21.0` and pnpm `11.6.0`, `pnpm audit --audit-level high` exited 1 with 13 findings, including two critical Next.js advisories (patched in `>=16.4.1`) and a high Vite advisory (patched in `>=8.3.3`).
+- Failure scenario: the PR bypasses the required delivery gate with no host checks, while its exact head contains dependencies that make the audit job fail and includes critical unauthenticated Next.js vulnerabilities.
+- Why it matters: UNI-13 says a failing audit blocks merge; the lack of check runs is not evidence of a pass.
+- Required correction: land the dependency remediation through a reviewed change, update PR #34 onto that `main`, and run all configured CI jobs on the new head until every required check is green. Current `main` already contains the Vite remediation, but the Next.js findings still need resolution and verification.
+- Owner: builder
+- Verification: `pnpm audit --audit-level high` exits 0 on the new head and GitHub reports successful Typecheck/lint/test/build, dependency audit, secret scan, and image/Trivy/E2E checks for that same SHA.
+- Status: open
+
+### [P1] The self-check omits UNI-11 for publishing the handoff mirror
+- Category: guardrail mismatch
+- Rule: UNI-11; reviewer role §3 (an applicable rule missing from the table is P1)
+- Evidence: the PR body self-check lists UNI-07, UNI-12, UNI-13, decision provenance, and the owner decision on `PROJECT.md`, but not UNI-11. The new decision explicitly sends the local in-flight handoff to the external GitHub service on `agent-logs` (`docs/DECISIONS.md:6,9`).
+- Failure scenario: future handoff contents are published without the PR documenting the owner's authorization boundary or checking that the mirrored content contains no client data, secrets, tokens, or private URLs.
+- Why it matters: Charlie did authorize this GitHub mirror, so the rule can pass, but the required self-check must show that authorization and the content/redaction boundary instead of leaving external transfer unaudited.
+- Required correction: add UNI-11 to the PR self-check with Charlie's authorization, the exact destination, the allowed data class, and evidence that the copied handoff is redacted and secret-free.
+- Owner: builder
+- Verification: inspect the updated PR body row against the owner decision and the final mirrored file.
+- Status: open
+
+### Self-check audit
+
+The applicability list below was derived from the changed behavior and project rules independently of the builder's conclusions.
+
+| Rule | Applies? (why / n-a reason) | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| UNI-01–06 | n-a — no code, dependency, or business-value change | omitted | n-a | two-file documentation diff | no |
+| UNI-07 | yes — decision and project metadata must not carry secrets | Pass | pass; pattern scan found only the documented scan pattern/password prose | changed files; `rg` scan | no |
+| UNI-08–10 | n-a — no production-secret mechanism, logging code, or audit-log mutation | omitted | n-a | diff | no |
+| UNI-11 | yes — local handoff data is copied to GitHub | omitted | authorization exists, but required row is missing | PR body; `docs/DECISIONS.md:6,9` | **yes — P1** |
+| UNI-12 | yes — PR and log-branch work stay inside project worktrees | Pass | pass | two tracked PR files; log worktree under `.agent/worktrees` | no |
+| UNI-13 | yes — workflow triggers every PR | Pending CI | fail | empty host checks; local audit exit 1 | **yes — P1** |
+| UNI-14–15 | n-a — lockfile/build pins and migrations are unchanged | omitted | n-a | diff | no |
+| UNI-16 | n-a — repository hosting metadata is not an application deployment/env/domain/auth change | omitted | n-a | diff | no |
+| UNI-17–19 | n-a — no platform endpoint or cookie/CSP change | omitted | n-a | diff | no |
+| Decision provenance | yes — both additions record owner words and rationale | Pass | pass as recorded; direct Andy-session evidence is unavailable to Bob | `docs/DECISIONS.md:5-21`; handoff history | no |
+| Command authority | yes — decision promises new `handoff` behavior | omitted | fail | `agents/START.md:259-263`; `agents/PROJECT.md:33`; `docs/DECISIONS.md:9` | **yes — P1** |
+| Other active packs / PROJECT §9 | n-a — no UI, tenancy, money, finalized-record, auth, public-link, file/template, job/event, or payment implementation changes | omitted | n-a | two-file documentation diff | no |
+
+### Verification performed
+
+| Command / check | Result |
+|---|---|
+| `git fetch origin` | passed |
+| Host PR metadata (`gh pr view 34`) | open; base `main`; head `332d3c5c`; final state `CONFLICTING`; no checks |
+| Exact-commit acquisition | `git worktree add` blocked by sandbox; fallback `git archive <head> | tar` succeeded |
+| Snapshot integrity | extracted file list matched `git ls-tree`; 141 tracked-file fingerprints unchanged at end |
+| `git diff --stat`, `--name-status`, log, full three-dot diff | 2 files; 19 insertions, 1 deletion; reviewed in full |
+| `git diff --check 4bf02f9...332d3c5c` | passed |
+| `git merge-tree 4bf02f9 origin/main 332d3c5c` | conflict in `docs/DECISIONS.md` |
+| Remote identity / redirect | current repository is private under the new organization; the old repository endpoint resolves to the new repository |
+| Current worktree remotes | main and the two registered project worktrees use the new origin |
+| Historical check claim for `b088fe4` | typecheck/lint/test, secrets, and image jobs passed; dependency audit failed, consistent with the PR's narrower statement |
+| Handoff mirror existence/currentness | `handoff/README.md` exists on `origin/agent-logs`; remote `handoff/handoff.md` hash equals local `.agent/handoff.md` now |
+| Secret/injection text scan of changed files | no credential material or reviewer-directed prompt injection found; expected prose/pattern false positives only |
+| `fnm exec --using 24.21.0 node --version` / pnpm version | `v24.21.0` / `11.6.0` |
+| `pnpm audit --audit-level high` | failed: 13 findings, including 2 critical and 3 high (1 ignored) |
+| End host-head check | unchanged at `332d3c5c114c5f5d68a16fbf372b451ce7bf1947` |
+
+### Residual risks and test gaps
+- No local typecheck/lint/test/build or E2E run: this is a documentation-only diff, but the mandatory host CI is absent and must run on the corrected head.
+- The owner-decision quotations come from the builder's session and cannot be independently observed by Bob; the handoff and log-branch commits corroborate the recorded operational outcome.
+- The snapshot has no Git metadata, so Git-dependent checks were run from the main repository against the pinned object rather than inside the snapshot.
+
+### Required before merge
+- Rebase/update onto current `main`, preserve all decision entries, and return a mergeable new head.
+- Encode the handoff mirror/restore behavior in an authoritative instruction source.
+- Resolve the blocking dependency audit and obtain green CI for the exact new head.
+- Add the missing UNI-11 self-check row.
+- Run `review 34` again; this verdict applies only to `332d3c5c114c5f5d68a16fbf372b451ce7bf1947`.
+
+### Deferred conditions
+- none
+
+### Optional improvements
+- none
+
