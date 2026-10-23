@@ -189,3 +189,17 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Worktree docs-spec-rev8 and its local branch removed. Main fast-forwarded to 36b5592. Spec hash on main: 733cc0e9ce4af0771bdd2769720e3f228caf8855.
 - NEXT (ask Charlie "Shall I do it?"): `setup` reconcile PR: agents/PROJECT.md hash 733cc0e9… + plan P1-P9; CLAUDE.md status; DECISIONS: record "I approve spec revision 8", fix revision 8 "Scope / affects" to "the spec and the merged Phase 1 plan"; spec Status line: revision 8 approved and merged. Then Bob `review spec` (exact hash) + `review <N>`.
 - Still open: PR #34 (unreviewed), repo visibility question (I recommend A: keep private), ASK 4-9 at their tasks.
+
+## 2026-10-23 — fix (Bob PR #34 Round 1, Revision required, 4 P1)
+- Target: PR 34 (only unresolved newest round; PR 8 is closed). Review archived on agent-logs 5ef75eb (hash 095c5225).
+- Worktree .agent/worktrees/chore-repo-moved, branch chore/repo-moved-to-mortarhaus. Local commits NOT pushed: 63cef10 (merge origin/main 36b5592, DECISIONS keeps all entries newest first), 5e9a629 (entry spacing). Uncommitted: none.
+- P1 #1 (conflict) fixed locally. P1 #4 (UNI-11 row): handoff mirror scanned clean (secret pattern 0 hits, no private URLs/emails); PR body row not written yet.
+- P1 #3 (audit): pnpm audit still exit 1 on this head and on main: next 16.4.0 has 2 critical + 1 high (patched 16.4.1). Needs a separate reviewed dependency PR. ASKED Charlie.
+- P1 #2 (handoff mirror not in an authoritative source): builder.md §11 says the handoff is "only on this machine", so a PROJECT.md-only rule is a kit exception. ASKED Charlie: A = PROJECT.md rule + exception noted (DECISIONS "Exception to a rule?" -> yes), or B = master-kit change first.
+- Next: on answers, push, update PR 34 body (UNI-11 row + new head), then Charlie runs `review 34`.
+
+## 2026-10-23 — Charlie: "1a, 2a"
+- 1a: PR #37 opened (branch chore/next-16-4-2, worktree .agent/worktrees/build-chore-next-16-4-2, head d44542c): next/@next/env/@next/eslint-plugin-next 16.3.8 -> 16.4.2 (16.4.2 over 16.4.1: same security fixes + Turbopack bug fixes; recorded in DECISIONS). Local: audit exit 0, typecheck, lint, 146 tests, build pass. E2E only in CI image job.
+- 2a: PR 34 local commit c1ba65e: PROJECT.md §2 row + "Handoff copy (two Macs)" refresh/restore steps (accepted exception to builder §11); DECISIONS "Two Macs" scope + exception=yes.
+- PR 34 commits 63cef10, 5e9a629, c1ba65e NOT pushed on purpose: the audit fails until #37 merges, and each push runs the ~26-min image job. Uncommitted: none.
+- Next: Charlie runs `review 37` (Bob); `approved 37` BEFORE merge; merge; `merged 37`. Then I merge main into PR 34, push, write the PR 34 body (UNI-11 row: Charlie's authorization, destination agent-logs handoff/handoff.md, allowed data = in-flight state only, secret scan 0 hits; new head; Round 1 response), wait for green CI, then Charlie runs `review 34`.

@@ -6,3 +6,4 @@
 - To resume on another Mac: `git fetch origin agent-logs`, then copy `handoff/handoff.md` from the `agent-logs` branch to `.agent/handoff.md` in the project, and read it with `git status` before trusting it (builder role, "Resume").
 - Before leaving a Mac: push every branch, then ask the builder to refresh this copy (`handoff`).
 - Never put secrets in the handoff.
+- The full refresh and restore steps are in `agents/PROJECT.md` §2 "Handoff copy (two Macs)" (added by PR #34).
