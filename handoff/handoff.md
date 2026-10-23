@@ -214,3 +214,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 ## 2026-10-23 — approved 37 done
 - Bob PR #37 Round 2 Approved (Opus 5.5) at head f64d010 = PR head; CI green; PR open. Review archived (hash 38d72fec), receipt reviews/PR-37.receipt pushed on agent-logs (0e34822).
 - Next: Charlie merges PR #37, then `merged 37`; then PR 34 (merge main, push, body). Uncommitted: none.
+
+## 2026-10-23 — merged 37 done
+- PR #37 merged f9d1454 (2026-10-23T13:27:15Z). Log log/2026-10-23_PR37_next-16-4-2-security-upgrade.md on agent-logs (8b56953). No gate breach. Worktree + local branch removed; main ff to f9d1454. Log gate clear.
+- Next (ask Charlie first, a push starts the ~26 min image job): in .agent/worktrees/chore-repo-moved merge main (f9d1454) into PR 34 (local c1ba65e; conflict risk in DECISIONS.md), confirm audit exit 0, push, rewrite PR 34 body (Round 1 response + UNI-11 row: Charlie's authorization, destination agent-logs handoff/handoff.md, in-flight state only, secret scan 0 hits), wait for green CI, then Charlie runs `review 34`.
+- Open: repo visibility (I pick A: keep private). Untracked on main, not mine: .playwright-mcp/, docker/sync-export.sh, docker/sync-import.sh. Uncommitted: none.
