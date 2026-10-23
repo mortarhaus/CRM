@@ -219,3 +219,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - PR #37 merged f9d1454 (2026-10-23T13:27:15Z). Log log/2026-10-23_PR37_next-16-4-2-security-upgrade.md on agent-logs (8b56953). No gate breach. Worktree + local branch removed; main ff to f9d1454. Log gate clear.
 - Next (ask Charlie first, a push starts the ~26 min image job): in .agent/worktrees/chore-repo-moved merge main (f9d1454) into PR 34 (local c1ba65e; conflict risk in DECISIONS.md), confirm audit exit 0, push, rewrite PR 34 body (Round 1 response + UNI-11 row: Charlie's authorization, destination agent-logs handoff/handoff.md, in-flight state only, secret scan 0 hits), wait for green CI, then Charlie runs `review 34`.
 - Open: repo visibility (I pick A: keep private). Untracked on main, not mine: .playwright-mcp/, docker/sync-export.sh, docker/sync-import.sh. Uncommitted: none.
+
+## 2026-10-23 — fix (Bob PR #34 Round 1, 4 P1) done
+- Merged main f9d1454 into PR 34 branch; pushed head 00fc620 (mergeable). Audit exit 0. All 4 P1 fixed: conflict (63cef10, 5e9a629, 00fc620), handoff steps in PROJECT.md §2 (c1ba65e), audit via PR #37, UNI-11 row in PR body (rewritten with Round 1 response). CI running on 00fc620 (~26 min image job).
+- Worktree .agent/worktrees/chore-repo-moved clean. Uncommitted: none.
+- Next: when CI is green, Charlie runs `review 34` (Bob). Then `approved 34` BEFORE merge; merge; `merged 34`. Then `setup` reconcile PR (spec rev 8 hash 733cc0e9, P1-P9, DECISIONS approval) and Phase 1 PR 1.
