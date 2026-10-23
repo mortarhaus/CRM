@@ -234,3 +234,10 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Deferred (Bob R2, due 2026-11-06): P2 refresh must not overwrite a newer remote handoff copy (compare last-pushed hash, else ask); P3 restore cites builder §1 step 2. Do both in the next PR that edits agents/PROJECT.md (the setup reconcile PR) and in handoff/README.md on agent-logs.
 - Next (ask Charlie): `setup` reconcile PR: PROJECT.md spec hash 733cc0e9 + plan P1-P9; CLAUDE.md status; DECISIONS revision 8 approval record + scope line fix; spec Status line rev 8 approved+merged; plus the P2/P3 above. Then Bob review spec + review N; Phase 1 PR 1.
 - Open: repo visibility (I pick A: keep private). Untracked on main, not mine: .playwright-mcp/, docker/sync-export.sh, docker/sync-import.sh (decision rejected the scripts; Charlie decides). Uncommitted: none.
+
+## 2026-10-23 — setup (Part B reconcile) done, PR #38
+- Branch chore/setup-reconcile-v4-7-rev8, worktree .agent/worktrees/build-chore-setup-reconcile-v4-7-rev8, head cb20fc6, PR https://github.com/mortarhaus/CRM/pull/38. Done on Sonnet 5.5 (not deep tier), stated to Charlie. Spec unchanged (hash 733cc0e9 = §2); no review spec needed.
+- Contents: P1, P2, P3, P5, P8, P9; CLAUDE.md Status; DECISIONS rev 8 approval + scope line; Bob PR #34 R2 P2/P3 (handoff.synced newer-copy check, restore section ref). P4, P6, P7 wait for Phase 1 PRs 5/6. Spec file still labels rev 8 draft (fix in first later spec PR; PROJECT.md §2 says so).
+- handoff/README.md on agent-logs updated for the newer-copy check (not in PR 38).
+- Next: CI green -> Charlie runs `review 38` (Bob); `approved 38` BEFORE merge; merge; `merged 38`; then `build` (Phase 1 PR 1, database roles; ask Charlie first).
+- Open: repo visibility (I pick A: private); untracked on main, not mine: .playwright-mcp/, docker/sync-export.sh, docker/sync-import.sh. Uncommitted: none.
