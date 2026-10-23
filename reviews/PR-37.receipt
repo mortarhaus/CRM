@@ -1,0 +1,8 @@
+pr: 37
+reviewed_head_sha: f64d0105f093259ce57d9c8654efeaf84132b216
+review_file: reviews/PR-37.md
+review_file_hash: 38d72fec2a1a0c1f2b17ebe03afa8729bd566999
+log_branch_commit_with_review: 9f10a4b248accfa6fb169fefc3f80ee9ee428d54
+verdict: Approved (Round 2, Opus 5.5)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-23T13:26:13Z
