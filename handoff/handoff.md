@@ -251,3 +251,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Deferred, due 2026-11-06, next PR that edits agents/PROJECT.md (+ handoff/README.md on agent-logs): P2 owner answer "remote is newer" must copy the remote over .agent/handoff.md, then write .agent/handoff.synced, restart refresh from step 1; P3 CLAUDE.md line 6, PROJECT.md §11 "decided in revision 7", DECISIONS rev 8 Decision/Scope pending sentences. Interim: if a builder asks "which is newer?" and remote is newer, tell it to copy the remote into .agent/handoff.md first.
 - Next (ask Charlie): `build` = Phase 1 PR 1 (database roles) per the Phase 1 plan; use Opus 5.5 (RLS/roles). Ask Charlie before starting.
 - Open: repo visibility (I pick A: private); untracked on main, not mine: .playwright-mcp/, docker/sync-export.sh, docker/sync-import.sh. Uncommitted: none.
+
+## 2026-10-24 — build started: Phase 1 PR 1 (feat/p1-db-roles)
+- Gates: spec gate (SPEC Round 27, hash 733cc0e9) and reconcile gate (PROJECT.md §2 = 733cc0e9) pass; log gate clear (PRs 1-7, 9-38 all logged). Charlie typed `build` after I asked "Shall I start?".
+- Branch feat/p1-db-roles, worktree .agent/worktrees/build-feat-p1-db-roles, base 065d9a2. Plan Tasks 1-3 (bootstrap five roles; connection per role; privilege baseline + manifest test). Running on Sonnet 5.5; code work handed to an Opus 5.5 helper (deep tier), I do git, checks, PR.
+- No open ASK for PR 1. Uncommitted: none yet.
