@@ -256,3 +256,10 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Gates: spec gate (SPEC Round 27, hash 733cc0e9) and reconcile gate (PROJECT.md §2 = 733cc0e9) pass; log gate clear (PRs 1-7, 9-38 all logged). Charlie typed `build` after I asked "Shall I start?".
 - Branch feat/p1-db-roles, worktree .agent/worktrees/build-feat-p1-db-roles, base 065d9a2. Plan Tasks 1-3 (bootstrap five roles; connection per role; privilege baseline + manifest test). Running on Sonnet 5.5; code work handed to an Opus 5.5 helper (deep tier), I do git, checks, PR.
 - No open ASK for PR 1. Uncommitted: none yet.
+
+## 2026-10-24 — PR 1 code done by Opus helper; security fix pending
+- Helper commit 7482990 on feat/p1-db-roles (Tasks 1-3; 27 files; typecheck, lint, 181 tests, build, audit, compose stack, 84 E2E vs image all pass per helper). Not pushed, no PR yet.
+- Automated security review (UNI-09): bootstrap.ts sends plaintext `ALTER ROLE ... PASSWORD` which can reach the Postgres log. Asked helper to add SET LOCAL log_statement='none' + log_min_error_statement='panic' (and SCRAM verifier if it works), tests, DECISIONS line, amend to one commit. Waiting for its report.
+- Deviations to tell Bob/Charlie: Invitation table granted; UPDATE grants per column; some proposed grants left out (fail closed until Task 24); ci.yml edited; env.ts restructured. ASK: accept the narrower measured grant set.
+- After the fix: I re-verify myself (typecheck, lint, test, build, audit), fill "#<PR number>" in DECISIONS, push, open PR 1, Charlie runs `review <N>`.
+- Uncommitted: none (worktree .agent/worktrees/build-feat-p1-db-roles).
