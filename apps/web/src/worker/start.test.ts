@@ -1,23 +1,22 @@
-import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { startPostgres } from "../test/postgres";
+import { startDatabase, type TestDatabase } from "../test/postgres";
 import { startWorker } from "./start";
 
-let container: StartedPostgreSqlContainer;
+let database: TestDatabase;
 
 beforeAll(async () => {
-  container = await startPostgres();
+  database = await startDatabase();
 });
 
 afterAll(async () => {
-  await container?.stop();
+  await database?.stop();
 });
 
 describe("startWorker", () => {
   it("logs readiness once the database answers and stops cleanly", async () => {
     const lines: string[] = [];
-    const worker = await startWorker(postgres(container.getConnectionUri(), { max: 2, prepare: false }), (line) => lines.push(line));
+    const worker = await startWorker(postgres(database.appUrl, { max: 2, prepare: false }), (line) => lines.push(line));
     expect(lines).toEqual([JSON.stringify({ level: "info", msg: "worker ready" })]);
 
     await worker.stop();

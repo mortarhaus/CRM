@@ -80,8 +80,9 @@ jobs:
             echo "DEPLOYMENT_MODE=selfhost"
             echo "APP_URL=http://localhost:3000"
             echo "AUTH_SECRET=$(openssl rand -base64 32)"
-            echo "DATABASE_URL=postgres://crm:crm@localhost:5433/crm"
-            echo "DATABASE_MIGRATOR_URL=postgres://crm:crm@localhost:5433/crm"
+            echo "DATABASE_URL=postgres://crm_app:crm-app-dev-only@localhost:5433/crm"
+            echo "DATABASE_MIGRATOR_URL=postgres://crm_migrator:crm-migrator-dev-only@localhost:5433/crm"
+            echo "DATABASE_WORKER_URL=postgres://crm_worker:crm-worker-dev-only@localhost:5433/crm"
           } > .env
       - name: Build image
         run: docker compose -f docker/compose.dev.yml build
@@ -94,7 +95,7 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
           format: table
-      - name: Start stack (migrations, web, worker)
+      - name: Start stack (role bootstrap, migrations, web, worker)
         run: docker compose -f docker/compose.dev.yml up -d --wait
       # Bob PR #26: `pnpm dev` with only the root .env must serve /api/auth/ok. It needs the .env
       # written above, which the checks job does not have.

@@ -4,26 +4,23 @@ import {
   PASSWORD_MIN_LENGTH,
   WORKSPACE_NAME_MAX_LENGTH,
 } from "@crm/core/security";
-import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDb, type DbHandle } from "../../db/client";
-import { runMigrations } from "../../db/migrate";
-import { account, invitation, member, twoFactor, user } from "../../db/schema";
-import { MIGRATIONS_DIR, startPostgres } from "../../test/postgres";
+import { account, invitation, member, session, twoFactor, user } from "../../db/schema";
+import { startDatabase, type TestDatabase } from "../../test/postgres";
 import { totpFromUri, wrongTotpCode } from "../../test/totp";
 import { createAuth, type Auth } from "./config";
 
 const PASSWORD = "correct horse battery staple 42";
 
-let container: StartedPostgreSqlContainer;
+let database: TestDatabase;
 let handle: DbHandle;
 let auth: Auth;
 
 beforeAll(async () => {
-  container = await startPostgres();
-  await runMigrations(container.getConnectionUri(), MIGRATIONS_DIR);
-  handle = createDb(container.getConnectionUri());
+  database = await startDatabase();
+  handle = createDb(database.appUrl);
   auth = createAuth({
     db: handle.db,
     secret: "integration test secret, not a real key",
@@ -33,7 +30,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await handle?.sql.end();
-  await container?.stop();
+  await database?.stop();
 });
 
 let emailCounter = 0;
@@ -103,6 +100,24 @@ describe("session cookie attributes", () => {
       expect(line).toMatch(/; HttpOnly(;|$)/i);
       expect(line).toMatch(/; SameSite=Lax(;|$)/i);
     }
+  });
+});
+
+describe("session refresh", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  // Better Auth 1.7.6 defaults: a session lasts 7 days and is extended once it is a day old.
+  it("extends a day-old session on the next session read, as crm_app", async () => {
+    const email = uniqueEmail();
+    const headers = await signUpAndSignIn(email);
+    const { id: userId } = await findUser(email);
+    const aged = new Date(Date.now() + 5 * DAY_MS);
+    await handle.db.update(session).set({ expiresAt: aged }).where(eq(session.userId, userId));
+
+    const refreshed = await auth.api.getSession({ headers });
+    expect(new Date(refreshed?.session.expiresAt ?? 0).getTime()).toBeGreaterThan(Date.now() + 6 * DAY_MS);
+    const [stored] = await handle.db.select().from(session).where(eq(session.userId, userId));
+    expect(stored?.expiresAt.getTime()).toBeGreaterThan(aged.getTime());
   });
 });
 
@@ -363,6 +378,36 @@ describe("TOTP enrolment", () => {
     await expect(
       auth.api.verifyBackupCode({ body: { code: recoveryCode }, headers: await startTwoFactorSignIn() }),
     ).rejects.toMatchObject({ statusCode: 401 });
+  });
+});
+
+describe("TOTP enrolment restart and turning 2FA off", () => {
+  it("replaces the unconfirmed secret when enrolment starts again, and only the new one confirms", async () => {
+    const email = uniqueEmail();
+    const headers = await signUpAndSignIn(email);
+    const first = totpFromUri((await startTotpEnrolment(headers)).totpURI);
+    const second = totpFromUri((await startTotpEnrolment(headers)).totpURI);
+    expect(second.secret.base32).not.toBe(first.secret.base32);
+
+    await auth.api.verifyTOTP({ body: { code: second.generate() }, headers });
+    expect((await findUser(email)).twoFactorEnabled).toBe(true);
+  });
+
+  it("turns 2FA off with the password and removes the stored secret", async () => {
+    const email = uniqueEmail();
+    const headers = await signUpAndSignIn(email);
+    const enrolment = await startTotpEnrolment(headers);
+    const verified = await auth.api.verifyTOTP({
+      body: { code: totpFromUri(enrolment.totpURI).generate() },
+      headers,
+      asResponse: true,
+    });
+    const signedIn = cookieHeaders(verified);
+
+    await auth.api.disableTwoFactor({ body: { password: PASSWORD }, headers: signedIn });
+    const { id, twoFactorEnabled } = await findUser(email);
+    expect(twoFactorEnabled).toBe(false);
+    expect(await handle.db.select().from(twoFactor).where(eq(twoFactor.userId, id))).toEqual([]);
   });
 });
 

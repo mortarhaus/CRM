@@ -1,26 +1,25 @@
-import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { startPostgres } from "../test/postgres";
+import { startDatabase, type TestDatabase } from "../test/postgres";
 import { createDb, type DbHandle } from "./client";
 
-let container: StartedPostgreSqlContainer;
+let database: TestDatabase;
 let handle: DbHandle;
 
 beforeAll(async () => {
-  container = await startPostgres();
-  handle = createDb(container.getConnectionUri());
+  database = await startDatabase();
+  handle = createDb(database.appUrl);
 });
 
 afterAll(async () => {
   await handle?.sql.end();
-  await container?.stop();
+  await database?.stop();
 });
 
 describe("createDb", () => {
-  it("runs queries over the postgres TCP driver", async () => {
-    const rows = await handle.sql<{ ok: number }[]>`select 1 as ok`;
-    expect(rows[0]?.ok).toBe(1);
+  it("runs queries over the postgres TCP driver as crm_app", async () => {
+    const rows = await handle.sql<{ ok: number; user: string }[]>`select 1 as ok, current_user as user`;
+    expect(rows[0]).toEqual({ ok: 1, user: "crm_app" });
   });
 
   it("exposes a Drizzle instance on the same pool", async () => {

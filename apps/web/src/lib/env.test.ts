@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { EnvError, parseEnv } from "./env";
+import { EnvError, parseBootstrapEnv, parseEnv, parseWorkerEnv } from "./env";
 
 const valid = {
   DEPLOYMENT_MODE: "selfhost",
   APP_URL: "http://localhost:3000",
   AUTH_SECRET: "k".repeat(32),
-  DATABASE_URL: "postgres://crm:crm@localhost:5433/crm",
-  DATABASE_MIGRATOR_URL: "postgres://crm:crm@localhost:5433/crm",
+  DATABASE_URL: "postgres://crm_app:app-password@localhost:5433/crm",
+  DATABASE_MIGRATOR_URL: "postgres://crm_migrator:migrator-password@localhost:5433/crm",
 };
 
 function messageOf(run: () => unknown): string {
@@ -16,7 +16,7 @@ function messageOf(run: () => unknown): string {
     expect(error).toBeInstanceOf(EnvError);
     return error instanceof Error ? error.message : String(error);
   }
-  throw new Error("expected parseEnv to throw");
+  throw new Error("expected the parser to throw");
 }
 
 describe("parseEnv", () => {
@@ -83,5 +83,75 @@ describe("parseEnv", () => {
     expect(parseEnv({ ...valid, NODE_ENV: "development", APP_URL: "http://localhost:3000" }).APP_URL).toBe(
       "http://localhost:3000",
     );
+  });
+});
+
+describe("parseWorkerEnv", () => {
+  const worker = { ...valid, DATABASE_WORKER_URL: "postgres://crm_worker:worker-password@localhost:5433/crm" };
+
+  it("returns the web values plus the worker's pg-boss connection", () => {
+    expect(parseWorkerEnv(worker)).toEqual(worker);
+  });
+
+  it("requires DATABASE_WORKER_URL, which the web process does not", () => {
+    expect(parseEnv(valid)).toEqual(valid);
+    expect(messageOf(() => parseWorkerEnv(valid))).toContain("DATABASE_WORKER_URL");
+  });
+
+  it("rejects a non-Postgres DATABASE_WORKER_URL without echoing the URL", () => {
+    const message = messageOf(() => parseWorkerEnv({ ...worker, DATABASE_WORKER_URL: "mysql://w:hunter2@db/crm" }));
+    expect(message).toContain("DATABASE_WORKER_URL: must be a postgres:// URL");
+    expect(message).not.toContain("hunter2");
+  });
+
+  it("keeps the production APP_URL rule", () => {
+    expect(
+      messageOf(() => parseWorkerEnv({ ...worker, NODE_ENV: "production", APP_URL: "http://crm.example.test" })),
+    ).toContain("APP_URL: must be an https:// URL in production");
+  });
+});
+
+describe("parseBootstrapEnv", () => {
+  const bootstrap = {
+    DATABASE_ADMIN_URL: "postgres://postgres:admin-password@localhost:5433/crm",
+    CRM_MIGRATOR_PASSWORD: "m".repeat(16),
+    CRM_APP_PASSWORD: "a".repeat(16),
+    CRM_WORKER_PASSWORD: "w".repeat(16),
+  };
+
+  it("needs no crm_purge password, and takes one when given", () => {
+    expect(parseBootstrapEnv(bootstrap)).toEqual(bootstrap);
+    expect(parseBootstrapEnv({ ...bootstrap, CRM_PURGE_PASSWORD: "p".repeat(16) }).CRM_PURGE_PASSWORD).toBe(
+      "p".repeat(16),
+    );
+  });
+
+  it("names every missing variable", () => {
+    const message = messageOf(() => parseBootstrapEnv({}));
+    for (const name of Object.keys(bootstrap)) {
+      expect(message).toContain(name);
+    }
+  });
+
+  it.each(["CRM_MIGRATOR_PASSWORD", "CRM_APP_PASSWORD", "CRM_WORKER_PASSWORD", "CRM_PURGE_PASSWORD"])(
+    "refuses a %s under 16 characters without echoing it",
+    (name) => {
+      const message = messageOf(() => parseBootstrapEnv({ ...bootstrap, [name]: "short-pw-value" }));
+      expect(message).toContain(`${name}: must be at least 16 characters`);
+      expect(message).not.toContain("short-pw-value");
+    },
+  );
+
+  it("refuses a password with a character outside printable ASCII without echoing it", () => {
+    const value = "pässwort-sixteen-chars";
+    const message = messageOf(() => parseBootstrapEnv({ ...bootstrap, CRM_APP_PASSWORD: value }));
+    expect(message).toContain("CRM_APP_PASSWORD: must use printable ASCII characters only");
+    expect(message).not.toContain(value);
+  });
+
+  it("rejects a non-Postgres DATABASE_ADMIN_URL without echoing the URL", () => {
+    const message = messageOf(() => parseBootstrapEnv({ ...bootstrap, DATABASE_ADMIN_URL: "mysql://a:hunter2@db/crm" }));
+    expect(message).toContain("DATABASE_ADMIN_URL: must be a postgres:// URL");
+    expect(message).not.toContain("hunter2");
   });
 });
