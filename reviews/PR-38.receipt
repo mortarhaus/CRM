@@ -1,0 +1,8 @@
+pr: 38
+reviewed_head_sha: cb20fc65209e0d969cd0496c9b20f09dae94cf74
+review_file: reviews/PR-38.md
+review_file_hash: c544dd8052e4b17bf93d9ed1c38d8864b2246877
+log_branch_commit_with_review: 6a4afb68fa8c7137ceb2f5421a117ace2156fae1
+verdict: Approved with conditions (Round 1)
+pr_state_at_receipt: open, unmerged
+written_at: 2026-10-23T16:42:58Z
