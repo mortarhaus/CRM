@@ -210,3 +210,7 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Bob asked that the re-review use Opus 5.5 (deep tier; security dependency gate).
 - PR 34 still waits (local commits 63cef10, 5e9a629, c1ba65e not pushed). Uncommitted: none.
 - Next: Charlie runs `review 37` (Bob, Opus 5.5) on f64d010; `approved 37` BEFORE merge; merge; `merged 37`; then PR 34 merge-main + push + body.
+
+## 2026-10-23 — approved 37 done
+- Bob PR #37 Round 2 Approved (Opus 5.5) at head f64d010 = PR head; CI green; PR open. Review archived (hash 38d72fec), receipt reviews/PR-37.receipt pushed on agent-logs (0e34822).
+- Next: Charlie merges PR #37, then `merged 37`; then PR 34 (merge main, push, body). Uncommitted: none.
