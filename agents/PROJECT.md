@@ -31,6 +31,7 @@ setup leaves no double braces anywhere in this file.
 | Durable notes (other lasting facts) | Claude Code auto-memory for this project (`MEMORY.md` index under `~/.claude/projects/`, outside the repo) <!-- e.g. tool memory folder, or docs/NOTES.md --> | handoff, chat history |
 | Review files | `.agent/reviews/` (reviewer writes, builder reads; local only — the final round is copied into each PR log) | |
 | In-flight task state (handoff) | `.agent/handoff.md` (default `.agent/handoff.md`) | nothing — repo wins for code state |
+| Handoff copy for the second Mac | `handoff/handoff.md` on the log branch (`agent-logs`), with `handoff/README.md`; a byte-for-byte copy of `.agent/handoff.md`, kept by the procedure below | nothing — the local handoff wins on this machine; git and the PR host win for code state |
 | Extra frontend standard (on top of `guardrails/frontend.md`) | `FRONTEND_STANDARDS.md` <!-- or "none" --> | |
 | Other standards | The active per-phase plan in `docs/superpowers/plans/` (exact version pins, global constraints for that phase) | |
 | Notes the reviewer must always load | none | |
@@ -38,6 +39,29 @@ setup leaves no double braces anywhere in this file.
 
 **Conflict rule:** repo state wins for *what the code is*. Handoff wins for *what we were doing*.
 Spec wins for *what we should build*. If two of these disagree, stop and ask Charlie.
+
+**Handoff copy (two Macs).** Charlie works on two Macs, so the builder keeps a copy of the handoff on the
+log branch. This is an accepted exception to `roles/builder.md` §11 ("only on this machine") and extends
+the `handoff` command in `START.md` (the copy is part of updating the handoff, done before it stops).
+Charlie approved it on 2026-10-21 ("A, and yes put the handoff on agent-logs") and chose this home for
+the steps on 2026-10-23 ("2a"); `docs/DECISIONS.md` 2026-10-21 "Two Macs".
+- **When to refresh:** on every `handoff` command, and as the last step of every other builder command
+  (`setup`, `spec`, `build`, `fix`, `approved`, `merged`) before the final reply.
+- **Refresh steps:**
+  1. Redact `.agent/handoff.md` (START.md "Redact") and run the §7 secret-scan pattern on it. Any hit, or
+     any client data, personal data, token or private URL → fix the handoff first; never push it.
+  2. Open the log-branch worktree as in START.md "Review archive" step 1 (clean, fast-forward to the
+     fetched remote; otherwise stop).
+  3. Copy `.agent/handoff.md` byte-for-byte to `handoff/handoff.md`. If nothing changed, stop here.
+  4. Commit `docs: refresh handoff copy`, push only the log branch, fetch, and confirm the remote
+     `git hash-object` of `handoff/handoff.md` equals the local handoff's. If the push or the check
+     fails, say so in the reply; the handoff line then reads `Handoff: updated … · copy NOT pushed — <reason>`.
+- **Restore on the other Mac** (session start, before builder §1 "Resume"): fetch the log branch. If
+  `.agent/handoff.md` is missing, copy `handoff/handoff.md` from the fetched branch into it byte-for-byte.
+  If both exist and differ, don't overwrite either; show the owner both "Just finished" entries and ask
+  which is newer. Then run the normal Resume check against git; the copy never proves code state.
+- **Allowed content:** only in-flight task state, as in `templates/handoff.md`. The repository is private;
+  the copy goes nowhere else (UNI-11).
 
 ## 3. Paths and layout
 
@@ -63,7 +87,7 @@ Spec wins for *what we should build*. If two of these disagree, stop and ask Cha
 
 ## 4. Repository
 
-- **Remote:** https://github.com/charliekhc/CRM (private) <!-- `pending remote` is a valid value until the owner creates the repository; the builder asks for it before the first PR -->
+- **Remote:** https://github.com/mortarhaus/CRM (private; moved from `charliekhc/CRM` on 2026-10-21, see `docs/DECISIONS.md`) <!-- `pending remote` is a valid value until the owner creates the repository; the builder asks for it before the first PR -->
 - **Default branch:** `main` <!-- usually main -->
 - **Merge policy:** Bob approves → Charlie merges. The builder never merges. The reviewer never merges.
 - **Commit trailer:** `Co-Authored-By: Claude <model> <noreply@anthropic.com>` — `<model>` is the name of the model that actually did the work (e.g. `Claude Opus 5.5`, `Claude Sonnet 5`), never fixed text copied from a plan. <!-- e.g. "Co-Authored-By: <agent> <model> <email>", or "none" -->
