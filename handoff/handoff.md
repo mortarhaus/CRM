@@ -280,3 +280,7 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - PR #39 CI Dependency audit failed: zod <4.6.6 and undici 8.0.0-8.12.1 (high), also on main.
 - Opened PR #40 `chore/deps-zod-undici` (worktree `.agent/worktrees/chore-deps-zod-undici`): zod 4.6.7 + override, undici 8.12.3 override, DECISIONS entry. Local: audit 0, typecheck, lint, 146 tests, build all 0.
 - Next: CI green on #40, Charlie `review 40`, `approved 40`, merge, `merged 40`. Then merge new main into feat/p1-db-roles (PR #39), push, Charlie `review 39`.
+
+## 2026-10-24 PR #40 image job failed once (flake)
+- E2E: 1 of 84 failed (tablet-768 accessibility.spec.ts:77, axe `document-title` on html in "/workspaces switch refused (light)"); same test passed on chromium, mobile-320, and on PR #39 head. zod change unrelated. Reran failed job (run 40084966255). If it fails again in the same place, treat as a real flake bug: report to Charlie (own fix PR, not in #40).
+- PR #39 CI: only Dependency audit red (fixed by #40); image job green on 2dfb4ee.
