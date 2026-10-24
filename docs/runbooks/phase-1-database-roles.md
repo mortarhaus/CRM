@@ -42,7 +42,7 @@ Inputs (`parseBootstrapEnv` in `apps/web/src/lib/env.ts`; an error names the var
 
 | Variable | Rule |
 |---|---|
-| `DATABASE_ADMIN_URL` | `postgres://` URL of a superuser (or a role that may create roles and change the database owner) |
+| `DATABASE_ADMIN_URL` | `postgres://` URL of a superuser (the bootstrap sets log settings that only a superuser may set) |
 | `CRM_MIGRATOR_PASSWORD`, `CRM_APP_PASSWORD`, `CRM_WORKER_PASSWORD` | at least 16 characters, printable ASCII only (`openssl rand -base64 24` fits) |
 | `CRM_PURGE_PASSWORD` | optional, same rule; leave unset until Phase 9. Unset means `PASSWORD NULL` |
 
@@ -97,8 +97,7 @@ statements, and with only these grants both suites pass and the Postgres log sho
 
 INSERT is table-level because Drizzle names every column in an insert. Better Auth paths outside the
 operation set get no grant and fail with `permission denied` (HTTP 500) if called, for example a successful
-password change (`account.password`), email change, a workspace slug or logo change, member role changes and
-invitation cancel or reject. The Phase 1 enabled-path list (plan Task 24) decides which of them stay
+password change (`account.password`), email change, a workspace slug or logo change, and member role changes. The Phase 1 enabled-path list (plan Task 24) decides which of them stay
 reachable; enabling one adds its grant and a test here.
 
 The manifest `apps/web/src/db/privileges.ts` holds the same set; `privileges.test.ts` fails on any privilege

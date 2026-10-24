@@ -67,7 +67,7 @@ Run from the repo root (Node 24.21.0, pnpm 11.6.0).
 |---|---|---|
 | Start Postgres 17 on `127.0.0.1:5433` | `docker compose -f docker/compose.dev.yml up -d --wait postgres` | Verified. `pnpm stack:up` now also builds and starts `web` (port 3000) and `worker`; use it only when you want the image, not with `pnpm dev` |
 | Apply migrations | `pnpm db:migrate` | Verified; prints `{"level":"info","msg":"migrations applied"}` |
-| Check applied migrations | `docker exec crm-dev-postgres-1 psql -U postgres -d crm -c 'select id, hash, created_at from drizzle.__drizzle_migrations order by id'` | Verified; one row per file in `apps/web/drizzle/` (today: `0000_auth_baseline.sql`) |
+| Check applied migrations | `docker exec crm-dev-postgres-1 psql -U postgres -d crm -c 'select id, hash, created_at from drizzle.__drizzle_migrations order by id'` | Verified; one row per file in `apps/web/drizzle/` |
 | Start the app | `pnpm dev` | Verified; reads the root `.env`, no exported variables needed |
 | Auth route answers | `curl -s http://localhost:3000/api/auth/ok` | Verified; returns `{"ok":true}` |
 | Smoke check: start with only the root `.env` | `pnpm smoke:auth-route` | Verified; prints `PASS: GET /api/auth/ok -> 200 {"ok":true} ...`. It starts `pnpm dev` on a free port with `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `DATABASE_MIGRATOR_URL`, `DEPLOYMENT_MODE` and `NODE_ENV` removed from its environment, then stops it. In CI it runs in the `image` job, which has a root `.env` (the `checks` job has none) |
