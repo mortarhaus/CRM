@@ -275,3 +275,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Pushed 2dfb4ee (docs only): invitation cancel/reject removed from fail-closed lists, admin = superuser, stale Phase 0 runbook note.
 - PR body: UNI-01/02/03/05 rows, size line, Round 1 response table. UNI-02: kept 16 floor beside AUTH_SECRET, justified.
 - Next: wait CI green on 2dfb4ee (image job ~26 min), Charlie runs `review 39` (Bob, Opus 5.5). Then `approved 39` before merge, `merged 39`. P2 invitation grants -> Task 24; audit dep PR (zod/undici) separate.
+
+## 2026-10-24 dependency PR #40 (owner chose "A")
+- PR #39 CI Dependency audit failed: zod <4.6.6 and undici 8.0.0-8.12.1 (high), also on main.
+- Opened PR #40 `chore/deps-zod-undici` (worktree `.agent/worktrees/chore-deps-zod-undici`): zod 4.6.7 + override, undici 8.12.3 override, DECISIONS entry. Local: audit 0, typecheck, lint, 146 tests, build all 0.
+- Next: CI green on #40, Charlie `review 40`, `approved 40`, merge, `merged 40`. Then merge new main into feat/p1-db-roles (PR #39), push, Charlie `review 39`.
