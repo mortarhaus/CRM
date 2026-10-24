@@ -284,3 +284,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 ## 2026-10-24 PR #40 image job failed once (flake)
 - E2E: 1 of 84 failed (tablet-768 accessibility.spec.ts:77, axe `document-title` on html in "/workspaces switch refused (light)"); same test passed on chromium, mobile-320, and on PR #39 head. zod change unrelated. Reran failed job (run 40084966255). If it fails again in the same place, treat as a real flake bug: report to Charlie (own fix PR, not in #40).
 - PR #39 CI: only Dependency audit red (fixed by #40); image job green on 2dfb4ee.
+
+## 2026-10-24 merged 40; PR #39 updated
+- Owner merged PR #40 (39918cd) without `review 40`/`approved 40`. Log written on agent-logs with GATE BREACH (no reviewer verdict, no receipt); told owner.
+- Merged origin/main into feat/p1-db-roles (conflict only in DECISIONS.md, kept both entries), pushed. Local: audit 0, typecheck, lint, 187 tests, build all 0. PR body updated.
+- Next: CI green on new #39 head (image job ~26 min), Charlie `review 39` (Bob, Opus 5.5), then `approved 39` BEFORE merge, `merged 39`. Then PR 2 (feat/p1-rls, Tasks 4-7). Flaky test accessibility.spec.ts:77 tablet-768 noted.
