@@ -269,3 +269,9 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - ASK for Bob/Charlie: accept the measured crm_app grant set (narrower than the plan; invitation granted; per-column UPDATE).
 - Next: wait for CI green; Charlie runs `review 39` (Bob, Opus 5.5); `fix` if needed; `approved 39` BEFORE merge; merge; `merged 39`; then PR 2 (feat/p1-rls, Tasks 4-7).
 - Uncommitted: none. Helper agent a35d5be9c4e14d085 finished.
+
+## 2026-10-24 fix PR #39 (Bob Round 1)
+- Archived `reviews/PR-39.md` on agent-logs (hash 32c0c7c verified).
+- Pushed 2dfb4ee (docs only): invitation cancel/reject removed from fail-closed lists, admin = superuser, stale Phase 0 runbook note.
+- PR body: UNI-01/02/03/05 rows, size line, Round 1 response table. UNI-02: kept 16 floor beside AUTH_SECRET, justified.
+- Next: wait CI green on 2dfb4ee (image job ~26 min), Charlie runs `review 39` (Bob, Opus 5.5). Then `approved 39` before merge, `merged 39`. P2 invitation grants -> Task 24; audit dep PR (zod/undici) separate.
