@@ -16,6 +16,10 @@ overrides:
   handlebars: 4.7.10
   # GHSA-587h-7wmj-h5pm (vite >=8.3.0 <=8.3.2, high; launch-editor); transitive via vitest. See docs/DECISIONS.md.
   vite: 8.3.4
+  # GHSA-mrhx-c7xc-m3w5 (zod < 4.6.6, high; memory exhaustion); transitive via better-auth, eslint-plugin-react-hooks and others. See docs/DECISIONS.md.
+  zod: 4.6.7
+  # GHSA-xjj6-f33q-929c (undici >= 8.0.0 < 8.12.2, high); transitive via testcontainers. See docs/DECISIONS.md.
+  undici: 8.12.3
 auditConfig:
   # Time-limited exception, see docs/DECISIONS.md "braces audit exception".
   # No patched braces exists (CVE-2026-93687); dev-tooling chain only. Remove when a patch ships.
