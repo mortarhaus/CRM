@@ -348,3 +348,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - PR #43 merged (c0bc2cc, 12:24:50Z); receipt 2 min before, head matched: no breach. Log `log/2026-10-25_PR43_system-module-billing-account-poly-ref.md`. Branch/worktree feat/p1-system-module removed. Log gate clear.
 - Deferred: P2 TEN-10 lint gaps -> PR 4 Task 15; P3 runbook paragraph order -> next PR touching runbook. ASK 5 open with Charlie (built: only `active`).
 - Next: ask Charlie before PR 4 (`feat/p1-action-audit`): Task 31 Step 0 spike first (Bob reviews), ASK 4 idempotency expiry (proposal 24 h) blocks Task 14 Step 4.
+
+## 2026-10-25 build Phase 1 PR 4 started (Charlie: "build"; ASK 4 default 24 h proposal, ASK 5 still open)
+- Worktree `.agent/worktrees/build-feat-p1-action-audit`, branch `feat/p1-action-audit` from origin/main c0bc2cc (upstream unset; push with `git push -u origin feat/p1-action-audit`). `.env` copied, install done.
+- Scope NOW: only Task 31 Step 0 (design spike, plan lines ~714-1217, 31.C) by an Opus helper: build `auth_audit_log` + mechanism, tests T1-T15, evidence for the PR body. Then push, open PR 4 as DRAFT, Charlie runs `review <n>` (Bob reviews the spike). Tasks 12-15 and 31 Steps 1-4 start only after Bob's spike round says Approved / Approved with conditions. Stop rule: if an R cannot be met without weakening it, stop and bring a spec revision proposal to Charlie.
+- Carried into Task 15: PR #43 P2 (TEN-10 lint gaps: `.js`/trailing slash, `postgres`/`pg` ban with worker.ts exemption, 4 fixtures). P3 runbook paragraph order: next PR touching the runbook.
