@@ -63,8 +63,6 @@ afterAll(async () => {
   await database?.stop();
 });
 
-
-
 describe("the isolation harness", () => {
   it("has a fixture for every tenant table, and none for any other table", async () => {
     const tables = await tenantTables(admin);

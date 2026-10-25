@@ -66,8 +66,11 @@ the steps on 2026-10-23 ("2a"); `docs/DECISIONS.md` 2026-10-21 "Two Macs".
 - **Restore on the other Mac** (session start, before `roles/builder.md` §1 step 2, "load the handoff"):
   fetch the log branch. If `.agent/handoff.md` is missing, copy `handoff/handoff.md` from the fetched
   branch into it byte-for-byte and write that file's hash to `.agent/handoff.synced`. If both exist and
-  differ, don't overwrite either; show the owner both "Just finished" entries and ask which is newer, and
-  after the owner answers write the hash of the remote file to `.agent/handoff.synced`. Then run the
+  differ, don't overwrite either yet; show the owner both "Just finished" entries and ask which is newer.
+  After the owner answers: if the remote is newer, copy `handoff/handoff.md` over `.agent/handoff.md`
+  byte-for-byte (keeping the old local file as `.agent/handoff.local-<date>.md` is optional); if the local
+  is newer, keep it. In both cases write the hash of the remote file to `.agent/handoff.synced`. If this
+  came from an interrupted refresh, restart that refresh from step 1. Then run the
   normal Resume check (`roles/builder.md` §2, "Startup check") against git; the copy never proves code
   state.
 - **Allowed content:** only in-flight task state, as in `templates/handoff.md`. The repository is private;
@@ -279,6 +282,6 @@ On top of the gates in `roles/builder.md`:
 - Before writing the Phase 4 plan (Current gates (c)): the tax-registration change vs open drafts ("Changes in v4.7" item 5); the invoice-void policy (item 6); Charlie's four payment-void choices (item 1: the `void_reason_code` list, the void-notice content, how the period export shows voided payments, and the phase placement; the spec's values for these are builder proposals); the source of a credit note's tax rate and tax-registration flag (Bob R11 proposal, not decided: from the credited invoice's frozen snapshot, with a test); and two small choices for Charlie (is a zero-total credit note refused? does a refund void need step-up? Bob recommends yes to both).
 - Before writing the Phase 5 plan (Current gates (d)): direct quote acceptance, and approval or acceptance after `valid_until` ("Changes in v4.7" item 5).
 - Before writing the Phase 7 plan (Current gates (e)): the artifact rule at sign (REC-11, §9 "Open for Bob").
-- Except the five Phase 1 items decided in revision 7, none of the items above is decided by the v4.7 approval; each needs Charlie's decision where it is an owner choice, then a reviewed spec revision, before its plan is written. Negative tax adjustments are also not decided (no plan gate named); until Charlie decides, a tax correction is made with a credit note ("Changes in v4.7", revision 3).
+- Except the five Phase 1 items decided in revision 7 and those settled by revision 8, none of the items above is decided by the v4.7 approval; each needs Charlie's decision where it is an owner choice, then a reviewed spec revision, before its plan is written. Negative tax adjustments are also not decided (no plan gate named); until Charlie decides, a tax correction is made with a credit note ("Changes in v4.7", revision 3).
 - Before Phase 4 goes live: the professional checks in spec "Verify with professionals before Phase 4 goes live" (accountant, lawyer, SST, PDPA), with results confirmed by Charlie.
 - Any choice on a question still open in spec "Open questions for Charlie" needs Charlie's explicit choice; Bob's recommendation is not Charlie's approval. The open questions are 2, 3, 6, 7 and 9 (question 8, `crm_purge` own login, was resolved on 2026-10-20); question 4 (VPS provider) was resolved on 2026-10-15 (Hostinger KVM 2, Malaysia). Questions 1, 5 and 10–13 were resolved by the v4.5 Approval record (spec v4.6 revisions 10–11), and 14–16 by v4.6 owner decisions. Changing any of those accepted defaults is a new owner decision.
