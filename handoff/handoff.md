@@ -329,3 +329,7 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Helper built Tasks 8-11 (6 local commits); I reran typecheck, lint, 321 tests, build, audit: all 0. Pushed, opened PR #43 with self-check, size note, ASK 5, observations for Bob.
 - Open for Charlie: ASK 5 (billing_account.status: only `active` built; name = user's name). PR #42 and #43 both edit docs/DECISIONS.md top: expect a merge conflict in the second to merge; resolve by keeping both entries (newest first).
 - Next: CI green on #42 and #43; Charlie `review 42`, `review 43`; `approved N` before merge; `merged N`. Then PR 4 (feat/p1-action-audit, Tasks 12-15 then 31): ask Charlie first; ASK 4 (idempotency expiry, proposal 24 h) blocks Task 14 Step 4.
+
+## 2026-10-25 approved 42
+- Bob Round 1: Approved (no conditions) on head 75cc03d = PR head, open, CI green. Review archived + receipt `reviews/PR-42.receipt`.
+- Next: Charlie merges #42, `merged 42`. Then PR #43 will conflict in DECISIONS.md top (keep both entries). #43 awaits CI and `review 43`; ASK 5 pending with Charlie.
