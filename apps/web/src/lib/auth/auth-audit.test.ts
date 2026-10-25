@@ -1913,6 +1913,89 @@ describe("T15 (R15): Phase 0 sessions are invalidated at cutover", () => {
   });
 });
 
+// PR #44 P2-1. Each auth POST holds one pool connection from its first query to commit, including the wait for the
+// user's lock. Bound: an unrelated `select 1` on the same pool answers in under 1 000 ms while 30 wrong-password
+// sign-ins for one email wait for that user's lock (Bob's probe: 15 ms with 30 emails, 161 ms with one). The lock is
+// held from the admin connection, so without the bound the burst holds every connection until it ends (the control).
+describe("PR #44 P2-1: a burst of sign-ins for one email leaves half of the pool to the rest of the app", () => {
+  const BURST = 30;
+  const BOUND_MS = 1_000;
+
+  // Holds the user's row lock from the admin connection until `release` is called.
+  async function holdUser(admin: postgres.Sql, userId: string) {
+    let release: () => void = () => undefined;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    let locked: () => void = () => undefined;
+    const isLocked = new Promise<void>((resolve) => (locked = resolve));
+    const held = admin.begin(async (tx) => {
+      await tx`select 1 from "user" where id = ${userId} for update`;
+      locked();
+      await released;
+    });
+    await isLocked;
+    return { release, held };
+  }
+
+  function wrongPasswords(instance: AuthLike, email: string): Promise<Reply>[] {
+    return Array.from({ length: BURST }, () =>
+      http(instance, "POST", "/sign-in/email", { body: { email, password: `${PASSWORD} wrong` } }),
+    );
+  }
+
+  async function settledWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<false>((resolve) => (timer = setTimeout(() => resolve(false), ms)));
+    try {
+      return await Promise.race([promise.then(() => true), late]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  it("as configured: at most half of the connections wait for the lock, and select 1 answers within the bound", async () => {
+    const { stack, auth } = await isolated();
+    const person = await signUp(auth, stack.admin);
+    const hold = await holdUser(stack.admin, person.id);
+    const replies = wrongPasswords(auth, person.email);
+    try {
+      // createDb's pool has 10 connections, so 5 request transactions.
+      await waitUntil(async () => (await lockWaiters(stack.admin)) === 5, "five sign-ins to wait for the lock");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(await lockWaiters(stack.admin)).toBe(5);
+      const started = performance.now();
+      expect(await stack.handle.sql`select 1 as ok`).toEqual([{ ok: 1 }]);
+      expect(performance.now() - started).toBeLessThan(BOUND_MS);
+    } finally {
+      hold.release();
+      await hold.held;
+    }
+    expect((await Promise.all(replies)).map((reply) => reply.status)).toEqual(Array.from({ length: BURST }, () => 401));
+  }, 60_000);
+
+  it("control: with as many request transactions as connections, the burst holds the pool and select 1 waits", async () => {
+    const { stack } = await isolated();
+    const transactions = createAuthTransactions(stack.handle.db, { slots: 10 });
+    const unbounded = withRequestTransactions(
+      betterAuth(authOptions({ db: stack.handle.db, secret: SECRET, baseURL: BASE_URL, adapterDb: transactions.db })),
+      transactions,
+    );
+    const person = await signUp(unbounded, stack.admin);
+    const hold = await holdUser(stack.admin, person.id);
+    const replies = wrongPasswords(unbounded, person.email);
+    let probe: Promise<unknown> | undefined;
+    try {
+      await waitUntil(async () => (await lockWaiters(stack.admin)) === 10, "ten sign-ins to wait for the lock");
+      probe = stack.handle.sql`select 1 as ok`;
+      expect(await settledWithin(probe, BOUND_MS + 500)).toBe(false);
+    } finally {
+      hold.release();
+      await hold.held;
+    }
+    await probe;
+    expect((await Promise.all(replies)).map((reply) => reply.status)).toEqual(Array.from({ length: BURST }, () => 401));
+  }, 60_000);
+});
+
 describe("T13 (R13): logs", () => {
   it("(c) the captured logs of every failure and race in this file hold no token, code, secret, email, user agent or client IP", () => {
     expect(logged.length).toBeGreaterThan(0);
