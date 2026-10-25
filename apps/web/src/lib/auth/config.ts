@@ -5,6 +5,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization, twoFactor } from "better-auth/plugins";
 import type { Database } from "../../db/client";
 import * as schema from "../../db/schema";
+import { ensureWorkspaceSettings } from "../../db/system/workspaces";
 import { isHttpsUrl, isLoopbackUrl } from "../origin";
 import { enforceInputLimits } from "./input-limits";
 
@@ -43,7 +44,15 @@ export function createAuth({ db, secret, baseURL }: AuthDeps) {
       },
     },
     hooks: { before: enforceInputLimits },
-    plugins: [twoFactor({ issuer: "CRM" }), organization({ invitationExpiresIn: INVITATION_EXPIRY_SECONDS })],
+    plugins: [
+      twoFactor({ issuer: "CRM" }),
+      organization({
+        invitationExpiresIn: INVITATION_EXPIRY_SECONDS,
+        organizationHooks: {
+          afterCreateOrganization: ({ organization: workspace }) => ensureWorkspaceSettings(db, workspace.id),
+        },
+      }),
+    ],
   });
 }
 
