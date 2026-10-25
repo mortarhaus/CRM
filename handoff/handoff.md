@@ -289,3 +289,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Owner merged PR #40 (39918cd) without `review 40`/`approved 40`. Log written on agent-logs with GATE BREACH (no reviewer verdict, no receipt); told owner.
 - Merged origin/main into feat/p1-db-roles (conflict only in DECISIONS.md, kept both entries), pushed. Local: audit 0, typecheck, lint, 187 tests, build all 0. PR body updated.
 - Next: CI green on new #39 head (image job ~26 min), Charlie `review 39` (Bob, Opus 5.5), then `approved 39` BEFORE merge, `merged 39`. Then PR 2 (feat/p1-rls, Tasks 4-7). Flaky test accessibility.spec.ts:77 tablet-768 noted.
+
+## 2026-10-25 approved 39
+- Bob Round 2: Approved with conditions on head 8285bee (= PR head, PR open). Review archived (hash dafa5fc), receipt PR-39.receipt on agent-logs. Fixed two stale PR-body lines first (body only, head unchanged).
+- Deferred: invitation grants -> Phase 1 PR 7 (Task 24); one extra blank line in DECISIONS.md -> next PR editing it; P2 items from PR #38 still due 2026-11-06.
+- Next: Charlie merges #39, then `merged 39`. Then PR 2 (feat/p1-rls, Tasks 4-7): ask Charlie first.
