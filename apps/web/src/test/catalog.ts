@@ -104,3 +104,100 @@ export async function objectsNotOwnedBy(sql: postgres.Sql, owner: string): Promi
       where nspname = any(${names}) and nspname <> 'public' and pg_get_userbyid(nspowner) <> ${owner}`;
   return rows.map((row) => row.object).sort();
 }
+
+// Tables without RLS, reached only through the system module (spec Tenancy). Task 8 adds the rest of the
+// spec's list and the test that the set of tables without RLS equals it.
+export const NO_RLS_ALLOW_LIST = [
+  "account",
+  "invitation",
+  "member",
+  "organization",
+  "session",
+  "two_factor",
+  "user",
+  "verification",
+] as const;
+
+// Every table in the schema that is not on the no-RLS allow-list.
+export async function tenantTables(sql: postgres.Sql, schema = "public"): Promise<string[]> {
+  const allowList = [...NO_RLS_ALLOW_LIST];
+  const rows = await sql<{ name: string }[]>`
+    select c.relname as name
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = ${schema} and c.relkind in ('r', 'p') and not (c.relname = any(${allowList}))
+    order by 1`;
+  return rows.map((row) => row.name);
+}
+
+export interface RowSecurity {
+  enabled: boolean;
+  forced: boolean;
+}
+
+export async function rowSecurity(sql: postgres.Sql, schema: string, table: string): Promise<RowSecurity | undefined> {
+  const [row] = await sql<RowSecurity[]>`
+    select c.relrowsecurity as enabled, c.relforcerowsecurity as forced
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = ${schema} and c.relname = ${table}`;
+  return row;
+}
+
+export interface Policy {
+  table: string;
+  name: string;
+  permissive: "PERMISSIVE" | "RESTRICTIVE";
+  roles: string[];
+  cmd: "ALL" | "SELECT" | "INSERT" | "UPDATE" | "DELETE";
+  qual: string | null;
+  withCheck: string | null;
+}
+
+// Every policy in the schema, or on one table of it, with its roles sorted.
+export async function policies(sql: postgres.Sql, schema: string, table?: string): Promise<Policy[]> {
+  const rows = await sql<Policy[]>`
+    select tablename as table, policyname as name, permissive, roles::text[] as roles, cmd, qual,
+      with_check as "withCheck"
+    from pg_policies
+    where schemaname = ${schema} and (${table ?? null}::name is null or tablename = ${table ?? null}::name)
+    order by tablename, policyname`;
+  return rows.map((row) => ({ ...row, roles: [...row.roles].sort() }));
+}
+
+// The workspace predicate of every tenant policy (spec Tenancy; plan Global Constraints).
+export const WORKSPACE_PREDICATE =
+  "workspace_id = (select nullif(current_setting('app.workspace_id', true), '')::uuid)";
+
+// The text PostgreSQL stores for WORKSPACE_PREDICATE, read back from a throwaway policy, so a comparison
+// never depends on a hand-typed pg_get_expr string.
+export function workspacePredicateText(sql: postgres.Sql): Promise<string> {
+  return sql.begin(async (tx) => {
+    await tx.unsafe("CREATE SCHEMA IF NOT EXISTS scratch");
+    await tx.unsafe("CREATE TABLE scratch.rls_reference (workspace_id uuid)");
+    await tx.unsafe(`CREATE POLICY rls_reference ON scratch.rls_reference USING (${WORKSPACE_PREDICATE})`);
+    const [row] = await tx<{ qual: string }[]>`
+      select qual from pg_policies where schemaname = 'scratch' and tablename = 'rls_reference'`;
+    await tx.unsafe("DROP TABLE scratch.rls_reference");
+    if (!row) throw new Error("reference policy not found");
+    return row.qual;
+  });
+}
+
+export interface ColumnShape {
+  type: string;
+  notNull: boolean;
+}
+
+export async function columnShape(
+  sql: postgres.Sql,
+  schema: string,
+  table: string,
+  column: string,
+): Promise<ColumnShape | undefined> {
+  const [row] = await sql<ColumnShape[]>`
+    select format_type(a.atttypid, a.atttypmod) as type, a.attnotnull as "notNull"
+    from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = ${schema} and c.relname = ${table} and a.attname = ${column} and not a.attisdropped`;
+  return row;
+}
