@@ -309,3 +309,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Opus helper built Tasks 4-7 (5 local commits); I reran typecheck, lint, 228 tests, build, audit: all 0. Pushed, opened PR #41 with self-check, size note, unverified list.
 - Helper note: repo-root `.env` still has Phase 0 `crm` user URLs (role gone); dev Postgres `crm-dev-postgres-1` at migration 0001. Tell Charlie to refresh `.env` from `.env.example` (his local file; I did not edit it).
 - Next: CI green (image job ~26 min), Charlie `review 41` (Bob Opus 5.5), `approved 41` before merge, `merged 41`. Then PR 3 (feat/p1-system-module, Tasks 8-11), ask Charlie first (new module).
+
+## 2026-10-25 approved 41
+- Bob Round 1: Approved with conditions on head 9128033 (= PR head, open, CI green). Review archived and receipt `reviews/PR-41.receipt` written on agent-logs.
+- Deferred: P2 TEN-09 lint gaps (connection-level forms) -> Phase 1 PR 3 (Task 8); P3 extra blank lines -> next edit of those files.
+- Next: Charlie merges #41, then `merged 41`. PR 3 (feat/p1-system-module, Tasks 8-11): ask Charlie first; must fix the TEN-09 lint P2 in Task 8.
