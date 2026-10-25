@@ -7,7 +7,9 @@ import {
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDb, type DbHandle } from "../../db/client";
-import { account, invitation, member, session, twoFactor, user } from "../../db/schema";
+import { account, invitation, member, organization, session, twoFactor, user, workspaceSettings } from "../../db/schema";
+import { ensureWorkspaceSettings } from "../../db/system/workspaces";
+import { runInWorkspace } from "../../db/workspace";
 import { startDatabase, type TestDatabase } from "../../test/postgres";
 import { totpFromUri, wrongTotpCode } from "../../test/totp";
 import { createAuth, type Auth } from "./config";
@@ -432,6 +434,41 @@ describe("switching workspace", () => {
       headers: ownerHeaders,
     });
     expect(switched?.id).toBe(workspace.id);
+  });
+});
+
+describe("workspace settings", () => {
+  it("gives every new workspace its own workspace_settings row at version 1", async () => {
+    const headers = await signUpAndSignIn(uniqueEmail());
+    const workspaceIds: string[] = [];
+    for (const name of ["First Studio", "Second Studio"]) {
+      const workspace = await auth.api.createOrganization({
+        body: { name, slug: `${name.toLowerCase().replace(" ", "-")}-${Date.now()}` },
+        headers,
+      });
+      if (!workspace) throw new Error("workspace not created");
+      workspaceIds.push(workspace.id);
+    }
+    for (const workspaceId of workspaceIds) {
+      const rows = await runInWorkspace(handle.db, workspaceId, (tx) => tx.select().from(workspaceSettings));
+      expect(rows).toEqual([expect.objectContaining({ workspaceId, version: 1 })]);
+    }
+  });
+
+  it("heals a workspace whose row is missing, and a second call changes nothing (plan Risk 6)", async () => {
+    const [workspace] = await handle.db
+      .insert(organization)
+      .values({ name: "Half Created", slug: `half-created-${Date.now()}`, createdAt: new Date() })
+      .returning({ id: organization.id });
+    if (!workspace) throw new Error("workspace not created");
+    const read = () => runInWorkspace(handle.db, workspace.id, (tx) => tx.select().from(workspaceSettings));
+    expect(await read()).toEqual([]);
+
+    await ensureWorkspaceSettings(handle.db, workspace.id);
+    const [healed] = await read();
+    await ensureWorkspaceSettings(handle.db, workspace.id);
+    expect(await read()).toEqual([healed]);
+    expect(healed).toMatchObject({ workspaceId: workspace.id, version: 1 });
   });
 });
 

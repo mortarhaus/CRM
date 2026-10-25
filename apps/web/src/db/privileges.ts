@@ -29,6 +29,8 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...table("member", "SELECT", "INSERT"),
     ...table("invitation", "SELECT", "INSERT"),
     ...columns("invitation", "UPDATE", "expires_at", "status"),
+    // Tenant tables, under RLS (migration 0003).
+    ...table("workspace_settings", "SELECT", "INSERT", "UPDATE"),
   ],
   crm_worker: PUBLIC_DEFAULTS,
   crm_purge: PUBLIC_DEFAULTS,

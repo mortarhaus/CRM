@@ -34,6 +34,9 @@ const restrictedDynamicImport = (names, message) => ({
   message,
 });
 
+const workspaceContextPattern = String.raw`/set_config\s*\(|\bSET\s+((SESSION|LOCAL)\s+)?(ROLE|SESSION\s+AUTHORIZATION|"?app\.)/i`;
+const workspaceContextMessage = "Set the workspace only through withWorkspace() (TEN-09)";
+
 export default defineConfig(
   {
     ignores: [
@@ -124,6 +127,19 @@ export default defineConfig(
             },
           ],
         },
+      ],
+    },
+  },
+  {
+    // TEN-09: the workspace context is set only by withWorkspace(), transaction-locally. No other
+    // set_config call, and no SET of the workspace setting or of the role, anywhere in the app.
+    files: ["apps/web/**/*.{ts,tsx,mts,cts,js,mjs}"],
+    ignores: ["apps/web/src/db/workspace.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        { selector: `TemplateElement[value.raw=${workspaceContextPattern}]`, message: workspaceContextMessage },
+        { selector: `Literal[value=${workspaceContextPattern}]`, message: workspaceContextMessage },
       ],
     },
   },
