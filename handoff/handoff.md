@@ -343,3 +343,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Bob Round 1: Approved with conditions on head bfcef5a = PR head, open, CI green. Added the "Settled item 3" line to the PR body (body only). Review archived + receipt `reviews/PR-43.receipt`.
 - Deferred: P2 TEN-10 lint gaps (`.js`/trailing-slash import forms, `postgres`/`pg` client outside src/db with worker.ts exemption until PR 5, 4 fixtures) -> Phase 1 PR 4 Task 15 (next PR editing eslint.config.mjs); P3 runbook manifest paragraph order -> next PR touching the runbook. ASK 5 still open with Charlie.
 - Next: Charlie merges #43, then `merged 43`. Then ask before PR 4 (feat/p1-action-audit, Tasks 12-15 then 31; Task 31 Step 0 spike reviewed by Bob first; ASK 4 idempotency expiry blocks Task 14 Step 4).
+
+## 2026-10-25 merged 43
+- PR #43 merged (c0bc2cc, 12:24:50Z); receipt 2 min before, head matched: no breach. Log `log/2026-10-25_PR43_system-module-billing-account-poly-ref.md`. Branch/worktree feat/p1-system-module removed. Log gate clear.
+- Deferred: P2 TEN-10 lint gaps -> PR 4 Task 15; P3 runbook paragraph order -> next PR touching runbook. ASK 5 open with Charlie (built: only `active`).
+- Next: ask Charlie before PR 4 (`feat/p1-action-audit`): Task 31 Step 0 spike first (Bob reviews), ASK 4 idempotency expiry (proposal 24 h) blocks Task 14 Step 4.
