@@ -338,3 +338,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - PR #42 merged (e4fd100, 08:46:39Z), receipt 3 min before, no breach. Log `log/2026-10-25_PR42_close-deferred-handoff-and-wording.md`. Branch/worktree chore/docs-status-deferred removed.
 - Merged origin/main into feat/p1-system-module (conflict only in DECISIONS.md top, kept both), pushed head new. Local: typecheck, lint, 321 tests, build, audit 0. PR #43 body updated. CI restarted.
 - Next: CI green on #43, Charlie `review 43` (Bob Opus 5.5), `approved 43` BEFORE merge, `merged 43`. ASK 5 answer pending from Charlie (A = only `active`). Then PR 4 (feat/p1-action-audit): ask Charlie first; ASK 4 blocks Task 14 Step 4.
+
+## 2026-10-25 approved 43
+- Bob Round 1: Approved with conditions on head bfcef5a = PR head, open, CI green. Added the "Settled item 3" line to the PR body (body only). Review archived + receipt `reviews/PR-43.receipt`.
+- Deferred: P2 TEN-10 lint gaps (`.js`/trailing-slash import forms, `postgres`/`pg` client outside src/db with worker.ts exemption until PR 5, 4 fixtures) -> Phase 1 PR 4 Task 15 (next PR editing eslint.config.mjs); P3 runbook manifest paragraph order -> next PR touching the runbook. ASK 5 still open with Charlie.
+- Next: Charlie merges #43, then `merged 43`. Then ask before PR 4 (feat/p1-action-audit, Tasks 12-15 then 31; Task 31 Step 0 spike reviewed by Bob first; ASK 4 idempotency expiry blocks Task 14 Step 4).
