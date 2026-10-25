@@ -82,6 +82,8 @@ describe("TEN-10: app code reaches the database only through withWorkspace() or 
     ["member from the schema barrel", 'import { member } from "../../../db/schema";'],
     ["billingAccount from schema/system", 'import { billingAccount } from "@/db/schema/system";'],
     ["rateLimit from schema/system", 'import { rateLimit } from "@/db/schema/system";'],
+    ["authAuditLog from schema/system", 'import { authAuditLog } from "@/db/schema/system";'],
+    ["authAuditLog from the schema barrel", 'import { authAuditLog } from "@/db/schema";'],
     ["a module of src/db/system past its barrel", 'import { getMembership } from "@/db/system/workspaces";'],
     ["the db barrel through a dynamic import", 'export const load = () => import("@/db");'],
   ])("reports %s in app code", async (_, code) => {
@@ -104,6 +106,7 @@ describe("TEN-10: app code reaches the database only through withWorkspace() or 
   it.each([
     ["schema/auth", 'import { session } from "./schema/auth";'],
     ["schema/system", 'import { billingAccount } from "./schema/system";'],
+    ["authAuditLog from the schema barrel", 'import { authAuditLog } from "./schema";'],
     ["a system table from the schema barrel", 'import { member } from "./schema";'],
     ["the whole schema barrel", 'import * as schema from "./schema";'],
   ])("reports %s elsewhere in src/db", async (_, code) => {

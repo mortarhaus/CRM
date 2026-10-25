@@ -30,6 +30,7 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...table("invitation", "SELECT", "INSERT"),
     ...columns("invitation", "UPDATE", "expires_at", "status"),
     ...table("billing_account", "SELECT", "INSERT"), // system table, no RLS (migration 0005)
+    ...table("auth_audit_log", "INSERT"), // system table, no RLS, append-only, no reader (migration 0008)
     // Tenant tables, under RLS (migration 0003).
     ...table("workspace_settings", "SELECT", "INSERT", "UPDATE"),
   ],

@@ -131,9 +131,31 @@ async function noRlsViolations(schema: string, allowList: readonly string[] | "e
   });
 }
 
+// A policy on a table without RLS is never applied, so one there would only look like protection (plan Task 31 R12).
+async function noRlsPolicyViolations(schema: string, allowList: readonly string[]): Promise<string[]> {
+  return (await policies(admin, schema))
+    .filter((policy) => allowList.includes(policy.table))
+    .map((policy) => `${policy.table}.${policy.name}: a policy on a table on the no-RLS allow-list`);
+}
+
 describe("no-RLS allow-list (spec Tenancy)", () => {
   it("public: the tables without RLS are exactly the system tables on the allow-list", async () => {
     expect(await noRlsViolations("public", NO_RLS_ALLOW_LIST)).toEqual([]);
+  });
+
+  it("public: no table on the allow-list has a policy", async () => {
+    expect(await noRlsPolicyViolations("public", NO_RLS_ALLOW_LIST)).toEqual([]);
+  });
+
+  it("reports a policy on a table on the allow-list", async () => {
+    await admin.unsafe("CREATE POLICY policy_probe ON public.auth_audit_log FOR INSERT TO crm_app WITH CHECK (true)");
+    try {
+      expect(await noRlsPolicyViolations("public", NO_RLS_ALLOW_LIST)).toEqual([
+        "auth_audit_log.policy_probe: a policy on a table on the no-RLS allow-list",
+      ]);
+    } finally {
+      await admin.unsafe("DROP POLICY policy_probe ON public.auth_audit_log");
+    }
   });
 
   it("pgboss: every table, and only pgboss tables beyond the allow-list", async () => {
