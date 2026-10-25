@@ -29,6 +29,20 @@
       "when": 1792900118320,
       "tag": "0003_rls_workspace_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792913746759,
+      "tag": "0004_billing_account",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792913767700,
+      "tag": "0005_billing_account_grants",
+      "breakpoints": true
     }
   ]
 }

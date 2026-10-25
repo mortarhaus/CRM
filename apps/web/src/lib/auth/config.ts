@@ -5,7 +5,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization, twoFactor } from "better-auth/plugins";
 import type { Database } from "../../db/client";
 import * as schema from "../../db/schema";
-import { ensureWorkspaceSettings } from "../../db/system";
+import { ensureBillingAccount, ensureWorkspaceSettings } from "../../db/system";
 import { isHttpsUrl, isLoopbackUrl } from "../origin";
 import { enforceInputLimits } from "./input-limits";
 
@@ -48,7 +48,16 @@ export function createAuth({ db, secret, baseURL }: AuthDeps) {
       twoFactor({ issuer: "CRM" }),
       organization({
         invitationExpiresIn: INVITATION_EXPIRY_SECONDS,
+        // Set only by the server (input: false): the creator's billing account, from the before-create hook.
+        schema: {
+          organization: {
+            additionalFields: { billingAccountId: { type: "string", required: false, input: false } },
+          },
+        },
         organizationHooks: {
+          beforeCreateOrganization: async ({ organization: workspace, user }) => ({
+            data: { ...workspace, billingAccountId: await ensureBillingAccount(db, user.id, user.name) },
+          }),
           afterCreateOrganization: ({ organization: workspace }) => ensureWorkspaceSettings(db, workspace.id),
         },
       }),

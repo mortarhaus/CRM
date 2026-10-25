@@ -69,6 +69,7 @@ const systemSchemaExports = [
   "organizationRelations",
   "memberRelations",
   "invitationRelations",
+  "billingAccount",
 ];
 const systemSchemaMessage = "Only src/db/system reads or writes the system tables (TEN-10)";
 

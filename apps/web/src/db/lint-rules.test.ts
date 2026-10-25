@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { ESLint } from "eslint";
 import { beforeAll, describe, expect, it } from "vitest";
 import * as authSchema from "./schema/auth";
+import * as systemSchema from "./schema/system";
 
 const REPO_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 const TEN_09 = "Set the workspace only through withWorkspace() (TEN-09)";
@@ -109,9 +110,9 @@ describe("TEN-10: app code reaches the database only through withWorkspace() or 
     expect((await restrictedImports(code, "apps/web/src/db/x.ts")).join("\n")).toContain(TEN_10_SCHEMA);
   });
 
-  it("covers every export of schema/auth", async () => {
+  it("covers every export of schema/auth and schema/system", async () => {
     const unrestricted: string[] = [];
-    for (const name of Object.keys(authSchema)) {
+    for (const name of [...Object.keys(authSchema), ...Object.keys(systemSchema)]) {
       const messages = await restrictedImports(`import { ${name} } from "./schema";`, "apps/web/src/db/x.ts");
       if (!messages.join("\n").includes(TEN_10_SCHEMA)) unrestricted.push(name);
     }
