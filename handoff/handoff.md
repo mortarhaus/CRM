@@ -360,3 +360,7 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Next: Charlie runs "review 44" (Bob). Tasks 12-15 and 31 Steps 1-4 start only after Approved / Approved with conditions.
 - Open: ASK 4 (Task 14), ASK 5, postgres.js uncaught TypeError on killed backend (decision needed), .env refresh, repo visibility, untracked docker/sync-*.sh and .playwright-mcp/.
 - Carried P3s: runbook manifest paragraph order; CLAUDE.md Status "Next" line; flaky E2E accessibility.spec.ts:77.
+
+## 2026-10-26 00:42 build Phase 1 PR 4: Bob Round 1 = Approved with conditions (spike)
+- Bob's review: .agent/reviews/PR-44.md Round 1. Tasks 12-15 may start. Conditions before PR 4 final review: P2-1 (bound auth-transaction pool/lock use, bypass guard, Task 22 note), P2-2 (next start crash check for postgres.js; pnpm patch if it exits), P2-4 (Facts relied on in PR body + DECISIONS). P2-3 (revoke session by id) goes to Task 24. Also: DECISIONS must say how a Phase 0 'flag on, unverified' user recovers (R11 terms).
+- Next: Opus helper builds Tasks 12-15 (+ PR #43 TEN-10 lint P2 in Task 15) in worktree build-feat-p1-action-audit; then conditions + Task 31 Steps 1-4. ASK 4: builder uses 24 h unless Charlie answers.
