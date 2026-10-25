@@ -294,3 +294,7 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Bob Round 2: Approved with conditions on head 8285bee (= PR head, PR open). Review archived (hash dafa5fc), receipt PR-39.receipt on agent-logs. Fixed two stale PR-body lines first (body only, head unchanged).
 - Deferred: invitation grants -> Phase 1 PR 7 (Task 24); one extra blank line in DECISIONS.md -> next PR editing it; P2 items from PR #38 still due 2026-11-06.
 - Next: Charlie merges #39, then `merged 39`. Then PR 2 (feat/p1-rls, Tasks 4-7): ask Charlie first.
+
+## 2026-10-25 merged 39
+- PR #39 merged (d64a899, 2026-10-25T03:29:02Z). Receipt 23 s before merge, head matched: no breach. Log on agent-logs: `log/2026-10-25_PR39_five-db-roles-privilege-manifest.md`. Log gate clear.
+- Next: ask Charlie before starting Phase 1 PR 2 (`feat/p1-rls`, Tasks 4-7, Opus tier). Old worktrees (build-feat-p1-db-roles, chore-deps-zod-undici) can be removed on his OK. Pending: CLAUDE.md Status line ("Next: Phase 1 PR 1") is stale; update in the next PR that edits it.
