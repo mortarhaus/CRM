@@ -67,7 +67,6 @@ async function workspacesSeen(executor: Executor): Promise<string[]> {
   return rows.map((row) => row.workspace_id);
 }
 
-
 async function expectCleanReusedConnection(pid: number | undefined): Promise<void> {
   const after = await connectionState(handle.db);
   expect(after?.pid).toBe(pid);
