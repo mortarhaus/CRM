@@ -20,7 +20,19 @@ export class NestedWorkspaceError extends Error {
   }
 }
 
+export class NoWorkspaceError extends Error {
+  constructor() {
+    super("This needs a workspace transaction (runInWorkspace or withWorkspace)");
+    this.name = "NoWorkspaceError";
+  }
+}
+
 const activeWorkspace = new AsyncLocalStorage<string>();
+
+// The workspace of the runInWorkspace transaction this code runs in, or undefined outside one.
+export function currentWorkspaceId(): string | undefined {
+  return activeWorkspace.getStore();
+}
 
 // The only place the workspace context is set (TEN-09): bound and transaction-local, so it never outlives
 // the transaction on a pooled connection. Policies read it through nullif (spec Tenancy, Known risk R1).

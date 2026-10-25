@@ -45,6 +45,34 @@ describe("roles", () => {
   });
 });
 
+// TEN-03 and spec Scalability: no runtime role, and not PUBLIC, can change or remove an audit row, at table or
+// column level; the owner is crm_migrator. Part 1 of the catalog test (plan Task 12 Step 4); domain_event joins
+// it in plan Task 19.
+const APPEND_ONLY_TABLES = ["audit_log", "auth_audit_log"] as const;
+
+describe("append-only audit tables (TEN-03)", () => {
+  it.each(APPEND_ONLY_TABLES)("no runtime role holds DELETE, UPDATE or TRUNCATE on %s", async (table) => {
+    const held: string[] = [];
+    for (const role of ["crm_app", "crm_worker", "crm_purge", "crm_link_resolver", "PUBLIC"]) {
+      const grantee = role === "PUBLIC" ? "public" : role;
+      const [row] = await admin<{ delete: boolean; update: boolean; truncate: boolean; columnUpdate: boolean }[]>`
+        select has_table_privilege(${grantee}, ${`public.${table}`}, 'DELETE') as delete,
+          has_table_privilege(${grantee}, ${`public.${table}`}, 'UPDATE') as update,
+          has_table_privilege(${grantee}, ${`public.${table}`}, 'TRUNCATE') as truncate,
+          has_any_column_privilege(${grantee}, ${`public.${table}`}, 'UPDATE') as "columnUpdate"`;
+      for (const [privilege, holds] of Object.entries(row ?? {})) if (holds) held.push(`${role} ${privilege}`);
+    }
+    expect(held).toEqual([]);
+  });
+
+  it.each(APPEND_ONLY_TABLES)("%s is owned by crm_migrator", async (table) => {
+    const [row] = await admin<{ owner: string }[]>`
+      select pg_get_userbyid(c.relowner) as owner from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relname = ${table}`;
+    expect(row?.owner).toBe("crm_migrator");
+  });
+});
+
 // Proves the helper is not blind: a direct grant, a column grant and PUBLIC EXECUTE all show up,
 // and a function crm_migrator creates after migration 0001 is not executable through PUBLIC.
 describe("the privilege scan itself", () => {

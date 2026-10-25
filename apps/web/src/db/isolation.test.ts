@@ -6,7 +6,7 @@ import { holdsCommand, tenantTables } from "../test/catalog";
 import { sqlState, startDatabase, type TestDatabase } from "../test/postgres";
 import { createDb, type DbHandle } from "./client";
 import { EXPECTED_PRIVILEGES } from "./privileges";
-import { organization, workspaceSettings } from "./schema";
+import { auditLog, organization, workspaceSettings } from "./schema";
 import { runInWorkspace, type Tx } from "./workspace";
 
 // TEN-08: every tenant table gets read and write isolation tests over two workspaces, as crm_app.
@@ -19,6 +19,12 @@ interface TenantFixture {
 }
 
 const TENANT_FIXTURES: Record<string, TenantFixture> = {
+  // Append-only: crm_app holds no UPDATE or DELETE, so the harness expects 42501 for both.
+  audit_log: {
+    async seed(tx, workspaceId) {
+      await tx.insert(auditLog).values({ workspaceId, action: "isolation.seed", targetType: "fixture" });
+    },
+  },
   workspace_settings: {
     async seed(tx, workspaceId) {
       await tx.insert(workspaceSettings).values({ workspaceId });
