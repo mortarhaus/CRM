@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WORKSPACE_PREDICATE } from "../test/catalog";
-import { startDatabase, type TestDatabase } from "../test/postgres";
+import { sqlState, startDatabase, type TestDatabase } from "../test/postgres";
 import { createDb, type DbHandle } from "./client";
 import { InvalidWorkspaceIdError, NestedWorkspaceError, runInWorkspace, type Tx } from "./workspace";
 
@@ -67,16 +67,6 @@ async function workspacesSeen(executor: Executor): Promise<string[]> {
   return rows.map((row) => row.workspace_id);
 }
 
-async function sqlState(promise: Promise<unknown>): Promise<string | undefined> {
-  try {
-    await promise;
-    return undefined;
-  } catch (error) {
-    // drizzle-orm wraps the driver error; postgres.js puts the SQLSTATE on `code`.
-    const { code, cause } = error as { code?: string; cause?: { code?: string } };
-    return cause?.code ?? code;
-  }
-}
 
 async function expectCleanReusedConnection(pid: number | undefined): Promise<void> {
   const after = await connectionState(handle.db);

@@ -2,6 +2,7 @@ import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   columnShape,
+  holdsCommand,
   policies,
   rowSecurity,
   tenantTables,
@@ -54,13 +55,6 @@ const isShareLinkResolve = (policy: Policy) =>
   policy.cmd === "SELECT" &&
   policy.roles.join() === "crm_link_resolver";
 
-function holds(privileges: Privileges, role: string, schema: string, table: string, command: string): boolean {
-  return (privileges[role] ?? []).some(
-    (privilege) =>
-      privilege === `table:${schema}.${table}:${command}` ||
-      (privilege.startsWith(`column:${schema}.${table}.`) && privilege.endsWith(`:${command}`)),
-  );
-}
 
 // TEN-04 to TEN-07 and spec Tenancy "Policy form": ENABLE + FORCE, one RESTRICTIVE workspace policy for ALL
 // to crm_app and crm_purge, and one PERMISSIVE policy per command, for exactly the commands each role holds.
@@ -88,7 +82,7 @@ async function policyFormViolations(schema: string, table: string, privileges: P
     if (policy.cmd === "ALL") found.push(`${where}: blanket PERMISSIVE policy for ALL`);
     for (const role of policy.roles) {
       if (!(POLICY_ROLES as readonly string[]).includes(role)) found.push(`${where}: PERMISSIVE policy names ${role}`);
-      else if (policy.cmd !== "ALL" && !holds(privileges, role, schema, table, policy.cmd)) {
+      else if (policy.cmd !== "ALL" && !holdsCommand(privileges, role, schema, table, policy.cmd)) {
         found.push(`${where}: PERMISSIVE ${policy.cmd} for ${role}, which holds no ${policy.cmd} grant`);
       }
     }
@@ -100,7 +94,7 @@ async function policyFormViolations(schema: string, table: string, privileges: P
   for (const role of POLICY_ROLES) {
     for (const command of COMMANDS) {
       const covered = permissive.some((policy) => policy.cmd === command && policy.roles.includes(role));
-      if (holds(privileges, role, schema, table, command) && !covered) {
+      if (holdsCommand(privileges, role, schema, table, command) && !covered) {
         found.push(`${table}: no PERMISSIVE ${command} policy for ${role}, which holds the grant`);
       }
     }

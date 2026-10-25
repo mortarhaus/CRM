@@ -201,3 +201,18 @@ export async function columnShape(
     where n.nspname = ${schema} and c.relname = ${table} and a.attname = ${column} and not a.attisdropped`;
   return row;
 }
+
+// Whether a privilege manifest gives the role the command on the table, at table or column level.
+export function holdsCommand(
+  privileges: Partial<Record<string, readonly string[]>>,
+  role: string,
+  schema: string,
+  table: string,
+  command: string,
+): boolean {
+  return (privileges[role] ?? []).some(
+    (privilege) =>
+      privilege === `table:${schema}.${table}:${command}` ||
+      (privilege.startsWith(`column:${schema}.${table}.`) && privilege.endsWith(`:${command}`)),
+  );
+}

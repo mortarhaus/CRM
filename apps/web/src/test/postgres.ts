@@ -61,3 +61,15 @@ export async function startDatabase(options: { migrate?: boolean } = {}): Promis
     },
   };
 }
+
+// The SQLSTATE a query failed with, or undefined if it succeeded. drizzle-orm wraps the driver error;
+// postgres.js puts the SQLSTATE on `code`.
+export async function sqlState(promise: Promise<unknown>): Promise<string | undefined> {
+  try {
+    await promise;
+    return undefined;
+  } catch (error) {
+    const { code, cause } = error as { code?: string; cause?: { code?: string } };
+    return cause?.code ?? code;
+  }
+}

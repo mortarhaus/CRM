@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { tenantTables } from "../test/catalog";
-import { startDatabase, type TestDatabase } from "../test/postgres";
+import { holdsCommand, tenantTables } from "../test/catalog";
+import { sqlState, startDatabase, type TestDatabase } from "../test/postgres";
 import { createDb, type DbHandle } from "./client";
 import { EXPECTED_PRIVILEGES } from "./privileges";
 import { organization, workspaceSettings } from "./schema";
@@ -63,24 +63,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-async function sqlState(promise: Promise<unknown>): Promise<string | undefined> {
-  try {
-    await promise;
-    return undefined;
-  } catch (error) {
-    // drizzle-orm wraps the driver error; postgres.js puts the SQLSTATE on `code`.
-    const { code, cause } = error as { code?: string; cause?: { code?: string } };
-    return cause?.code ?? code;
-  }
-}
 
-function crmAppHolds(table: string, command: string): boolean {
-  return EXPECTED_PRIVILEGES.crm_app.some(
-    (privilege) =>
-      privilege === `table:public.${table}:${command}` ||
-      (privilege.startsWith(`column:public.${table}.`) && privilege.endsWith(`:${command}`)),
-  );
-}
 
 describe("the isolation harness", () => {
   it("has a fixture for every tenant table, and none for any other table", async () => {
@@ -96,8 +79,8 @@ describe("the isolation harness", () => {
   it.each(Object.keys(TENANT_FIXTURES))("%s has an update and a delete fixture exactly where crm_app holds them", (table) => {
     const fixture = TENANT_FIXTURES[table];
     expect({ update: fixture?.update !== undefined, delete: fixture?.delete !== undefined }).toEqual({
-      update: crmAppHolds(table, "UPDATE"),
-      delete: crmAppHolds(table, "DELETE"),
+      update: holdsCommand(EXPECTED_PRIVILEGES, "crm_app", "public", table, "UPDATE"),
+      delete: holdsCommand(EXPECTED_PRIVILEGES, "crm_app", "public", table, "DELETE"),
     });
   });
 });
