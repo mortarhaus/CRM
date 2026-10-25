@@ -55,7 +55,6 @@ const isShareLinkResolve = (policy: Policy) =>
   policy.cmd === "SELECT" &&
   policy.roles.join() === "crm_link_resolver";
 
-
 // TEN-04 to TEN-07 and spec Tenancy "Policy form": ENABLE + FORCE, one RESTRICTIVE workspace policy for ALL
 // to crm_app and crm_purge, and one PERMISSIVE policy per command, for exactly the commands each role holds.
 async function policyFormViolations(schema: string, table: string, privileges: Privileges): Promise<string[]> {
