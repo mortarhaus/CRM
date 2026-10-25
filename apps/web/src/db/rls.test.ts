@@ -2,7 +2,9 @@ import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   columnShape,
+  effectivePrivileges,
   holdsCommand,
+  NO_RLS_ALLOW_LIST,
   policies,
   rowSecurity,
   tenantTables,
@@ -11,7 +13,7 @@ import {
   type Policy,
 } from "../test/catalog";
 import { startDatabase, type TestDatabase } from "../test/postgres";
-import { EXPECTED_PRIVILEGES } from "./privileges";
+import { EXPECTED_PRIVILEGES, type ManifestRole } from "./privileges";
 
 const NULLIF_WORKSPACE_SETTING = "NULLIF(current_setting('app.workspace_id'::text, true), ''::text)";
 const POLICY_ROLES = ["crm_app", "crm_purge"] as const;
@@ -111,6 +113,57 @@ async function policyRoleViolations(schema: string): Promise<string[]> {
         .map((role) => `${policy.table}.${policy.name}: names ${role}`),
     );
 }
+
+// Spec Tenancy: the tables without RLS are exactly the system tables on the allow-list and every pgboss table.
+// Listed tables that a later Phase 1 PR creates (rate_limit, auth_audit_log) are skipped until they exist;
+// the Phase 1 done-when run checks that each one does (plan Task 8, Task 29).
+async function noRlsViolations(schema: string, allowList: readonly string[] | "every table"): Promise<string[]> {
+  const rows = await admin<{ name: string; rls: boolean }[]>`
+    select c.relname as name, c.relrowsecurity as rls
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = ${schema} and c.relkind in ('r', 'p')
+    order by 1`;
+  const allowed = (name: string) => allowList === "every table" || allowList.includes(name);
+  return rows.flatMap((row) => {
+    if (!row.rls && !allowed(row.name)) return [`${schema}.${row.name}: no row level security and not on the allow-list`];
+    if (row.rls && allowed(row.name)) return [`${schema}.${row.name}: on the no-RLS allow-list but has row level security`];
+    return [];
+  });
+}
+
+describe("no-RLS allow-list (spec Tenancy)", () => {
+  it("public: the tables without RLS are exactly the system tables on the allow-list", async () => {
+    expect(await noRlsViolations("public", NO_RLS_ALLOW_LIST)).toEqual([]);
+  });
+
+  it("pgboss: every table, and only pgboss tables beyond the allow-list", async () => {
+    expect(await noRlsViolations("pgboss", "every table")).toEqual([]);
+  });
+
+  it("drizzle: the migration ledger is out of reach of every runtime role", async () => {
+    const roles: ManifestRole[] = ["crm_app", "crm_worker", "crm_purge", "crm_link_resolver", "PUBLIC"];
+    const reachable: string[] = [];
+    for (const role of roles) {
+      const privileges = await effectivePrivileges(admin, role, ["drizzle"]);
+      reachable.push(...privileges.filter((privilege) => !privilege.startsWith("database:")).map((p) => `${role} ${p}`));
+    }
+    expect(reachable).toEqual([]);
+  });
+
+  it("reports a table without RLS that is not on the list, and a listed table with RLS", async () => {
+    await admin.unsafe("CREATE TABLE public.no_rls_probe (id uuid)");
+    await admin.unsafe("CREATE TABLE public.listed_probe (id uuid)");
+    await admin.unsafe("ALTER TABLE public.listed_probe ENABLE ROW LEVEL SECURITY");
+    try {
+      expect(await noRlsViolations("public", [...NO_RLS_ALLOW_LIST, "listed_probe"])).toEqual([
+        "public.listed_probe: on the no-RLS allow-list but has row level security",
+        "public.no_rls_probe: no row level security and not on the allow-list",
+      ]);
+    } finally {
+      await admin.unsafe("DROP TABLE public.no_rls_probe, public.listed_probe");
+    }
+  });
+});
 
 describe("tenant tables", () => {
   it("are not an empty set, so the checks below test something", async () => {

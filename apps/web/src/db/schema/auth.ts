@@ -8,6 +8,7 @@ import {
   uuid,
   index,
 } from "drizzle-orm/pg-core";
+import { billingAccount } from "./system";
 
 export const user = pgTable("user", {
   id: uuid("id")
@@ -121,6 +122,7 @@ export const organization = pgTable("organization", {
   logo: text("logo"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   metadata: text("metadata"),
+  billingAccountId: uuid("billing_account_id").references(() => billingAccount.id, { onDelete: "restrict" }),
 });
 
 export const member = pgTable(

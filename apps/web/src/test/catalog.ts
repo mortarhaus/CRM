@@ -105,13 +105,17 @@ export async function objectsNotOwnedBy(sql: postgres.Sql, owner: string): Promi
   return rows.map((row) => row.object).sort();
 }
 
-// Tables without RLS, reached only through the system module (spec Tenancy). Task 8 adds the rest of the
-// spec's list and the test that the set of tables without RLS equals it.
+// Tables without RLS, reached only through the system module (spec Tenancy, revision 8): the Better Auth
+// tables, billing_account, the rate-limit counters and auth_audit_log. rls.test.ts checks that the tables
+// without RLS in public are exactly these.
 export const NO_RLS_ALLOW_LIST = [
   "account",
+  "auth_audit_log",
+  "billing_account",
   "invitation",
   "member",
   "organization",
+  "rate_limit",
   "session",
   "two_factor",
   "user",
@@ -215,4 +219,27 @@ export function holdsCommand(
       privilege === `table:${schema}.${table}:${command}` ||
       (privilege.startsWith(`column:${schema}.${table}.`) && privilege.endsWith(`:${command}`)),
   );
+}
+
+// Spec Tenancy "Composite workspace foreign keys": every FK whose referencing and referenced tables are both
+// tenant tables (not on the no-RLS allow-list) must hold workspace_id on both sides at the same position. FKs
+// to the system tables (organization, user, billing_account) are outside the rule.
+export async function compositeFkViolations(sql: postgres.Sql, schema = "public"): Promise<string[]> {
+  const allowList = [...NO_RLS_ALLOW_LIST];
+  const rows = await sql<{ name: string; child: string; parent: string; childAt: number | null; parentAt: number | null }[]>`
+    select c.conname as name, cn.nspname || '.' || cr.relname as child, pn.nspname || '.' || pr.relname as parent,
+      array_position(c.conkey, (select a.attnum from pg_attribute a
+        where a.attrelid = c.conrelid and a.attname = 'workspace_id' and not a.attisdropped)) as "childAt",
+      array_position(c.confkey, (select a.attnum from pg_attribute a
+        where a.attrelid = c.confrelid and a.attname = 'workspace_id' and not a.attisdropped)) as "parentAt"
+    from pg_constraint c
+      join pg_class cr on cr.oid = c.conrelid join pg_namespace cn on cn.oid = cr.relnamespace
+      join pg_class pr on pr.oid = c.confrelid join pg_namespace pn on pn.oid = pr.relnamespace
+    where c.contype = 'f' and cn.nspname = ${schema}
+      and not (pn.nspname = 'public' and pr.relname = any(${allowList}))
+      and not (cn.nspname = 'public' and cr.relname = any(${allowList}))
+    order by 1`;
+  return rows
+    .filter((row) => row.childAt === null || row.parentAt === null || row.childAt !== row.parentAt)
+    .map((row) => `${row.child}.${row.name} -> ${row.parent}: not composite on workspace_id`);
 }

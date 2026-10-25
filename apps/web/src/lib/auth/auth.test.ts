@@ -5,12 +5,23 @@ import {
   WORKSPACE_NAME_MAX_LENGTH,
 } from "@crm/core/security";
 import { and, eq } from "drizzle-orm";
+import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDb, type DbHandle } from "../../db/client";
-import { account, invitation, member, organization, session, twoFactor, user, workspaceSettings } from "../../db/schema";
+import {
+  account,
+  billingAccount,
+  invitation,
+  member,
+  organization,
+  session,
+  twoFactor,
+  user,
+  workspaceSettings,
+} from "../../db/schema";
 import { ensureWorkspaceSettings } from "../../db/system/workspaces";
 import { runInWorkspace } from "../../db/workspace";
-import { startDatabase, type TestDatabase } from "../../test/postgres";
+import { sqlState, startDatabase, type TestDatabase } from "../../test/postgres";
 import { totpFromUri, wrongTotpCode } from "../../test/totp";
 import { createAuth, type Auth } from "./config";
 
@@ -469,6 +480,74 @@ describe("workspace settings", () => {
     await ensureWorkspaceSettings(handle.db, workspace.id);
     expect(await read()).toEqual([healed]);
     expect(healed).toMatchObject({ workspaceId: workspace.id, version: 1 });
+  });
+});
+
+describe("billing accounts", () => {
+  const slug = () => `billing-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  async function createWorkspace(headers: Headers, body: Record<string, unknown> = {}) {
+    const workspace = await auth.api.createOrganization({ body: { name: "Billing Studio", slug: slug(), ...body }, headers });
+    if (!workspace) throw new Error("workspace not created");
+    const [row] = await handle.db.select().from(organization).where(eq(organization.id, workspace.id));
+    return row;
+  }
+
+  it("gives a user's first workspace a free billing account they own, and reuses it for the second", async () => {
+    const email = uniqueEmail();
+    const headers = await signUpAndSignIn(email);
+    const owner = await findUser(email);
+    const first = await createWorkspace(headers);
+    const second = await createWorkspace(headers);
+
+    const accounts = await handle.db.select().from(billingAccount).where(eq(billingAccount.ownerUserId, owner.id));
+    expect(accounts).toEqual([
+      expect.objectContaining({ ownerUserId: owner.id, name: owner.name, plan: "free", status: "active", stripeCustomerId: null, limits: {} }),
+    ]);
+    expect(first?.billingAccountId).toBe(accounts[0]?.id);
+    expect(second?.billingAccountId).toBe(accounts[0]?.id);
+  });
+
+  it("never takes the billing account from the request, on create or on update", async () => {
+    const otherHeaders = await signUpAndSignIn(uniqueEmail());
+    const other = await createWorkspace(otherHeaders);
+    const email = uniqueEmail();
+    const headers = await signUpAndSignIn(email);
+    const owner = await findUser(email);
+
+    const created = await createWorkspace(headers, { billingAccountId: other?.billingAccountId });
+    const [own] = await handle.db.select().from(billingAccount).where(eq(billingAccount.ownerUserId, owner.id));
+    expect(created?.billingAccountId).toBe(own?.id);
+    expect(created?.billingAccountId).not.toBe(other?.billingAccountId);
+
+    if (!created) throw new Error("workspace not created");
+    await viaHttp(
+      "/organization/update",
+      { organizationId: created.id, data: { name: "Renamed", billingAccountId: other?.billingAccountId } },
+      headers,
+    );
+    const [after] = await handle.db.select().from(organization).where(eq(organization.id, created.id));
+    expect(after?.billingAccountId).toBe(own?.id);
+  });
+
+  it("refuses any plan but free and any status but active (locked switch; ASK 5)", async () => {
+    const email = uniqueEmail();
+    await signUpAndSignIn(email);
+    const { id: ownerUserId } = await findUser(email);
+    const admin = postgres(database.adminUrl, { max: 1, onnotice: () => {} });
+    try {
+      const rows: ReadonlyArray<readonly [plan: string, status: string]> = [
+        ["pro", "active"],
+        ["free", "suspended"],
+      ];
+      for (const [plan, status] of rows) {
+        expect(
+          await sqlState(admin`insert into billing_account (owner_user_id, name, plan, status) values (${ownerUserId}, 'x', ${plan}, ${status})`),
+        ).toBe("23514");
+      }
+    } finally {
+      await admin.end();
+    }
   });
 });
 

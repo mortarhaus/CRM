@@ -4,7 +4,9 @@ Scope: Phase 1 PR 1 (plan `docs/superpowers/plans/2026-10-20-phase-1-tenancy-sec
 the five database roles, the bootstrap step that creates them, one connection per role, and the privilege
 baseline (migration `0001_privileges_baseline.sql`). PR 2 (Tasks 4-7) adds the first tenant table,
 `workspace_settings`, under row-level security, and `withWorkspace()` (section "Tenant tables and the
-workspace context"). Later Phase 1 PRs add grants (`audit_log`, pg-boss) and update the tables below.
+workspace context"). PR 3 (Tasks 8-11) adds the system table `billing_account` (section "System tables
+beyond Better Auth") and the polymorphic-reference trigger functions. Later Phase 1 PRs add grants
+(`audit_log`, pg-boss) and update the tables below.
 
 "Verified" means the command was run on 2026-10-24 against the dev compose Postgres 17 or a Testcontainers
 Postgres 17.
@@ -17,7 +19,7 @@ None is superuser or has `BYPASSRLS`, `CREATEROLE`, `CREATEDB` or `REPLICATION`
 | Role | Login | What it may do | Connection |
 |---|---|---|---|
 | `crm_migrator` | yes | Owns the database, every schema object and (from PR 5) `pgboss`; runs migrations. Member of `crm_link_resolver` with `INHERIT FALSE, SET TRUE`, only so a migration can make it the owner of `resolve_share_link()` (Phase 7) | `DATABASE_MIGRATOR_URL`, direct, never pooled |
-| `crm_app` | yes | Every web request and the worker's tenant work. Today: the Better Auth tables, exactly as measured below, and `workspace_settings` under RLS | `DATABASE_URL`, may be pooled |
+| `crm_app` | yes | Every web request and the worker's tenant work. Today: the Better Auth tables, exactly as measured below, `billing_account` (SELECT, INSERT), and `workspace_settings` under RLS | `DATABASE_URL`, may be pooled |
 | `crm_worker` | yes | The worker's pg-boss instance, `pgboss.*` only. No grant yet: PR 5 measures them | `DATABASE_WORKER_URL` (worker only; read since PR 1, used from PR 5) |
 | `crm_purge` | yes, `NOINHERIT`, `CONNECTION LIMIT 2` | PDPA purge only. No grant yet (PR 4 adds INSERT on `audit_log`). No role is a member of it. It has **no password** in dev compose and production until the purge job lands (Phase 9), so nobody can sign in as it | none until Phase 9 (`DATABASE_PURGE_URL`, worker only) |
 | `crm_link_resolver` | no (`NOLOGIN`) | Owns `resolve_share_link()` from Phase 7. No privilege beyond the PUBLIC defaults, which it cannot use | none |
@@ -99,14 +101,33 @@ statements, and with only these grants both suites pass and the Postgres log sho
 INSERT is table-level because Drizzle names every column in an insert. Better Auth paths outside the
 operation set get no grant and fail with `permission denied` (HTTP 500) if called, for example a successful
 password change (`account.password`), email change, a workspace slug or logo change, and member role changes. The Phase 1 enabled-path list (plan Task 24) decides which of them stay
-reachable; enabling one adds its grant and a test here.
+reachable; enabling one adds its grant and a test here. Since PR 3 the seven invitation endpoints answer
+404 over HTTP (`disabledPaths` in `apps/web/src/lib/auth/config.ts`; invitations are Phase 3), so the
+`invitation` grants are used only by the server-side tests until then.
+
+## System tables beyond Better Auth
+
+`billing_account` (migration 0004, grants in 0005) has no RLS and is reached only through the system module
+(`apps/web/src/db/system/billing.ts`). `crm_app` holds SELECT and INSERT; no role holds UPDATE or DELETE.
+One row per owner (`UNIQUE (owner_user_id)`), created by the organization plugin's before-create hook on the
+user's first workspace; `organization.billing_account_id` points at it (`ON DELETE RESTRICT`; nullable, so
+workspaces created before PR 3 have none). `plan` is locked to `free` and `status` to `active` by CHECK
+constraints until Part 3, so any other value fails with `23514`, also for the admin.
+
+## Polymorphic-reference trigger functions
+
+Migration 0006 installs `public.poly_ref_check_insert()` and `public.poly_ref_forbid_retarget()`
+(`SECURITY INVOKER`, owned by `crm_migrator`, no EXECUTE grant: a trigger function needs none to fire). No
+table uses them yet; each later migration that creates a table with a polymorphic reference attaches them.
+Their errors: `23503 poly_ref: target not in workspace`, `23514 poly_ref: unknown target type`,
+`23514 poly_ref: target is immutable`.
 
 The manifest `apps/web/src/db/privileges.ts` holds the same set; `privileges.test.ts` fails on any privilege
 that is missing from it or not in it, for every role and for PUBLIC.
 
 ## Tenant tables and the workspace context
 
-Every table in `public` that is not a system table (today: the Better Auth tables) is a tenant table:
+Every table in `public` that is not a system table (today: the Better Auth tables and `billing_account`) is a tenant table:
 it has a non-null `workspace_id`, row-level security `ENABLE`d and `FORCE`d, one RESTRICTIVE workspace
 policy `FOR ALL TO crm_app, crm_purge`, and one PERMISSIVE policy per command `crm_app` holds (spec
 Tenancy, revision 7). The predicate is always

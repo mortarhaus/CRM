@@ -5,9 +5,21 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization, twoFactor } from "better-auth/plugins";
 import type { Database } from "../../db/client";
 import * as schema from "../../db/schema";
-import { ensureWorkspaceSettings } from "../../db/system/workspaces";
+import { ensureBillingAccount, ensureWorkspaceSettings } from "../../db/system";
 import { isHttpsUrl, isLoopbackUrl } from "../origin";
 import { enforceInputLimits } from "./input-limits";
+
+// Invitations are a Phase 3 feature (plan Task 10; Task 24 replaces this with the full Phase 1 allow-list).
+// disabledPaths applies to HTTP requests: Better Auth answers 404 before any handler runs.
+export const INVITATION_PATHS = [
+  "/organization/invite-member",
+  "/organization/accept-invitation",
+  "/organization/reject-invitation",
+  "/organization/cancel-invitation",
+  "/organization/get-invitation",
+  "/organization/list-invitations",
+  "/organization/list-user-invitations",
+] as const;
 
 export interface AuthDeps {
   db: Database;
@@ -29,6 +41,7 @@ export function createAuth({ db, secret, baseURL }: AuthDeps) {
     },
     // Info-level lines include user emails (e.g. duplicate sign-up attempts); logs must carry no PII.
     logger: { level: "warn" },
+    disabledPaths: [...INVITATION_PATHS],
     emailAndPassword: {
       enabled: true,
       // Spec: uniform responses on sign-up. With auto sign-in off, a duplicate email gets the same
@@ -48,7 +61,16 @@ export function createAuth({ db, secret, baseURL }: AuthDeps) {
       twoFactor({ issuer: "CRM" }),
       organization({
         invitationExpiresIn: INVITATION_EXPIRY_SECONDS,
+        // Set only by the server (input: false): the creator's billing account, from the before-create hook.
+        schema: {
+          organization: {
+            additionalFields: { billingAccountId: { type: "string", required: false, input: false } },
+          },
+        },
         organizationHooks: {
+          beforeCreateOrganization: async ({ organization: workspace, user }) => ({
+            data: { ...workspace, billingAccountId: await ensureBillingAccount(db, user.id, user.name) },
+          }),
           afterCreateOrganization: ({ organization: workspace }) => ensureWorkspaceSettings(db, workspace.id),
         },
       }),

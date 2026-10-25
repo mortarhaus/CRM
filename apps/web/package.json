@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "auth:generate": "auth generate --config src/lib/auth/cli-config.ts --output src/db/schema/auth.ts --yes && tsx scripts/apply-timestamptz.ts src/db/schema/auth.ts",
+    "auth:generate": "auth generate --config src/lib/auth/cli-config.ts --output src/db/schema/auth.ts --yes && tsx scripts/postprocess-auth-schema.ts src/db/schema/auth.ts",
     "db:generate": "drizzle-kit generate",
     "db:bootstrap": "tsx --env-file=../../.env scripts/bootstrap-roles.ts",
     "db:migrate": "tsx --env-file=../../.env migrate.ts",
