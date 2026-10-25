@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../client";
+import { getDb } from "../index";
 import { member, workspaceSettings } from "../schema";
 import { runInWorkspace } from "../workspace";
 
@@ -37,4 +38,20 @@ export function ensureWorkspaceSettings(db: Database, workspaceId: string): Prom
   return runInWorkspace(db, workspaceId, async (tx) => {
     await tx.insert(workspaceSettings).values({ workspaceId }).onConflictDoNothing();
   });
+}
+
+// getMembership() on the app's own pool, for requireWorkspaceMember() (plan Task 14): app code never holds the
+// database handle (TEN-10), so the system module binds it here.
+export function findMembership(userId: string, workspaceId: string): Promise<{ role: WorkspaceRole } | null> {
+  return getMembership(getDb().db, userId, workspaceId);
+}
+
+// Heals a missing workspace_settings row on first use (plan Task 14 Step 3, Risk 6): one read when it is there,
+// ensureWorkspaceSettings() when it is not.
+export async function healWorkspaceSettings(workspaceId: string): Promise<void> {
+  const { db } = getDb();
+  const present = await runInWorkspace(db, workspaceId, (tx) =>
+    tx.select({ workspaceId: workspaceSettings.workspaceId }).from(workspaceSettings).limit(1),
+  );
+  if (present.length === 0) await ensureWorkspaceSettings(db, workspaceId);
 }

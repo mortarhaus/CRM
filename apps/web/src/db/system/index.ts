@@ -15,4 +15,11 @@ export {
 export { type AuthTransactions, createAuthTransactions } from "./auth-transaction";
 export { ensureBillingAccount } from "./billing";
 export { pingDatabase } from "./health";
-export { ensureWorkspaceSettings, getMembership, type WorkspaceRole } from "./workspaces";
+export {
+  ensureWorkspaceSettings,
+  findMembership,
+  getMembership,
+  healWorkspaceSettings,
+  WORKSPACE_ROLES,
+  type WorkspaceRole,
+} from "./workspaces";

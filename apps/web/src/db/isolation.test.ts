@@ -6,7 +6,7 @@ import { holdsCommand, tenantTables } from "../test/catalog";
 import { sqlState, startDatabase, type TestDatabase } from "../test/postgres";
 import { createDb, type DbHandle } from "./client";
 import { EXPECTED_PRIVILEGES } from "./privileges";
-import { auditLog, organization, workspaceSettings } from "./schema";
+import { auditLog, idempotencyKey, organization, workspaceSettings } from "./schema";
 import { runInWorkspace, type Tx } from "./workspace";
 
 // TEN-08: every tenant table gets read and write isolation tests over two workspaces, as crm_app.
@@ -23,6 +23,28 @@ const TENANT_FIXTURES: Record<string, TenantFixture> = {
   audit_log: {
     async seed(tx, workspaceId) {
       await tx.insert(auditLog).values({ workspaceId, action: "isolation.seed", targetType: "fixture" });
+    },
+  },
+  idempotency_key: {
+    async seed(tx, workspaceId) {
+      await tx.insert(idempotencyKey).values({
+        workspaceId,
+        key: `isolation-${randomUUID()}`,
+        action: "isolation.seed",
+        requestHash: Buffer.alloc(32),
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+    },
+    async update(tx, workspaceId) {
+      const result = await tx
+        .update(idempotencyKey)
+        .set({ response: { replayed: true } })
+        .where(eq(idempotencyKey.workspaceId, workspaceId));
+      return result.count;
+    },
+    async delete(tx, workspaceId) {
+      const result = await tx.delete(idempotencyKey).where(eq(idempotencyKey.workspaceId, workspaceId));
+      return result.count;
     },
   },
   workspace_settings: {

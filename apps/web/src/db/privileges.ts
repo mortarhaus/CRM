@@ -31,9 +31,11 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...columns("invitation", "UPDATE", "expires_at", "status"),
     ...table("billing_account", "SELECT", "INSERT"), // system table, no RLS (migration 0005)
     ...table("auth_audit_log", "INSERT"), // system table, no RLS, append-only, no reader (migration 0008)
-    // Tenant tables, under RLS (migrations 0003 and 0012).
+    // Tenant tables, under RLS (migrations 0003, 0012 and 0014).
     ...table("workspace_settings", "SELECT", "INSERT", "UPDATE"),
     ...table("audit_log", "SELECT", "INSERT"), // append-only (TEN-03)
+    ...table("idempotency_key", "SELECT", "INSERT", "DELETE"),
+    ...columns("idempotency_key", "UPDATE", "response"),
   ],
   crm_worker: PUBLIC_DEFAULTS,
   // Phase 1 part (b1): INSERT on audit_log only, for the purge's own entry (spec "crm_purge in Phase 1").
