@@ -353,3 +353,10 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Worktree `.agent/worktrees/build-feat-p1-action-audit`, branch `feat/p1-action-audit` from origin/main c0bc2cc (upstream unset; push with `git push -u origin feat/p1-action-audit`). `.env` copied, install done.
 - Scope NOW: only Task 31 Step 0 (design spike, plan lines ~714-1217, 31.C) by an Opus helper: build `auth_audit_log` + mechanism, tests T1-T15, evidence for the PR body. Then push, open PR 4 as DRAFT, Charlie runs `review <n>` (Bob reviews the spike). Tasks 12-15 and 31 Steps 1-4 start only after Bob's spike round says Approved / Approved with conditions. Stop rule: if an R cannot be met without weakening it, stop and bring a spec revision proposal to Charlie.
 - Carried into Task 15: PR #43 P2 (TEN-10 lint gaps: `.js`/trailing slash, `postgres`/`pg` ban with worker.ts exemption, 4 fixtures). P3 runbook paragraph order: next PR touching the runbook.
+
+## 2026-10-25 21:59 build Phase 1 PR 4 spike pushed (DRAFT PR #44)
+- Branch feat/p1-action-audit, head b935a47, worktree .agent/worktrees/build-feat-p1-action-audit. Draft PR #44 (https://github.com/mortarhaus/CRM/pull/44).
+- Scope so far: Task 31 Step 0 only (auth_audit_log design spike by Opus helper). Builder reran typecheck, lint, test (24 files, 425 tests), build, audit: all exit 0. e2e (84 passed) reported by helper on 1bed3c5, not rerun.
+- Next: Charlie runs "review 44" (Bob). Tasks 12-15 and 31 Steps 1-4 start only after Approved / Approved with conditions.
+- Open: ASK 4 (Task 14), ASK 5, postgres.js uncaught TypeError on killed backend (decision needed), .env refresh, repo visibility, untracked docker/sync-*.sh and .playwright-mcp/.
+- Carried P3s: runbook manifest paragraph order; CLAUDE.md Status "Next" line; flaky E2E accessibility.spec.ts:77.
