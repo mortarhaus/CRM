@@ -8,6 +8,8 @@ WORKDIR /repo
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm applies patchedDependencies at install (postgres.js, see docs/DECISIONS.md).
+COPY patches ./patches
 COPY apps/web/package.json apps/web/package.json
 COPY packages/core/package.json packages/core/package.json
 RUN pnpm install --frozen-lockfile
