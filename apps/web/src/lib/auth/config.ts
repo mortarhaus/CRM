@@ -5,7 +5,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization, twoFactor } from "better-auth/plugins";
 import type { Database } from "../../db/client";
 import * as schema from "../../db/schema";
-import { ensureWorkspaceSettings } from "../../db/system/workspaces";
+import { ensureWorkspaceSettings } from "../../db/system";
 import { isHttpsUrl, isLoopbackUrl } from "../origin";
 import { enforceInputLimits } from "./input-limits";
 

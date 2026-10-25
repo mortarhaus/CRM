@@ -34,8 +34,43 @@ const restrictedDynamicImport = (names, message) => ({
   message,
 });
 
-const workspaceContextPattern = String.raw`/set_config\s*\(|\bSET\s+((SESSION|LOCAL)\s+)?(ROLE|SESSION\s+AUTHORIZATION|"?app\.)/i`;
+const workspaceContextPattern = String.raw`/"?set_config"?\s*\(|\bSET\s+((SESSION|LOCAL)\s+)?(ROLE|SESSION\s+AUTHORIZATION|"?app\.)|(-c\s*|--)app\./i`;
 const workspaceContextMessage = "Set the workspace only through withWorkspace() (TEN-09)";
+const workspaceContextSyntax = [
+  { selector: `TemplateElement[value.raw=${workspaceContextPattern}]`, message: workspaceContextMessage },
+  { selector: `Literal[value=${workspaceContextPattern}]`, message: workspaceContextMessage },
+  // An app. setting passed as a connection parameter would hold for every transaction on that connection.
+  { selector: String.raw`Property[key.value=/^app\./]`, message: workspaceContextMessage },
+];
+
+const coreSourceImport = {
+  group: ["**/packages/*/src/**"],
+  message: "Import core through its package exports (for example @crm/core/password), not its source files.",
+};
+
+// TEN-10: app code reaches the database through withWorkspace() (src/db/workspace) or a named function of
+// the system module barrel (src/db/system), never through the pool, the client or the schema.
+const directDbSource = String.raw`(^|/)db(/(index|client|schema(/.*)?|system/.+))?$`;
+const directDbMessage = "Use withWorkspace() for tenant data or a function of src/db/system for system tables (TEN-10)";
+// Every export of schema/auth.ts and schema/system.ts (lint-rules.test.ts checks the list is complete).
+const systemSchemaExports = [
+  "user",
+  "session",
+  "account",
+  "verification",
+  "twoFactor",
+  "organization",
+  "member",
+  "invitation",
+  "userRelations",
+  "sessionRelations",
+  "accountRelations",
+  "twoFactorRelations",
+  "organizationRelations",
+  "memberRelations",
+  "invitationRelations",
+];
+const systemSchemaMessage = "Only src/db/system reads or writes the system tables (TEN-10)";
 
 export default defineConfig(
   {
@@ -117,29 +152,64 @@ export default defineConfig(
   {
     files: ["apps/web/**/*.{ts,tsx,mts,cts,js,mjs}"],
     rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["**/packages/*/src/**"],
-              message: "Import core through its package exports (for example @crm/core/password), not its source files.",
-            },
-          ],
-        },
-      ],
+      "no-restricted-imports": ["error", { patterns: [coreSourceImport] }],
     },
   },
   {
     // TEN-09: the workspace context is set only by withWorkspace(), transaction-locally. No other
-    // set_config call, and no SET of the workspace setting or of the role, anywhere in the app.
+    // set_config call, no SET of the workspace setting or of the role, and no app. setting on a
+    // connection, anywhere in the app.
     files: ["apps/web/**/*.{ts,tsx,mts,cts,js,mjs}"],
     ignores: ["apps/web/src/db/workspace.ts"],
     rules: {
+      "no-restricted-syntax": ["error", ...workspaceContextSyntax],
+    },
+  },
+  {
+    // TEN-10, app code. The exceptions build the pool and Better Auth's adapter (the system module's
+    // configuration, spec "System module"); tests reach the database directly to set up and inspect it.
+    files: ["apps/web/**/*.{ts,tsx,mts,cts,js,mjs}"],
+    ignores: [
+      "apps/web/src/db/**",
+      "apps/web/src/lib/auth/config.ts",
+      "apps/web/src/lib/auth/server.ts",
+      "apps/web/src/lib/auth/cli-config.ts",
+      "apps/web/src/test/**",
+      "apps/web/**/*.test.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: [coreSourceImport, { regex: directDbSource, message: directDbMessage }] },
+      ],
       "no-restricted-syntax": [
         "error",
-        { selector: `TemplateElement[value.raw=${workspaceContextPattern}]`, message: workspaceContextMessage },
-        { selector: `Literal[value=${workspaceContextPattern}]`, message: workspaceContextMessage },
+        ...workspaceContextSyntax,
+        { selector: `ImportExpression[source.value=/${directDbSource.replaceAll("/", "\\/")}/i]`, message: directDbMessage },
+      ],
+    },
+  },
+  {
+    // TEN-10 inside src/db: only the system module (and the schema, the client and the role bootstrap)
+    // imports the system tables.
+    files: ["apps/web/src/db/**/*.{ts,tsx,mts,cts,js,mjs}"],
+    ignores: [
+      "apps/web/src/db/system/**",
+      "apps/web/src/db/schema/**",
+      "apps/web/src/db/client.ts",
+      "apps/web/src/db/bootstrap.ts",
+      "apps/web/src/db/**/*.test.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            coreSourceImport,
+            { regex: String.raw`(^|/)schema/(auth|system)$`, message: systemSchemaMessage },
+            { regex: String.raw`(^|/)schema(/index)?$`, importNames: systemSchemaExports, message: systemSchemaMessage },
+          ],
+        },
       ],
     },
   },

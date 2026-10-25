@@ -105,13 +105,17 @@ export async function objectsNotOwnedBy(sql: postgres.Sql, owner: string): Promi
   return rows.map((row) => row.object).sort();
 }
 
-// Tables without RLS, reached only through the system module (spec Tenancy). Task 8 adds the rest of the
-// spec's list and the test that the set of tables without RLS equals it.
+// Tables without RLS, reached only through the system module (spec Tenancy, revision 8): the Better Auth
+// tables, billing_account, the rate-limit counters and auth_audit_log. rls.test.ts checks that the tables
+// without RLS in public are exactly these.
 export const NO_RLS_ALLOW_LIST = [
   "account",
+  "auth_audit_log",
+  "billing_account",
   "invitation",
   "member",
   "organization",
+  "rate_limit",
   "session",
   "two_factor",
   "user",
