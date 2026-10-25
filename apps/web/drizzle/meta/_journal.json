@@ -15,6 +15,20 @@
       "when": 1792775150438,
       "tag": "0001_privileges_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792900106749,
+      "tag": "0002_workspace_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792900118320,
+      "tag": "0003_rls_workspace_settings",
+      "breakpoints": true
     }
   ]
 }
