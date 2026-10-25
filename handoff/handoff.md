@@ -314,3 +314,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Bob Round 1: Approved with conditions on head 9128033 (= PR head, open, CI green). Review archived and receipt `reviews/PR-41.receipt` written on agent-logs.
 - Deferred: P2 TEN-09 lint gaps (connection-level forms) -> Phase 1 PR 3 (Task 8); P3 extra blank lines -> next edit of those files.
 - Next: Charlie merges #41, then `merged 41`. PR 3 (feat/p1-system-module, Tasks 8-11): ask Charlie first; must fix the TEN-09 lint P2 in Task 8.
+
+## 2026-10-25 merged 41
+- PR #41 merged (5e82a4c, 07:13:48Z). Receipt 07:10:47Z, head matched: no breach. Log `log/2026-10-25_PR41_workspace-settings-rls-withworkspace.md` on agent-logs. Log gate clear.
+- Cleaned up branch and worktree `feat/p1-rls` (tip on main, clean, pushed).
+- Next: ask Charlie before PR 3 (`feat/p1-system-module`, Tasks 8-11, Opus helper). Task 8 must fix the TEN-09 lint P2 (quoted `set_config`, `app.` connection keys, `-c app.` options, 3 fixtures). P3 blank lines in rls/isolation/workspace tests: next touch. Stale CLAUDE.md Status ("Next: Phase 1 PR 1") and PR #38 P2/P3 items due 2026-11-06 in next PR editing PROJECT.md/CLAUDE.md.
