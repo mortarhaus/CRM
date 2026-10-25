@@ -153,11 +153,20 @@ async function rowContentViolations(admin: postgres.Sql): Promise<string[]> {
   return violations;
 }
 
+// A fault a test installed (failOnce) that never fired: the request failed for another reason, so the test would
+// pass without testing its point.
+async function faultsNotFired(admin: postgres.Sql): Promise<string[]> {
+  const rows = await admin<{ name: string }[]>`
+    select sequencename as name from pg_sequences where schemaname = 'test_fixture' and last_value is null order by 1`;
+  return rows.map((row) => row.name);
+}
+
 afterEach(async () => {
   try {
     for (const stack of [main, ...isolatedStacks]) {
       expect(await sessionsWithoutRow(stack.admin), `session invariant in ${stack.name}`).toEqual([]);
       expect(await rowContentViolations(stack.admin), `row content in ${stack.name}`).toEqual([]);
+      expect(await faultsNotFired(stack.admin), `injected faults that never fired in ${stack.name}`).toEqual([]);
     }
   } finally {
     for (const stack of isolatedStacks.splice(0)) await stack.close();
@@ -419,7 +428,30 @@ describe("T1 (R1): one row per event, keyed by user, with no workspace", () => {
   });
 });
 
+// crm_app holds no UPDATE on account until plan Task 24 enables the password change; a test database of its own
+// gets the two columns Better Auth writes, so /change-password reaches its rotation.
+async function grantPasswordChange(admin: postgres.Sql): Promise<void> {
+  await admin.unsafe("GRANT UPDATE (password, updated_at) ON public.account TO crm_app");
+}
+
 describe("T2 (R2): no session exists without its audit row", () => {
+  it("the password-change path reaches its rotation (with the test-only grant): one rotation row, A′ only", async () => {
+    const { stack, auth: instance } = await isolated();
+    await grantPasswordChange(stack.admin);
+    const person = await signUp(instance, stack.admin);
+    const jar = await signIn(instance, person.email);
+    const other = await signIn(instance, person.email);
+    const reply = await http(instance, "POST", "/change-password", {
+      body: { currentPassword: PASSWORD, newPassword: `${PASSWORD} changed`, revokeOtherSessions: true },
+      jar,
+    });
+    expect(reply.status).toBe(200);
+    expect(setsSession(reply)).toBe(true);
+    expect(await sessionOf(instance, other)).toBeNull();
+    expect(await sessionTokens(stack.admin, person.id)).toEqual([reply.jar.sessionToken]);
+    expect(shape(await auditRows(stack.admin, person.id))).toEqual([LOGIN, LOGIN, rotation("password_changed")]);
+  });
+
   interface Step {
     // Builds the state before the failing request and returns it; prepare() installs the fault.
     setup(instance: Auth, admin: postgres.Sql): Promise<{ userId: string; act(): Promise<Reply>; existing: CookieJar[] }>;
@@ -508,6 +540,7 @@ describe("T2 (R2): no session exists without its audit row", () => {
       "rotation on password change",
       {
         async setup(instance, admin) {
+          await grantPasswordChange(admin);
           const person = await signUp(instance, admin);
           const jar = await signIn(instance, person.email);
           const act = () =>
