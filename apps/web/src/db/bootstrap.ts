@@ -1,5 +1,5 @@
 import { createHash, createHmac, pbkdf2Sync, randomBytes } from "node:crypto";
-import type postgres from "postgres";
+import postgres from "postgres";
 
 export interface RolePasswords {
   migrator: string;
@@ -68,4 +68,15 @@ export async function bootstrapRoles(adminSql: postgres.Sql, passwords: RolePass
       "DO $$ BEGIN EXECUTE format('ALTER DATABASE %I OWNER TO crm_migrator', current_database()); END $$",
     );
   });
+}
+
+// `pnpm db:bootstrap` (scripts/bootstrap-roles.ts): its own admin connection, closed when done. The connection is
+// opened here because only src/db opens database connections (TEN-10 lint).
+export async function bootstrapRolesAt(adminUrl: string, passwords: RolePasswords): Promise<void> {
+  const admin = postgres(adminUrl, { max: 1, onnotice: () => {} });
+  try {
+    await bootstrapRoles(admin, passwords);
+  } finally {
+    await admin.end();
+  }
 }
