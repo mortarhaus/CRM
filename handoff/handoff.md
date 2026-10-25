@@ -298,3 +298,9 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 ## 2026-10-25 merged 39
 - PR #39 merged (d64a899, 2026-10-25T03:29:02Z). Receipt 23 s before merge, head matched: no breach. Log on agent-logs: `log/2026-10-25_PR39_five-db-roles-privilege-manifest.md`. Log gate clear.
 - Next: ask Charlie before starting Phase 1 PR 2 (`feat/p1-rls`, Tasks 4-7, Opus tier). Old worktrees (build-feat-p1-db-roles, chore-deps-zod-undici) can be removed on his OK. Pending: CLAUDE.md Status line ("Next: Phase 1 PR 1") is stale; update in the next PR that edits it.
+
+## 2026-10-25 build Phase 1 PR 2 started (Charlie: "A")
+- Cleaned up merged worktrees/branches for #39 and #40 (tips on main, clean, pushed; no --force).
+- New worktree `.agent/worktrees/build-feat-p1-rls`, branch `feat/p1-rls` from origin/main d64a899, upstream unset (push only with `git push -u origin feat/p1-rls`). `.env` copied, `pnpm install` done.
+- Plan Tasks 4-7 (RLS, `withWorkspace()`, `workspace_settings`, hook). Deep tier: Opus 5.5 helper writes code and commits locally (trailer Claude Opus 5.5), no push. I verify, push, open PR.
+- Gates: spec hash 733cc0e9 reviewed + reconciled; log gate clear (PR 39 log on agent-logs).
