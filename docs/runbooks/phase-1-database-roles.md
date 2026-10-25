@@ -5,8 +5,9 @@ the five database roles, the bootstrap step that creates them, one connection pe
 baseline (migration `0001_privileges_baseline.sql`). PR 2 (Tasks 4-7) adds the first tenant table,
 `workspace_settings`, under row-level security, and `withWorkspace()` (section "Tenant tables and the
 workspace context"). PR 3 (Tasks 8-11) adds the system table `billing_account` (section "System tables
-beyond Better Auth") and the polymorphic-reference trigger functions. Later Phase 1 PRs add grants
-(`audit_log`, pg-boss) and update the tables below.
+beyond Better Auth") and the polymorphic-reference trigger functions. PR 4 (Tasks 12-15 and 31) adds the
+tenant tables `audit_log` and `idempotency_key`, `crm_purge`'s one grant and the system table
+`auth_audit_log`. PR 5 adds the pg-boss grants.
 
 "Verified" means the command was run on 2026-10-24 against the dev compose Postgres 17 or a Testcontainers
 Postgres 17.
@@ -19,9 +20,9 @@ None is superuser or has `BYPASSRLS`, `CREATEROLE`, `CREATEDB` or `REPLICATION`
 | Role | Login | What it may do | Connection |
 |---|---|---|---|
 | `crm_migrator` | yes | Owns the database, every schema object and (from PR 5) `pgboss`; runs migrations. Member of `crm_link_resolver` with `INHERIT FALSE, SET TRUE`, only so a migration can make it the owner of `resolve_share_link()` (Phase 7) | `DATABASE_MIGRATOR_URL`, direct, never pooled |
-| `crm_app` | yes | Every web request and the worker's tenant work. Today: the Better Auth tables, exactly as measured below, `billing_account` (SELECT, INSERT), and `workspace_settings` under RLS | `DATABASE_URL`, may be pooled |
+| `crm_app` | yes | Every web request and the worker's tenant work. Today: the Better Auth tables, exactly as measured below, `billing_account` (SELECT, INSERT), `auth_audit_log` (INSERT), and `workspace_settings`, `audit_log` and `idempotency_key` under RLS | `DATABASE_URL`, may be pooled |
 | `crm_worker` | yes | The worker's pg-boss instance, `pgboss.*` only. No grant yet: PR 5 measures them | `DATABASE_WORKER_URL` (worker only; read since PR 1, used from PR 5) |
-| `crm_purge` | yes, `NOINHERIT`, `CONNECTION LIMIT 2` | PDPA purge only. No grant yet (PR 4 adds INSERT on `audit_log`). No role is a member of it. It has **no password** in dev compose and production until the purge job lands (Phase 9), so nobody can sign in as it | none until Phase 9 (`DATABASE_PURGE_URL`, worker only) |
+| `crm_purge` | yes, `NOINHERIT`, `CONNECTION LIMIT 2` | PDPA purge only. INSERT on `audit_log` only, for the purge's own entry, under the RESTRICTIVE workspace policy and `audit_log_purge_insert` (PR 4, migration 0012; `purge-role.test.ts`). No role is a member of it. It has **no password** in dev compose and production until the purge job lands (Phase 9), so nobody can sign in as it | none until Phase 9 (`DATABASE_PURGE_URL`, worker only) |
 | `crm_link_resolver` | no (`NOLOGIN`) | Owns `resolve_share_link()` from Phase 7. No privilege beyond the PUBLIC defaults, which it cannot use | none |
 
 `PUBLIC` keeps only `CONNECT` on the database and `USAGE` on schema `public`. Migration 0001 revokes
@@ -105,6 +106,10 @@ reachable; enabling one adds its grant and a test here. Since PR 3 the seven inv
 404 over HTTP (`disabledPaths` in `apps/web/src/lib/auth/config.ts`; invitations are Phase 3), so the
 `invitation` grants are used only by the server-side tests until then.
 
+The manifest `apps/web/src/db/privileges.ts` holds the same set, together with every grant below
+(system tables, tenant tables, `crm_purge`); `privileges.test.ts` fails on any privilege
+that is missing from it or not in it, for every role and for PUBLIC.
+
 ## System tables beyond Better Auth
 
 `billing_account` (migration 0004, grants in 0005) has no RLS and is reached only through the system module
@@ -122,12 +127,9 @@ table uses them yet; each later migration that creates a table with a polymorphi
 Their errors: `23503 poly_ref: target not in workspace`, `23514 poly_ref: unknown target type`,
 `23514 poly_ref: target is immutable`.
 
-The manifest `apps/web/src/db/privileges.ts` holds the same set; `privileges.test.ts` fails on any privilege
-that is missing from it or not in it, for every role and for PUBLIC.
-
 ## Tenant tables and the workspace context
 
-Every table in `public` that is not a system table (today: the Better Auth tables and `billing_account`) is a tenant table:
+Every table in `public` that is not a system table (today: the Better Auth tables, `billing_account` and `auth_audit_log`) is a tenant table:
 it has a non-null `workspace_id`, row-level security `ENABLE`d and `FORCE`d, one RESTRICTIVE workspace
 policy `FOR ALL TO crm_app, crm_purge`, and one PERMISSIVE policy per command `crm_app` holds (spec
 Tenancy, revision 7). The predicate is always
@@ -144,11 +146,14 @@ errors in `apps/web` (TEN-09). `crm_migrator` and `crm_worker` have no policy on
 | Table | `crm_app` | Policies | Created by |
 |---|---|---|---|
 | `workspace_settings` | SELECT, INSERT, UPDATE (no DELETE: workspace deletion is Phase 9) | `workspace_settings_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update` | migrations 0002 (table) and 0003 (RLS, grants) |
+| `audit_log` | SELECT, INSERT (append-only: no role but the owner updates, deletes or truncates, TEN-03); `crm_purge` INSERT only | `audit_log_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_purge_insert` | migrations 0011 (table) and 0012 (RLS, grants) |
+| `idempotency_key` | SELECT, INSERT, DELETE, UPDATE (`response` only) | `idempotency_key_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update`, `_app_delete` | migrations 0013 (table) and 0014 (RLS, grants) |
 
 Every new workspace gets its `workspace_settings` row from Better Auth's `afterCreateOrganization` hook
 (`apps/web/src/db/system/workspaces.ts`, `ensureWorkspaceSettings`). It is a second write after Better
 Auth's own, so a crash in between can leave a workspace without its row; the call is idempotent, and `requireWorkspaceMember`
-will call it once when the row is missing (planned for PR 4, plan Task 14 and Risk 6).
+(`apps/web/src/lib/auth/action.ts`, through `healWorkspaceSettings` in the system module) recreates it when
+the row is missing (plan Task 14 and Risk 6).
 
 Checks: `apps/web/src/db/rls.test.ts` (the `nullif` policy lint and the RESTRICTIVE + PERMISSIVE catalog
 test over every tenant table), `apps/web/src/db/isolation.test.ts` (two workspaces, every tenant table,
