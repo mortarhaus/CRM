@@ -333,3 +333,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 ## 2026-10-25 approved 42
 - Bob Round 1: Approved (no conditions) on head 75cc03d = PR head, open, CI green. Review archived + receipt `reviews/PR-42.receipt`.
 - Next: Charlie merges #42, `merged 42`. Then PR #43 will conflict in DECISIONS.md top (keep both entries). #43 awaits CI and `review 43`; ASK 5 pending with Charlie.
+
+## 2026-10-25 merged 42; PR #43 updated
+- PR #42 merged (e4fd100, 08:46:39Z), receipt 3 min before, no breach. Log `log/2026-10-25_PR42_close-deferred-handoff-and-wording.md`. Branch/worktree chore/docs-status-deferred removed.
+- Merged origin/main into feat/p1-system-module (conflict only in DECISIONS.md top, kept both), pushed head new. Local: typecheck, lint, 321 tests, build, audit 0. PR #43 body updated. CI restarted.
+- Next: CI green on #43, Charlie `review 43` (Bob Opus 5.5), `approved 43` BEFORE merge, `merged 43`. ASK 5 answer pending from Charlie (A = only `active`). Then PR 4 (feat/p1-action-audit): ask Charlie first; ASK 4 blocks Task 14 Step 4.
