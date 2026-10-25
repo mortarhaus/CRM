@@ -304,3 +304,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - New worktree `.agent/worktrees/build-feat-p1-rls`, branch `feat/p1-rls` from origin/main d64a899, upstream unset (push only with `git push -u origin feat/p1-rls`). `.env` copied, `pnpm install` done.
 - Plan Tasks 4-7 (RLS, `withWorkspace()`, `workspace_settings`, hook). Deep tier: Opus 5.5 helper writes code and commits locally (trailer Claude Opus 5.5), no push. I verify, push, open PR.
 - Gates: spec hash 733cc0e9 reviewed + reconciled; log gate clear (PR 39 log on agent-logs).
+
+## 2026-10-25 PR #41 opened (Phase 1 PR 2, feat/p1-rls, head 9128033)
+- Opus helper built Tasks 4-7 (5 local commits); I reran typecheck, lint, 228 tests, build, audit: all 0. Pushed, opened PR #41 with self-check, size note, unverified list.
+- Helper note: repo-root `.env` still has Phase 0 `crm` user URLs (role gone); dev Postgres `crm-dev-postgres-1` at migration 0001. Tell Charlie to refresh `.env` from `.env.example` (his local file; I did not edit it).
+- Next: CI green (image job ~26 min), Charlie `review 41` (Bob Opus 5.5), `approved 41` before merge, `merged 41`. Then PR 3 (feat/p1-system-module, Tasks 8-11), ask Charlie first (new module).
