@@ -252,6 +252,50 @@ describe("Better Auth endpoints: U1 cannot read or change W2", () => {
   });
 });
 
+// Reachable in this PR and disabled by Task 24's Phase 1 allow-list; until then Better Auth's own checks hold.
+describe("Better Auth member endpoints: U1 cannot read or change W2's members", () => {
+  async function u2MemberId(): Promise<string> {
+    const [row] = await handle.db.select().from(member).where(eq(member.userId, u2.userId));
+    if (!row) throw new Error("U2 has no member row");
+    return row.id;
+  }
+
+  const byId = (w2: string, memberId: string): [method: "GET" | "POST", path: string, body?: unknown][] => [
+    ["GET", `/organization/get-organization?organizationId=${w2}`],
+    ["GET", `/organization/list-members?organizationId=${w2}`],
+    ["POST", "/organization/update-member-role", { memberId, role: "admin", organizationId: w2 }],
+    ["POST", "/organization/remove-member", { memberIdOrEmail: memberId, organizationId: w2 }],
+    ["POST", "/organization/leave", { organizationId: w2 }],
+    ["POST", "/organization/delete", { organizationId: w2 }],
+  ];
+
+  const byStaleSession = (memberId: string): [method: "GET" | "POST", path: string, body?: unknown][] => [
+    ["GET", "/organization/get-organization"],
+    ["GET", "/organization/list-members"],
+    ["GET", "/organization/get-active-member"],
+    ["GET", "/organization/get-active-member-role"],
+    ["POST", "/organization/update-member-role", { memberId, role: "admin" }],
+    ["POST", "/organization/remove-member", { memberIdOrEmail: memberId }],
+  ];
+
+  it("refuses every member read and change of W2 named by id; W2 is unchanged", async () => {
+    const before = await snapshotOf(u2);
+    for (const [method, path, body] of byId(u2.workspaceId, await u2MemberId())) {
+      expect({ path, status: (await http(method, path, body, u1.headers)).status }).toEqual({ path, status: expect.toSatisfy((s: number) => s >= 400) });
+    }
+    expect(await snapshotOf(u2)).toEqual(before);
+  });
+
+  it("refuses every member read and change of W2 through a stale active workspace; W2 is unchanged", async () => {
+    const before = await snapshotOf(u2);
+    await makeStale(u1, u2.workspaceId);
+    for (const [method, path, body] of byStaleSession(await u2MemberId())) {
+      expect({ path, status: (await http(method, path, body, u1.headers)).status }).toEqual({ path, status: expect.toSatisfy((s: number) => s >= 400) });
+    }
+    expect(await snapshotOf(u2)).toEqual(before);
+  });
+});
+
 describe("system-module writes stay in their own workspace", () => {
   it("creating a workspace touches no other workspace's settings, members or billing account", async () => {
     const before = await snapshotOf(u2);
