@@ -9,6 +9,18 @@ import { ensureBillingAccount, ensureWorkspaceSettings } from "../../db/system";
 import { isHttpsUrl, isLoopbackUrl } from "../origin";
 import { enforceInputLimits } from "./input-limits";
 
+// Invitations are a Phase 3 feature (plan Task 10; Task 24 replaces this with the full Phase 1 allow-list).
+// disabledPaths applies to HTTP requests: Better Auth answers 404 before any handler runs.
+export const INVITATION_PATHS = [
+  "/organization/invite-member",
+  "/organization/accept-invitation",
+  "/organization/reject-invitation",
+  "/organization/cancel-invitation",
+  "/organization/get-invitation",
+  "/organization/list-invitations",
+  "/organization/list-user-invitations",
+] as const;
+
 export interface AuthDeps {
   db: Database;
   secret: string;
@@ -29,6 +41,7 @@ export function createAuth({ db, secret, baseURL }: AuthDeps) {
     },
     // Info-level lines include user emails (e.g. duplicate sign-up attempts); logs must carry no PII.
     logger: { level: "warn" },
+    disabledPaths: [...INVITATION_PATHS],
     emailAndPassword: {
       enabled: true,
       // Spec: uniform responses on sign-up. With auto sign-in off, a duplicate email gets the same

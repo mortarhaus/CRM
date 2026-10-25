@@ -2,4 +2,4 @@
 // RLS. App code imports from here, never from the modules behind it.
 export { ensureBillingAccount } from "./billing";
 export { pingDatabase } from "./health";
-export { ensureWorkspaceSettings } from "./workspaces";
+export { ensureWorkspaceSettings, getMembership, type WorkspaceRole } from "./workspaces";
