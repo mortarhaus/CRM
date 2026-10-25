@@ -55,7 +55,9 @@ first. To build like CI locally, move the root `.env` aside, run
   session-level advisory lock (`apps/web/src/db/migrate.ts`), which a transaction-mode pooler breaks.
 - `DATABASE_URL` may go through a transaction-mode pooler from Phase 1. The app client always uses
   `prepare: false` (`apps/web/src/db/client.ts`), so no setting is needed for that.
-- Phase 0 uses one dev user for both URLs; Phase 1 splits them into `crm_app` and `crm_migrator`.
+- Phase 0 used one dev user for both URLs. From Phase 1 PR 1 each URL has its own role (`crm_app`,
+  `crm_migrator`, and `DATABASE_WORKER_URL` for `crm_worker`), created by a bootstrap step; see
+  `docs/runbooks/phase-1-database-roles.md`, which also says how to replace a Phase 0 dev database.
 
 ## Local startup and migrations
 
@@ -65,7 +67,7 @@ Run from the repo root (Node 24.21.0, pnpm 11.6.0).
 |---|---|---|
 | Start Postgres 17 on `127.0.0.1:5433` | `docker compose -f docker/compose.dev.yml up -d --wait postgres` | Verified. `pnpm stack:up` now also builds and starts `web` (port 3000) and `worker`; use it only when you want the image, not with `pnpm dev` |
 | Apply migrations | `pnpm db:migrate` | Verified; prints `{"level":"info","msg":"migrations applied"}` |
-| Check applied migrations | `docker exec crm-dev-postgres-1 psql -U crm -d crm -c 'select id, hash, created_at from drizzle.__drizzle_migrations order by id'` | Verified; one row per file in `apps/web/drizzle/` (today: `0000_auth_baseline.sql`) |
+| Check applied migrations | `docker exec crm-dev-postgres-1 psql -U postgres -d crm -c 'select id, hash, created_at from drizzle.__drizzle_migrations order by id'` | Verified; one row per file in `apps/web/drizzle/` |
 | Start the app | `pnpm dev` | Verified; reads the root `.env`, no exported variables needed |
 | Auth route answers | `curl -s http://localhost:3000/api/auth/ok` | Verified; returns `{"ok":true}` |
 | Smoke check: start with only the root `.env` | `pnpm smoke:auth-route` | Verified; prints `PASS: GET /api/auth/ok -> 200 {"ok":true} ...`. It starts `pnpm dev` on a free port with `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `DATABASE_MIGRATOR_URL`, `DEPLOYMENT_MODE` and `NODE_ENV` removed from its environment, then stops it. In CI it runs in the `image` job, which has a root `.env` (the `checks` job has none) |
@@ -177,8 +179,9 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 - `pnpm build` runs `next build` and then `scripts/build-node.mjs` (esbuild 0.28.2), which bundles
   `worker.ts` and `migrate.ts` into `apps/web/dist/`. `pnpm --filter @crm/web build:node` rebuilds only the
   bundles; `pnpm worker:dev` runs the worker from source with the root `.env`.
-- Compose (`docker/compose.dev.yml`, project `crm-dev`) reads the root `.env` and replaces both database
-  URLs with `postgres://crm:crm@postgres:5432/crm` inside the containers.
+- Compose (`docker/compose.dev.yml`, project `crm-dev`) reads the root `.env` and replaces the database
+  URLs with the role URLs on `postgres:5432` inside the containers (from Phase 1 PR 1; see
+  `docs/runbooks/phase-1-database-roles.md`).
 
 | Step | Command | Status |
 |---|---|---|
@@ -224,7 +227,7 @@ failure it uploads the Playwright report, traces and the stack logs for 7 days.
 | `connect ECONNREFUSED 127.0.0.1:5433` | Postgres is not running or the port is wrong | `docker compose -f docker/compose.dev.yml up -d --wait postgres`, then rerun |
 | `pnpm stack:up` fails to bind port 3000 (exact message not captured) | `pnpm dev` (or another server) holds port 3000 | Stop that server, or start only Postgres (above) |
 | `password authentication failed for user "crm"` | Wrong credentials in the URL | Fix the URL in `.env` |
-| `pnpm db:migrate` hangs with no output | Another runner holds the migration lock; this one waits without a timeout | Find the holder: `docker exec crm-dev-postgres-1 psql -U crm -d crm -c "select l.pid, l.granted, a.state, a.query_start from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory'"` (verified). Wait for it to finish. If the holder is a dead session, end it with `select pg_terminate_backend(<pid>)` (unverified) and rerun |
+| `pnpm db:migrate` hangs with no output | Another runner holds the migration lock; this one waits without a timeout | Find the holder: `docker exec crm-dev-postgres-1 psql -U postgres -d crm -c "select l.pid, l.granted, a.state, a.query_start from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory'"` (verified). Wait for it to finish. If the holder is a dead session, end it with `select pg_terminate_backend(<pid>)` (unverified) and rerun |
 | A migration fails with a SQL error | Drizzle runs all pending files in one transaction (verified in drizzle-orm 0.45.3 source), so nothing from the run is applied and no row is added to `drizzle.__drizzle_migrations` | Fix the migration in a new PR, then rerun. Never edit an applied migration file |
 
 A failed `pnpm db:migrate` exits non-zero.

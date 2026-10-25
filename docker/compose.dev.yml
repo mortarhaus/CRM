@@ -1,36 +1,55 @@
 name: crm-dev
 
+# Dev-only fixed credentials, reachable only on 127.0.0.1. Production passwords come from the
+# host's secret store (UNI-08; docs/runbooks/phase-1-database-roles.md).
+x-db-urls: &db-urls
+  DATABASE_URL: postgres://crm_app:crm-app-dev-only@postgres:5432/crm
+  DATABASE_MIGRATOR_URL: postgres://crm_migrator:crm-migrator-dev-only@postgres:5432/crm
+
 x-app: &app
   image: crm-app:dev
   env_file:
     - path: ../.env
       required: true
-  environment:
-    DATABASE_URL: postgres://crm:crm@postgres:5432/crm
-    DATABASE_MIGRATOR_URL: postgres://crm:crm@postgres:5432/crm
+  environment: *db-urls
   read_only: true
   tmpfs:
     - /tmp
   depends_on:
-    postgres:
-      condition: service_healthy
+    bootstrap:
+      condition: service_completed_successfully
 
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: crm
-      POSTGRES_PASSWORD: crm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres-dev-only
       POSTGRES_DB: crm
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U crm -d crm"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d crm"]
       interval: 2s
       timeout: 3s
       retries: 30
+
+  # Creates or repairs the five roles once, then exits (plan Task 1; runbook phase-1-database-roles).
+  bootstrap:
+    <<: *app
+    pull_policy: never
+    command: ["bootstrap"]
+    restart: "no"
+    environment:
+      DATABASE_ADMIN_URL: postgres://postgres:postgres-dev-only@postgres:5432/crm
+      CRM_MIGRATOR_PASSWORD: crm-migrator-dev-only
+      CRM_APP_PASSWORD: crm-app-dev-only
+      CRM_WORKER_PASSWORD: crm-worker-dev-only
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   web:
     <<: *app
@@ -58,6 +77,9 @@ services:
     <<: *app
     pull_policy: never
     command: ["worker"]
+    environment:
+      <<: *db-urls
+      DATABASE_WORKER_URL: postgres://crm_worker:crm-worker-dev-only@postgres:5432/crm
 
 volumes:
   pgdata:

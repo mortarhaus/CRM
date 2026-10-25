@@ -1,23 +1,22 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { getTableName } from "drizzle-orm";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MIGRATIONS_DIR, startPostgres } from "../test/postgres";
+import { MIGRATIONS_DIR, startDatabase, type TestDatabase } from "../test/postgres";
 import { runMigrations } from "./migrate";
 import { account, invitation, member, organization, session, twoFactor, user, verification } from "./schema";
 
-let container: StartedPostgreSqlContainer;
+let database: TestDatabase;
 let url: string;
 
 beforeAll(async () => {
-  container = await startPostgres();
-  url = container.getConnectionUri();
+  database = await startDatabase({ migrate: false });
+  url = database.migratorUrl;
 });
 
 afterAll(async () => {
-  await container?.stop();
+  await database?.stop();
 });
 
 function journalLength(): number {

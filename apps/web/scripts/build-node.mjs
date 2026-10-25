@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 
 await build({
-  entryPoints: ["worker.ts", "migrate.ts"],
+  entryPoints: { worker: "worker.ts", migrate: "migrate.ts", bootstrap: "scripts/bootstrap-roles.ts" },
   bundle: true,
   platform: "node",
   target: "node24",

@@ -13,6 +13,9 @@ case "${1:-web}" in
   migrate)
     exec node dist/migrate.mjs
     ;;
+  bootstrap)
+    exec node dist/bootstrap.mjs
+    ;;
   *)
     exec "$@"
     ;;
