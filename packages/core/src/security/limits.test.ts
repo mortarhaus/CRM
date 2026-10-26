@@ -22,7 +22,7 @@ describe("fixed security values", () => {
     expect(WORKSPACE_NAME_MAX_LENGTH).toBe(80);
   });
 
-  it("keeps the idempotency key expiry at the builder default of 24 hours (ASK 4, awaiting Charlie) and keys at 128", () => {
+  it("keeps the idempotency key expiry at the decided 24 hours (ASK 4, Charlie 2026-10-26) and keys at 128", () => {
     expect(IDEMPOTENCY_KEY_EXPIRY_SECONDS).toBe(86_400);
     expect(IDEMPOTENCY_KEY_MAX_LENGTH).toBe(128);
   });

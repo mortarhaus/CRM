@@ -7,7 +7,7 @@ export const PASSWORD_MAX_LENGTH = 128;
 export const NAME_MAX_LENGTH = 100;
 export const WORKSPACE_NAME_MAX_LENGTH = 80;
 
-// Not in the spec (plan ASK 4). Builder default 2026-10-26, awaiting Charlie: the plan's proposal of 24 hours.
+// Not in the spec (plan ASK 4). Charlie decided 24 hours on 2026-10-26 (plan ASK 4).
 export const IDEMPOTENCY_KEY_EXPIRY_SECONDS = 24 * 60 * 60;
 // Plan Task 14 Step 1: a key is 1 to 128 characters (CHECK on idempotency_key.key).
 export const IDEMPOTENCY_KEY_MAX_LENGTH = 128;
