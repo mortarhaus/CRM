@@ -388,3 +388,9 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 ## 2026-10-27 00:15 build Phase 1 PR 5 started
 - Gates passed (spec hash 733cc0e reviewed + reconciled; logs through PR 44 on agent-logs). Worktree .agent/worktrees/build-feat-p1-pgboss, branch feat/p1-pgboss from origin/main 130fd4d. Scope: plan Tasks 16-18 (pg-boss 12.35.0 by migration, queues, crm_app enqueue grants; measure crm_worker grants; send-only/worker instances, retry command, pg ban; end of TEN-10 worker.ts driver exemption). Opus helper builds; Andy verifies, pushes, opens PR 5.
 - Carried: Task 24 revoke-by-id, PR 44 P3-2 pointers, CLAUDE.md Status line. Open for Charlie: ASK 5, .env refresh, repo visibility, untracked docker/sync-*.sh and .playwright-mcp/.
+
+## 2026-10-27 00:52 build PR 5: Task 16 done, STOP in Task 17 (needs Charlie)
+- Branch feat/p1-pgboss head 4b27b7d (2 local commits, not pushed): Task 16 (migrations 0015_pgboss_install, 0016_pgboss_queues_grants, install.test.ts 14 tests, UNI-06 row). typecheck/lint 0, pnpm test 587 passed (helper run; I have not rerun).
+- STOP: pg-boss 12.35.0 start() with schedule:true calls createQueue('__pgboss__send-it') (dist/timekeeper.js:252, verified by me); crm_worker then needs EXECUTE create_queue + INSERT on pgboss.queue, which plan Settled item 2 and spec §9 forbid. Options: (a) grant the pair; (b) schedule:false + cron in app; (c) pnpm patch pg-boss to skip createQueue when the queue exists + migration creating __pgboss__send-it. Builder recommends (c).
+- Also: boss.retry('email.send.dead', id) is a no-op (plan Task 17 Step 1); jobs:retry must take the original queue + failed id. SELECT(start_after) on job_common unused by send (kept per spec).
+- Parked Task 17 work: scratchpad/task17-parked/. Task 18 not started. Waiting for Charlie's choice.
