@@ -369,3 +369,6 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Head b782501 pushed, PR #44 retitled, body rewritten (facts, upgrade notice, self-check), marked ready. Tasks 12-15 + Bob conditions P2-1, P2-2 (postgres.js patch), P2-4 + Task 31 Steps 1-4 done. Builder reran install/typecheck/lint/test (569)/build/audit: all 0. e2e 84 reported by helper. CI pending.
 - Next: Charlie runs "review 44" (final round). Task 24 must name revoke-session-by-id (P2-3); Task 22 note added to plan. ASK 4 = 24 h builder default.
 - Open: ASK 4, ASK 5, .env refresh, repo visibility, untracked docker/sync-*.sh, .playwright-mcp/. Carried: CLAUDE.md Status "Next" line (now PR 5 after merge).
+
+## 2026-10-26 15:08 ASK 4 answered by Charlie: 24 hours
+- Docs/code comment updated and pushed (head e3afafd, docs-only commit, limits test passes, lint and typecheck 0). PR #44 body updated. CI re-runs on the new head. Charlie still runs "review 44"; Bob must re-check head e3afafd.
