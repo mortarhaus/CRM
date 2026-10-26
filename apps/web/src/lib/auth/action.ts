@@ -48,14 +48,22 @@ export async function requireWorkspaceMember(minRole: Role): Promise<{ userId: s
   return { userId: current.user.id, workspaceId, role: membership.role };
 }
 
-// Canonical JSON of the parsed input: object keys sorted, so the same request always hashes the same.
+// A plain object (an object literal, Zod's object and record output, or one with no prototype). Any other object
+// (a Set, a Map, a Blob or File, a class instance) has state Object.entries does not see, so it would hash as {}.
+function isPlainObject(value: object): boolean {
+  const prototype: unknown = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+// Canonical JSON of the parsed input: object keys sorted, so the same request always hashes the same. A value it
+// cannot represent exactly is refused with a TypeError, never hashed as something else (PR #44 Round 2 P3-1).
 function canonical(value: unknown): string {
   if (value === null || typeof value === "boolean" || typeof value === "string") return JSON.stringify(value);
   if (typeof value === "number") return Number.isFinite(value) ? JSON.stringify(value) : JSON.stringify(String(value));
   if (typeof value === "bigint") return JSON.stringify({ $bigint: value.toString() });
   if (value instanceof Date) return JSON.stringify({ $date: value.toISOString() });
   if (Array.isArray(value)) return `[${value.map((item) => (item === undefined ? "null" : canonical(item))).join(",")}]`;
-  if (typeof value === "object") {
+  if (typeof value === "object" && isPlainObject(value)) {
     const entries = Object.entries(value)
       .filter(([, item]) => item !== undefined)
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));

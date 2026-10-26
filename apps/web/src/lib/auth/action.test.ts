@@ -321,6 +321,35 @@ describe("action(): idempotency", () => {
     expect((await run({ tags: { a: { c: 1, d: 3 }, b: { e: 3 } } }, key)).status).toBe("IDEMPOTENCY_KEY_REUSED");
   });
 
+  it("refuses to hash a Set, a Map, a Blob, a File or a class instance (TypeError), and claims no key", async () => {
+    class Point {
+      constructor(readonly x: number) {}
+    }
+    const values: [string, unknown][] = [
+      ["Set", new Set([1])],
+      ["Map", new Map([["a", 1]])],
+      ["Blob", new Blob(["a"])],
+      ["File", new File(["a"], "a.txt")],
+      ["class instance", new Point(1)],
+    ];
+    for (const [label, value] of values) {
+      const { handler } = recordingHandler();
+      const input = z.object({ field: z.custom<unknown>(() => true) });
+      const run = action({ name: `test.unhashable.${label}`, minRole: "staff", input, idempotent: true, handler });
+      const key = randomUUID();
+      await expect(run({ field: value }, key), label).rejects.toThrow(TypeError);
+      expect(handler, label).not.toHaveBeenCalled();
+      expect(await keyRows(owner.workspaceId, key), label).toEqual([]);
+    }
+    // An object with no prototype is plain: hashed by its entries like an object literal.
+    const { handler } = recordingHandler();
+    const input = z.object({ field: z.custom<unknown>(() => true) });
+    const run = action({ name: "test.unhashable.null-prototype", minRole: "staff", input, idempotent: true, handler });
+    const key = randomUUID();
+    expect((await run({ field: Object.assign(Object.create(null), { a: 1 }) }, key)).status).toBe("DONE");
+    expect((await run({ field: { a: 1 } }, key)).status).toBe("REPLAYED");
+  });
+
   it("returns IDEMPOTENCY_KEY_REUSED for the same key with other input, or for another action", async () => {
     const { handler } = recordingHandler();
     const run = noteAction("test.reuse", "staff", handler, true);
