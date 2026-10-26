@@ -372,3 +372,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 
 ## 2026-10-26 15:08 ASK 4 answered by Charlie: 24 hours
 - Docs/code comment updated and pushed (head e3afafd, docs-only commit, limits test passes, lint and typecheck 0). PR #44 body updated. CI re-runs on the new head. Charlie still runs "review 44"; Bob must re-check head e3afafd.
+
+## 2026-10-26 15:41 fix 44 done (Round 3 findings)
+- Review PR-44.md (3 rounds) archived to agent-logs first. Fixed: P1-1/P1-2 (self-check table, all rules, packs line, in PR body), P2-1 (ASK 4 answered), P2-2 (sign-in email advisory lock, AUTH-05, commit e0b63bd), P3-1 (canonical, f29ba42). Head 1f5939e pushed; PR body updated incl. replay-per-workspace note.
+- Builder reran install/typecheck/lint/test (573)/build/audit: all 0. CI pending on new head. E2E not rerun after e3afafd (helper e2e was at b782501).
+- Next: Charlie runs "review 44" (Round 4) once CI is green.
