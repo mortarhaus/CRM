@@ -384,3 +384,7 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 ## 2026-10-26 22:54 merged 44
 - PR #44 merged 2026-10-26 (130fd4d). Log on agent-logs (log/2026-10-26_PR44_...). Receipt before merge, no gate breaches. Worktree and branch feat/p1-action-audit removed without --force.
 - Next: Phase 1 PR 5 (pg-boss, Tasks 16-18) via "build" (ask Charlie first). Open: ASK 5, .env refresh, repo visibility, untracked docker/sync-*.sh and .playwright-mcp/. Carried: CLAUDE.md Status line, PR 44 P3-2 pointers, Task 24 revoke-by-id.
+
+## 2026-10-27 00:15 build Phase 1 PR 5 started
+- Gates passed (spec hash 733cc0e reviewed + reconciled; logs through PR 44 on agent-logs). Worktree .agent/worktrees/build-feat-p1-pgboss, branch feat/p1-pgboss from origin/main 130fd4d. Scope: plan Tasks 16-18 (pg-boss 12.35.0 by migration, queues, crm_app enqueue grants; measure crm_worker grants; send-only/worker instances, retry command, pg ban; end of TEN-10 worker.ts driver exemption). Opus helper builds; Andy verifies, pushes, opens PR 5.
+- Carried: Task 24 revoke-by-id, PR 44 P3-2 pointers, CLAUDE.md Status line. Open for Charlie: ASK 5, .env refresh, repo visibility, untracked docker/sync-*.sh and .playwright-mcp/.
