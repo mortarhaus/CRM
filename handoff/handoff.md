@@ -380,3 +380,7 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 
 ## 2026-10-26 22:53 approved 44
 - Round 4 Approved with conditions at head 1f5939e; CI 4/4 green. Review archived (hash 19f27e13762b3165ebcb96df0c6afaa84ae81a2f) and receipt written on agent-logs. Condition: P2-3 (revoke session by id) in Task 24 / PR 7. Next: Charlie merges, then "merged 44".
+
+## 2026-10-26 22:54 merged 44
+- PR #44 merged 2026-10-26 (130fd4d). Log on agent-logs (log/2026-10-26_PR44_...). Receipt before merge, no gate breaches. Worktree and branch feat/p1-action-audit removed without --force.
+- Next: Phase 1 PR 5 (pg-boss, Tasks 16-18) via "build" (ask Charlie first). Open: ASK 5, .env refresh, repo visibility, untracked docker/sync-*.sh and .playwright-mcp/. Carried: CLAUDE.md Status line, PR 44 P3-2 pointers, Task 24 revoke-by-id.
