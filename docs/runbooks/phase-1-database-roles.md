@@ -154,14 +154,20 @@ by the PDPA check before Phase 4 goes live (plan Task 31 open point E); until th
   IP the triggers store). GET endpoints run outside it; none of them inserts a session, and a session
   insert without a known label is refused anyway (default deny).
 - **One request of a user at a time.** On the seven paths that read or write the 2FA state, the request
-  locks the user row (`FOR NO KEY UPDATE`) before Better Auth reads it, until commit.
+  locks the user row (`FOR NO KEY UPDATE`) before Better Auth reads it, until commit. A sign-in
+  (`/sign-in/email`) first takes a transaction advisory lock on its lower-cased email, whether or not an
+  account has it, so sign-ins on one email run one at a time and a burst does not show whether the account
+  exists (AUTH-05, PR #44 Round 2 P2-2). To see who waits for an email lock: `select l.pid, l.granted,
+  a.query_start from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory' and
+  l.objsubid = 2 and l.classid = 1129467137` (unverified against a live server; the tests count waiters with the same filter).
 - **Pool bound (PR #44 P2-1).** Request transactions take at most half of the web process's pool
   (`createDb` `max: 10`, so 5). A request waits at most 10 s for one of those slots in memory, then answers
   500 with no change (`[auth] request failed: AuthTransactionsBusy`). The other half always serves the rest
   of the app: in the test, 30 parallel sign-ins for one locked user left an unrelated `select 1` under
   1 000 ms (`auth-audit.test.ts`, "PR #44 P2-1"). **Residual:** during such a burst, the other users' sign-ins
   and 2FA requests queue behind it for a slot (auth throughput, not the app, is what the burst slows), and
-  the user under attack can see 500s after 5 s (lock wait) or 10 s (slot wait). The per-IP and per-account
+  requests on the attacked email, with or without an account, can see 500s after 5 s (lock wait) or 10 s
+  (slot wait). The per-IP and per-account
   rate limits (plan Task 22) bound the burst. Inside a request transaction a query on the pool itself, which
   would need a second connection, fails at once (`PoolBypassError`) and the request rolls back.
 - **A 2FA change ends every session of the user that existed before it (AUTH-07, R5).** Enabling 2FA,
@@ -318,9 +324,9 @@ runs `select set_config('app.workspace_id', '<workspace uuid>', true)`. Never `S
 | `invalid input syntax for type uuid: ""` (`22P02`) on a tenant table | A policy casts `current_setting('app.workspace_id', true)` without `nullif`, on a connection where an earlier transaction set it (Known risk R1) | A migration bug: `rls.test.ts` should have failed. Fix the policy in a new migration; never work around it in app code |
 | A tenant query returns no rows, or an insert fails with `new row violates row-level security policy` (`42501`) | The query ran outside `withWorkspace()`, or for another workspace's row | Run it inside `withWorkspace()` with the workspace from the server session (TEN-11). Do not add a broader policy |
 | `pnpm stack:up` fails with `service "bootstrap" didn't complete successfully` | Bootstrap exited non-zero; `docker compose -f docker/compose.dev.yml logs bootstrap` shows the reason (variable names only) | Fix the variable or the admin URL and rerun |
-| `[auth] request failed: AuthTransactionsBusy` (HTTP 500 on sign-in or 2FA) | Every request-transaction slot (half of the pool) stayed busy for 10 s, usually a burst of requests for one user waiting for that user's lock | Nothing to repair. Look for the burst in the access log (one email, many IPs); the rate limits (plan Task 22) bound it |
+| `[auth] request failed: AuthTransactionsBusy` (HTTP 500 on sign-in or 2FA) | Every request-transaction slot (half of the pool) stayed busy for 10 s, usually a burst of sign-ins on one email waiting for that email's lock (or requests of one user for its row) | Nothing to repair. Look for the burst in the access log (one email, many IPs); the rate limits (plan Task 22) bound it |
 | `[auth] request failed: PoolBypassError` | A query inside an auth request transaction went to the pool instead of the transaction (a code defect) | Nothing to repair: the request rolled back. Report it; the path must use the routed db |
-| `[auth] request failed: … (55P03)` | A request waited 5 s for its user's lock (`lock_timeout`) | Nothing to repair; the user retries |
+| `[auth] request failed: … (55P03)` | A request waited 5 s for its user's lock or, on sign-in, its email's lock (`lock_timeout`; the same for an email with no account) | Nothing to repair; the user retries |
 | `[auth] request failed: … (40001)` on a sign-in | A 2FA change of the same user committed during the sign-in; the sign-in was refused | Nothing to repair; the user signs in again |
 | `[auth] request failed: … (23514)` on a session insert | A session insert had no known `issue_reason` label (an auth path the audit does not know) | Do not grant or relabel by hand. Add the path to `labelSessionIssue` with its test |
 | `[auth] request failed: Error (CONNECTION_CLOSED)` | The request's database backend ended (restart, failover, `pg_terminate_backend`); the request rolled back | Nothing to repair once the database is back. If it is followed by an uncaught `TypeError` in `connection.js`, the postgres.js patch is not applied: run `pnpm install` and rebuild the image |
