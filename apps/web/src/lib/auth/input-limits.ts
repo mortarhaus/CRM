@@ -18,6 +18,9 @@ const NEW_PASSWORD_FIELD: Record<string, string> = {
   "/reset-password": "newPassword",
 };
 const USER_NAME_PATHS = new Set(["/sign-up/email", "/update-user"]);
+// Trusted devices are not a Phase 1 feature (spec "Better Auth endpoints"; plan Task 31 R9): the two-factor
+// plugin has no option to turn them off, so a request for one is refused before it can mint a record or cookie.
+const TRUST_DEVICE_PATHS = new Set(["/two-factor/verify-totp", "/two-factor/verify-backup-code", "/two-factor/verify-otp"]);
 // Every body field that carries a password, new or to verify, on any endpoint.
 const PASSWORD_FIELDS = ["password", "newPassword", "currentPassword"];
 
@@ -27,7 +30,10 @@ function asBody(value: unknown): Body | undefined {
   return typeof value === "object" && value !== null ? (value as Body) : undefined;
 }
 
-function refuse(code: LimitErrorCode): never {
+// No form sends trustDevice, so this refusal has no user-facing message.
+type RefusalCode = LimitErrorCode | "TRUST_DEVICE_DISABLED";
+
+function refuse(code: RefusalCode): never {
   throw new APIError("BAD_REQUEST", { code, message: code });
 }
 
@@ -49,6 +55,7 @@ function checkMax(value: unknown, max: number, code: LimitErrorCode): void {
 export const enforceInputLimits = createAuthMiddleware(async (ctx) => {
   const body = asBody(ctx.body);
   if (!body) return;
+  if (TRUST_DEVICE_PATHS.has(ctx.path) && body.trustDevice) refuse("TRUST_DEVICE_DISABLED");
   const passwordField = NEW_PASSWORD_FIELD[ctx.path];
   if (passwordField) checkPassword(body[passwordField]);
   if (USER_NAME_PATHS.has(ctx.path)) checkMax(body.name, NAME_MAX_LENGTH, "NAME_TOO_LONG");

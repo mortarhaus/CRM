@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./audit": "./src/audit/redact.ts",
     "./password": "./src/password/index.ts",
     "./security": "./src/security/limits.ts",
     "./workspace": "./src/workspace/slug.ts"

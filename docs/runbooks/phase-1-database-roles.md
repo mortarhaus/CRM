@@ -5,8 +5,10 @@ the five database roles, the bootstrap step that creates them, one connection pe
 baseline (migration `0001_privileges_baseline.sql`). PR 2 (Tasks 4-7) adds the first tenant table,
 `workspace_settings`, under row-level security, and `withWorkspace()` (section "Tenant tables and the
 workspace context"). PR 3 (Tasks 8-11) adds the system table `billing_account` (section "System tables
-beyond Better Auth") and the polymorphic-reference trigger functions. Later Phase 1 PRs add grants
-(`audit_log`, pg-boss) and update the tables below.
+beyond Better Auth") and the polymorphic-reference trigger functions. PR 4 (Tasks 12-15 and 31) adds the
+tenant tables `audit_log` and `idempotency_key`, `crm_purge`'s one grant and the system table
+`auth_audit_log` (sections "Auth audit and 2FA sessions" and "Upgrading a Phase 0 database to Phase 1:
+every user is signed out once"). PR 5 adds the pg-boss grants.
 
 "Verified" means the command was run on 2026-10-24 against the dev compose Postgres 17 or a Testcontainers
 Postgres 17.
@@ -19,9 +21,9 @@ None is superuser or has `BYPASSRLS`, `CREATEROLE`, `CREATEDB` or `REPLICATION`
 | Role | Login | What it may do | Connection |
 |---|---|---|---|
 | `crm_migrator` | yes | Owns the database, every schema object and (from PR 5) `pgboss`; runs migrations. Member of `crm_link_resolver` with `INHERIT FALSE, SET TRUE`, only so a migration can make it the owner of `resolve_share_link()` (Phase 7) | `DATABASE_MIGRATOR_URL`, direct, never pooled |
-| `crm_app` | yes | Every web request and the worker's tenant work. Today: the Better Auth tables, exactly as measured below, `billing_account` (SELECT, INSERT), and `workspace_settings` under RLS | `DATABASE_URL`, may be pooled |
+| `crm_app` | yes | Every web request and the worker's tenant work. Today: the Better Auth tables, exactly as measured below, `billing_account` (SELECT, INSERT), `auth_audit_log` (INSERT), and `workspace_settings`, `audit_log` and `idempotency_key` under RLS | `DATABASE_URL`, may be pooled |
 | `crm_worker` | yes | The worker's pg-boss instance, `pgboss.*` only. No grant yet: PR 5 measures them | `DATABASE_WORKER_URL` (worker only; read since PR 1, used from PR 5) |
-| `crm_purge` | yes, `NOINHERIT`, `CONNECTION LIMIT 2` | PDPA purge only. No grant yet (PR 4 adds INSERT on `audit_log`). No role is a member of it. It has **no password** in dev compose and production until the purge job lands (Phase 9), so nobody can sign in as it | none until Phase 9 (`DATABASE_PURGE_URL`, worker only) |
+| `crm_purge` | yes, `NOINHERIT`, `CONNECTION LIMIT 2` | PDPA purge only. INSERT on `audit_log` only, for the purge's own entry, under the RESTRICTIVE workspace policy and `audit_log_purge_insert` (PR 4, migration 0012; `purge-role.test.ts`). No role is a member of it. It has **no password** in dev compose and production until the purge job lands (Phase 9), so nobody can sign in as it | none until Phase 9 (`DATABASE_PURGE_URL`, worker only) |
 | `crm_link_resolver` | no (`NOLOGIN`) | Owns `resolve_share_link()` from Phase 7. No privilege beyond the PUBLIC defaults, which it cannot use | none |
 
 `PUBLIC` keeps only `CONNECT` on the database and `USAGE` on schema `public`. Migration 0001 revokes
@@ -105,6 +107,10 @@ reachable; enabling one adds its grant and a test here. Since PR 3 the seven inv
 404 over HTTP (`disabledPaths` in `apps/web/src/lib/auth/config.ts`; invitations are Phase 3), so the
 `invitation` grants are used only by the server-side tests until then.
 
+The manifest `apps/web/src/db/privileges.ts` holds the same set, together with every grant below
+(system tables, tenant tables, `crm_purge`); `privileges.test.ts` fails on any privilege
+that is missing from it or not in it, for every role and for PUBLIC.
+
 ## System tables beyond Better Auth
 
 `billing_account` (migration 0004, grants in 0005) has no RLS and is reached only through the system module
@@ -122,12 +128,160 @@ table uses them yet; each later migration that creates a table with a polymorphi
 Their errors: `23503 poly_ref: target not in workspace`, `23514 poly_ref: unknown target type`,
 `23514 poly_ref: target is immutable`.
 
-The manifest `apps/web/src/db/privileges.ts` holds the same set; `privileges.test.ts` fails on any privilege
-that is missing from it or not in it, for every role and for PUBLIC.
+## Auth audit and 2FA sessions (`auth_audit_log`)
+
+Plan Task 31; design and evidence in `docs/DECISIONS.md` ("Phase 1 PR 4: `auth_audit_log` design (Task 31
+spike)").
+
+| Table | `crm_app` | Reader | Created by |
+|---|---|---|---|
+| `auth_audit_log` | INSERT only (no SELECT, UPDATE, DELETE or TRUNCATE for any runtime role; append-only) | none at runtime. Operators read it only through the admin connection, read-only, for an incident | migrations 0007 (table, `session.issue_reason`), 0008 (grant), 0009 (triggers, R15 cutover), 0010 (trusted devices refused) |
+
+No RLS (it is on the no-RLS allow-list, `apps/web/src/test/catalog.ts`): rows are per user, not per
+workspace. `user_id` is `ON DELETE RESTRICT`; no user deletion is enabled. Retention and erasure are decided
+by the PDPA check before Phase 4 goes live (plan Task 31 open point E); until then every row is kept.
+
+### Mechanism
+
+- **Only a migration may change it.** The rows are written by four trigger functions of migration 0009
+  (`SECURITY INVOKER`, owned by `crm_migrator`, no EXECUTE for anyone), in the statement that makes the
+  change they record. No application code writes a row, and no runtime role can drop, disable or replace
+  a trigger (`auth-audit.test.ts` T14).
+- **Each auth POST is one database transaction** (outside `/organization/*`; `withRequestTransactions`
+  in `apps/web/src/lib/auth/request-transaction.ts`, `createAuthTransactions` in
+  `apps/web/src/db/system/auth-transaction.ts`). It commits when the response status is below 500 and
+  otherwise rolls back and drops `Set-Cookie`. It sets `lock_timeout = '5s'` and `crm.auth_client_ip` (the
+  IP the triggers store). GET endpoints run outside it; none of them inserts a session, and a session
+  insert without a known label is refused anyway (default deny).
+- **One request of a user at a time.** On the seven paths that read or write the 2FA state, the request
+  locks the user row (`FOR NO KEY UPDATE`) before Better Auth reads it, until commit. A sign-in
+  (`/sign-in/email`) first takes a transaction advisory lock on its lower-cased email, whether or not an
+  account has it, so sign-ins on one email run one at a time and a burst does not show whether the account
+  exists (AUTH-05, PR #44 Round 2 P2-2). To see who waits for an email lock: `select l.pid, l.granted,
+  a.query_start from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory' and
+  l.objsubid = 2 and l.classid = 1129467137` (unverified against a live server; the tests count waiters with the same filter).
+- **Pool bound (PR #44 P2-1).** Request transactions take at most half of the web process's pool
+  (`createDb` `max: 10`, so 5). A request waits at most 10 s for one of those slots in memory, then answers
+  500 with no change (`[auth] request failed: AuthTransactionsBusy`). The other half always serves the rest
+  of the app: in the test, 30 parallel sign-ins for one locked user left an unrelated `select 1` under
+  1 000 ms (`auth-audit.test.ts`, "PR #44 P2-1"). **Residual:** during such a burst, the other users' sign-ins
+  and 2FA requests queue behind it for a slot (auth throughput, not the app, is what the burst slows), and
+  requests on the attacked email, with or without an account, can see 500s after 5 s (lock wait) or 10 s
+  (slot wait). The per-IP and per-account
+  rate limits (plan Task 22) bound the burst. Inside a request transaction a query on the pool itself, which
+  would need a second connection, fails at once (`PoolBypassError`) and the request rolls back.
+- **A 2FA change ends every session of the user that existed before it (AUTH-07, R5).** Enabling 2FA,
+  disabling it and regenerating the recovery codes each end every session of that user, on every device,
+  the device that made the change included. That device continues on a fresh session that the same response
+  sets, with its own `session_issued` row (reason `rotation`). **Signing in with a recovery code ends no
+  session** (it is a login method; open point F, decided by Charlie on 2026-10-22).
+- **Trusted devices are off.** `trustDevice: true` is refused with 400 `TRUST_DEVICE_DISABLED`, and the
+  database refuses any `trust-device-%` verification row (23514); migration 0010 deleted the Phase 0 ones.
+  Every sign-in of a 2FA user asks for the second step.
+- **`/list-sessions` returns no token** (R10): id, user id, timestamps, IP and user agent only. Ending one
+  chosen other session by id comes with plan Task 24 (PR #44 P2-3); "sign out other sessions" works today.
+
+### An interrupted or failed 2FA enrolment or disable (R11)
+
+Enable and disable are each one transaction: a failure or a lost connection at any statement rolls the
+flag, the session revocation, the replacement session and their audit rows back together. The user keeps
+the session they had and the 2FA state they had, and simply tries again (enrolment restarts with a new
+secret and new recovery codes). If the response is lost after the commit, the change happened: the user
+signs in again (with the authenticator just set up, or with the password only after a disable). No operator
+action is needed in either case.
+
+A **Phase 0** account can be in the state "2FA flag on, enrolment unverified" (Phase 0 had no transaction).
+Such a user is asked for a second step at sign-in that the authenticator cannot answer, so they sign in
+with one of the recovery codes shown when they started the enrolment, then restart enrolment or disable 2FA.
+Phase 0 holds only test data, so there is no real user in this state.
+
+### How a login maps to rows
+
+| What happened | Rows (in order) |
+|---|---|
+| Sign-in, password only | `session_issued` `{reason: sign_in, method: password}` |
+| Sign-in of a 2FA user, password step | `session_issued` `{reason: two_factor_pending, method: password}` (Better Auth deletes this session in the same request; it is not a login) |
+| Second step with the authenticator | `two_factor_verified` `{method: totp}`, `session_issued` `{reason: sign_in, method: totp}` |
+| Second step with a recovery code | `two_factor_backup_codes_changed`, `two_factor_verified` `{method: backup_code}`, `session_issued` `{reason: sign_in, method: backup_code}` |
+| 2FA enabled (enrolment confirmed) | `two_factor_enabled`, `session_issued` `{reason: rotation, cause: two_factor_enabled}` |
+| 2FA disabled | `two_factor_disabled`, `session_issued` `{reason: rotation, cause: two_factor_disabled}` |
+| Recovery codes regenerated | `two_factor_backup_codes_changed`, `session_issued` `{reason: rotation, cause: backup_codes_regenerated}` |
+| Password changed (from plan Task 24) | `session_issued` `{reason: rotation, cause: password_changed}` |
+
+A login is exactly one `session_issued` row with reason `sign_in`. `session_issued` and `two_factor_verified`
+rows also hold `session_id`, the internal id of the session (never its token). Every row has `user_id`, `ip` (null when
+the request had no trustworthy IP) and `created_at`. Sign-out, a failed password and a failed code are not
+recorded here (failed codes count in `two_factor.failed_verification_count`).
+
+### Incident queries (admin connection, read-only)
+
+```sql
+-- A user's history, oldest first (in one statement the 2FA step comes before its session).
+select created_at, event, detail, ip from auth_audit_log
+where user_id = '<user uuid>'
+order by created_at, case event when 'two_factor_verified' then 0 else 1 end;
+
+-- Logins in a time window, with method and IP.
+select created_at, user_id, detail ->> 'method' as method, ip from auth_audit_log
+where event = 'session_issued' and detail ->> 'reason' = 'sign_in'
+  and created_at >= '<from>' and created_at < '<to>'
+order by created_at;
+
+-- Logins from one IP.
+select created_at, user_id, detail ->> 'method' as method from auth_audit_log
+where event = 'session_issued' and detail ->> 'reason' = 'sign_in' and ip = '<ip>'
+order by created_at;
+
+-- 2FA changes in a time window.
+select created_at, user_id, event, ip from auth_audit_log
+where event in ('two_factor_enabled', 'two_factor_disabled', 'two_factor_backup_codes_changed')
+  and created_at >= '<from>' and created_at < '<to>'
+order by created_at;
+
+-- The invariant: every session has its row. Expect no rows.
+select s.id from session s
+where not exists (select 1 from auth_audit_log a
+                  where a.event = 'session_issued' and a.detail ->> 'session_id' = s.id::text);
+```
+
+To end every session of a compromised account, an operator deletes them as the admin
+(`delete from session where user_id = '<user uuid>'`); this writes no audit row, so record it in the incident
+notes.
+
+### Database driver patch (postgres.js 3.4.9)
+
+`patches/postgres@3.4.9.patch` (pnpm `patchedDependencies`, applied at install, also in the image's deps
+stage) fixes what happens when a database backend ends during a transaction (a Postgres restart, a failover,
+`pg_terminate_backend`): without it the web process logged an uncaught `TypeError` and one pool connection
+stayed wedged (health checks 503 after 2 s). With it the transaction is rejected (`CONNECTION_CLOSED`, the
+request answers 500), and the connection reconnects for the next query. Remove the patch when an upstream
+release fixes it (see `docs/DECISIONS.md`, 2026-10-26, PR #44 Round 1).
+
+## Upgrading a Phase 0 database to Phase 1: every user is signed out once
+
+- **What happens:** migration 0009, which installs the audit mechanism, first locks `session` against
+  writes, deletes every session and writes no audit row (plan R15, open point G, decided by Charlie on
+  2026-10-22). Only then do the triggers exist. Migration 0010 deletes the Phase 0 trusted-device records.
+  All pending migrations run in one transaction, so the lock holds until they commit.
+- **User effect:** everyone is signed out once and signs in again (with their second step, if 2FA is on;
+  no device stays trusted). No account, workspace, setting or 2FA enrolment is lost.
+- **Operator steps:** announce it to users before a production upgrade. Note the time just before starting
+  the upgrade (the cutover time). Let `migrate` finish before `web` and `worker` start, as the compose order
+  and the image entrypoint already do. No manual session cleanup.
+- **After-check** (admin connection), each expects 0:
+
+```sql
+select count(*) from session where created_at < '<cutover time>';
+select count(*) from auth_audit_log where created_at < '<cutover time>';
+select count(*) from verification where identifier like 'trust-device-%';
+select count(*) from session s
+where not exists (select 1 from auth_audit_log a
+                  where a.event = 'session_issued' and a.detail ->> 'session_id' = s.id::text);
+```
 
 ## Tenant tables and the workspace context
 
-Every table in `public` that is not a system table (today: the Better Auth tables and `billing_account`) is a tenant table:
+Every table in `public` that is not a system table (today: the Better Auth tables, `billing_account` and `auth_audit_log`) is a tenant table:
 it has a non-null `workspace_id`, row-level security `ENABLE`d and `FORCE`d, one RESTRICTIVE workspace
 policy `FOR ALL TO crm_app, crm_purge`, and one PERMISSIVE policy per command `crm_app` holds (spec
 Tenancy, revision 7). The predicate is always
@@ -144,11 +298,14 @@ errors in `apps/web` (TEN-09). `crm_migrator` and `crm_worker` have no policy on
 | Table | `crm_app` | Policies | Created by |
 |---|---|---|---|
 | `workspace_settings` | SELECT, INSERT, UPDATE (no DELETE: workspace deletion is Phase 9) | `workspace_settings_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update` | migrations 0002 (table) and 0003 (RLS, grants) |
+| `audit_log` | SELECT, INSERT (append-only: no role but the owner updates, deletes or truncates, TEN-03); `crm_purge` INSERT only | `audit_log_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_purge_insert` | migrations 0011 (table) and 0012 (RLS, grants) |
+| `idempotency_key` | SELECT, INSERT, DELETE, UPDATE (`response` only) | `idempotency_key_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update`, `_app_delete` | migrations 0013 (table) and 0014 (RLS, grants) |
 
 Every new workspace gets its `workspace_settings` row from Better Auth's `afterCreateOrganization` hook
 (`apps/web/src/db/system/workspaces.ts`, `ensureWorkspaceSettings`). It is a second write after Better
 Auth's own, so a crash in between can leave a workspace without its row; the call is idempotent, and `requireWorkspaceMember`
-will call it once when the row is missing (planned for PR 4, plan Task 14 and Risk 6).
+(`apps/web/src/lib/auth/action.ts`, through `healWorkspaceSettings` in the system module) recreates it when
+the row is missing (plan Task 14 and Risk 6).
 
 Checks: `apps/web/src/db/rls.test.ts` (the `nullif` policy lint and the RESTRICTIVE + PERMISSIVE catalog
 test over every tenant table), `apps/web/src/db/isolation.test.ts` (two workspaces, every tenant table,
@@ -167,3 +324,9 @@ runs `select set_config('app.workspace_id', '<workspace uuid>', true)`. Never `S
 | `invalid input syntax for type uuid: ""` (`22P02`) on a tenant table | A policy casts `current_setting('app.workspace_id', true)` without `nullif`, on a connection where an earlier transaction set it (Known risk R1) | A migration bug: `rls.test.ts` should have failed. Fix the policy in a new migration; never work around it in app code |
 | A tenant query returns no rows, or an insert fails with `new row violates row-level security policy` (`42501`) | The query ran outside `withWorkspace()`, or for another workspace's row | Run it inside `withWorkspace()` with the workspace from the server session (TEN-11). Do not add a broader policy |
 | `pnpm stack:up` fails with `service "bootstrap" didn't complete successfully` | Bootstrap exited non-zero; `docker compose -f docker/compose.dev.yml logs bootstrap` shows the reason (variable names only) | Fix the variable or the admin URL and rerun |
+| `[auth] request failed: AuthTransactionsBusy` (HTTP 500 on sign-in or 2FA) | Every request-transaction slot (half of the pool) stayed busy for 10 s, usually a burst of sign-ins on one email waiting for that email's lock (or requests of one user for its row) | Nothing to repair. Look for the burst in the access log (one email, many IPs); the rate limits (plan Task 22) bound it |
+| `[auth] request failed: PoolBypassError` | A query inside an auth request transaction went to the pool instead of the transaction (a code defect) | Nothing to repair: the request rolled back. Report it; the path must use the routed db |
+| `[auth] request failed: … (55P03)` | A request waited 5 s for its user's lock or, on sign-in, its email's lock (`lock_timeout`; the same for an email with no account) | Nothing to repair; the user retries |
+| `[auth] request failed: … (40001)` on a sign-in | A 2FA change of the same user committed during the sign-in; the sign-in was refused | Nothing to repair; the user signs in again |
+| `[auth] request failed: … (23514)` on a session insert | A session insert had no known `issue_reason` label (an auth path the audit does not know) | Do not grant or relabel by hand. Add the path to `labelSessionIssue` with its test |
+| `[auth] request failed: Error (CONNECTION_CLOSED)` | The request's database backend ended (restart, failover, `pg_terminate_backend`); the request rolled back | Nothing to repair once the database is back. If it is followed by an uncaught `TypeError` in `connection.js`, the postgres.js patch is not applied: run `pnpm install` and rebuild the image |

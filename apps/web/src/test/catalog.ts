@@ -243,3 +243,36 @@ export async function compositeFkViolations(sql: postgres.Sql, schema = "public"
     .filter((row) => row.childAt === null || row.parentAt === null || row.childAt !== row.parentAt)
     .map((row) => `${row.child}.${row.name} -> ${row.parent}: not composite on workspace_id`);
 }
+
+// What the auth_audit_log mechanism installs (plan Task 31; migrations 0009 and 0010), as "table.trigger: function".
+// T14 checks that these are exactly the triggers on the Better Auth tables and auth_audit_log.
+export const AUTH_AUDIT_TRIGGERS = [
+  "session.session_issued_audit: auth_audit_session_issued",
+  "session.session_two_factor_check: auth_session_two_factor_check",
+  "two_factor.two_factor_backup_codes_audit: auth_audit_backup_codes",
+  "user.user_two_factor_changed: auth_two_factor_changed",
+  "user.user_two_factor_created: auth_two_factor_changed",
+  "verification.verification_refuse_trusted_device: auth_refuse_trusted_device",
+] as const;
+
+export const AUTH_AUDIT_FUNCTIONS = [
+  "auth_audit_backup_codes",
+  "auth_audit_session_issued",
+  "auth_refuse_trusted_device",
+  "auth_session_two_factor_check",
+  "auth_two_factor_changed",
+] as const;
+
+// Every user trigger on the given public tables, enabled or not: "table.trigger: function (enabled)".
+export async function triggersOn(sql: postgres.Sql, tables: readonly string[]): Promise<string[]> {
+  const names = [...tables];
+  const rows = await sql<{ trigger: string }[]>`
+    select c.relname || '.' || t.tgname || ': ' || p.proname
+           || case t.tgenabled when 'O' then '' else ' (enabled ' || t.tgenabled::text || ')' end as trigger
+    from pg_trigger t
+      join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace
+      join pg_proc p on p.oid = t.tgfoid
+    where n.nspname = 'public' and c.relname = any(${names}) and not t.tgisinternal
+    order by 1`;
+  return rows.map((row) => row.trigger);
+}

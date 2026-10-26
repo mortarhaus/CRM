@@ -25,3 +25,5 @@ auditConfig:
   # No patched braces exists (CVE-2026-93687); dev-tooling chain only. Remove when a patch ships.
   ignoreGhsas:
     - GHSA-vfj7-8cjw-p6xm
+patchedDependencies:
+  postgres@3.4.9: patches/postgres@3.4.9.patch

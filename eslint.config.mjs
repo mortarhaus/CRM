@@ -5,6 +5,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import { defineConfig } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
+import { serverActionWrapper } from "./apps/web/eslint/server-action-wrapper.mjs";
 
 const coreFiles = ["packages/core/**/*.{ts,tsx,mts,cts,js,mjs}"];
 
@@ -49,9 +50,14 @@ const coreSourceImport = {
 };
 
 // TEN-10: app code reaches the database through withWorkspace() (src/db/workspace) or a named function of
-// the system module barrel (src/db/system), never through the pool, the client or the schema.
-const directDbSource = String.raw`(^|/)db(/(index|client|schema(/.*)?|system/.+))?$`;
+// the system module barrel (src/db/system), never through the pool, the client or the schema. A specifier may
+// carry a script extension or a trailing slash and still resolve to the same module (PR #43 Round 1 P2).
+const moduleSuffix = String.raw`(\.(js|ts|mjs|mts|cjs|cts))?/?`;
+const directDbSource = String.raw`(^|/)db(/(index|client|schema(/.*)?|system/.+))?${moduleSuffix}$`;
 const directDbMessage = "Use withWorkspace() for tenant data or a function of src/db/system for system tables (TEN-10)";
+// TEN-10: no database client outside src/db (PR #43 Round 1 P2); a type import has no runtime value.
+const dbClientSource = String.raw`^(postgres|pg|drizzle-orm/postgres-js)(/.*)?$`;
+const dbClientMessage = "Open database connections only in src/db (TEN-10)";
 // Every export of schema/auth.ts and schema/system.ts (lint-rules.test.ts checks the list is complete).
 const systemSchemaExports = [
   "user",
@@ -70,6 +76,7 @@ const systemSchemaExports = [
   "memberRelations",
   "invitationRelations",
   "billingAccount",
+  "authAuditLog",
 ];
 const systemSchemaMessage = "Only src/db/system reads or writes the system tables (TEN-10)";
 
@@ -187,8 +194,29 @@ export default defineConfig(
         "error",
         ...workspaceContextSyntax,
         { selector: `ImportExpression[source.value=/${directDbSource.replaceAll("/", "\\/")}/i]`, message: directDbMessage },
+        { selector: `ImportExpression[source.value=/${dbClientSource.replaceAll("/", "\\/")}/]`, message: dbClientMessage },
       ],
     },
+  },
+  {
+    // TEN-10: database drivers only in src/db and tests. worker.ts is the Phase 0 worker stub and keeps its own
+    // client until Phase 1 PR 5 replaces it (PR #43 Round 1 P2).
+    files: ["apps/web/**/*.{ts,tsx,mts,cts,js,mjs}"],
+    ignores: ["apps/web/src/db/**", "apps/web/src/test/**", "apps/web/**/*.test.ts", "apps/web/worker.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { patterns: [{ regex: dbClientSource, message: dbClientMessage, allowTypeImports: true }] },
+      ],
+    },
+  },
+  {
+    // AUTH-01: every server action goes through action() or is a named Better Auth forwarder
+    // (apps/web/eslint/forwarding-actions.mjs). The rule follows the "use server" directive, so it runs on every
+    // file and is a no-op without one.
+    files: ["apps/web/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+    plugins: { crm: { rules: { "server-action-wrapper": serverActionWrapper } } },
+    rules: { "crm/server-action-wrapper": "error" },
   },
   {
     // TEN-10 inside src/db: only the system module (and the schema, the client and the role bootstrap)
@@ -207,8 +235,8 @@ export default defineConfig(
         {
           patterns: [
             coreSourceImport,
-            { regex: String.raw`(^|/)schema/(auth|system)$`, message: systemSchemaMessage },
-            { regex: String.raw`(^|/)schema(/index)?$`, importNames: systemSchemaExports, message: systemSchemaMessage },
+            { regex: String.raw`(^|/)schema/(auth|system)${moduleSuffix}$`, message: systemSchemaMessage },
+            { regex: String.raw`(^|/)schema(/index)?${moduleSuffix}$`, importNames: systemSchemaExports, message: systemSchemaMessage },
           ],
         },
       ],
