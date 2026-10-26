@@ -78,14 +78,32 @@ export async function serverLog(container: StartedPostgreSqlContainer): Promise<
   return output.split("\n");
 }
 
-// The lines of the log that report a permission error (SQLSTATE 42501) raised for `role`, with the statement line
-// that follows each (log_min_error_statement).
+// The permission errors (SQLSTATE 42501) the server logged for `role`, each as "<message> | <statement>". The
+// statement is the STATEMENT entry log_min_error_statement writes for the same backend after the error (after a
+// CONTEXT entry when the error came from inside a function), joined onto one line.
 export function permissionErrors(lines: readonly string[], role: string): string[] {
+  const entryStart = /^\d{4}-\d{2}-\d{2} /;
+  const entries: string[] = [];
+  for (const line of lines) {
+    if (entryStart.test(line) || entries.length === 0) entries.push(line);
+    else entries[entries.length - 1] += ` ${line}`;
+  }
+  const prefix = `user=${role} sqlstate=42501 `;
   const found: string[] = [];
-  lines.forEach((line, index) => {
-    if (!line.includes(`user=${role} sqlstate=42501 `)) return;
-    const next = lines[index + 1] ?? "";
-    found.push(next.includes("STATEMENT:") ? `${line.trim()} | ${next.trim()}` : line.trim());
+  entries.forEach((entry, index) => {
+    if (!entry.includes(`${prefix}ERROR:`)) return;
+    const pid = /\[(\d+)\]/.exec(entry)?.[1];
+    const message = entry.slice(entry.indexOf("ERROR:") + "ERROR:".length).trim();
+    let statement = "";
+    for (const next of entries.slice(index + 1, index + 6)) {
+      if (!next.includes(`[${pid}] ${prefix}`)) continue;
+      if (next.includes(`${prefix}ERROR:`)) break;
+      if (next.includes(`${prefix}STATEMENT:`)) {
+        statement = next.slice(next.indexOf("STATEMENT:") + "STATEMENT:".length);
+        break;
+      }
+    }
+    found.push(`${message} | ${statement}`.replace(/\s+/g, " ").trim());
   });
   return found;
 }
