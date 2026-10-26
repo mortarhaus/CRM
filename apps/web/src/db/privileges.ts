@@ -4,9 +4,12 @@
 
 export type ManifestRole = "crm_app" | "crm_worker" | "crm_purge" | "crm_link_resolver" | "PUBLIC";
 
-const table = (name: string, ...privileges: string[]) => privileges.map((privilege) => `table:public.${name}:${privilege}`);
+// A bare table name is in schema public; other schemas are written out ("pgboss.job_common").
+const qualified = (name: string) => (name.includes(".") ? name : `public.${name}`);
+const table = (name: string, ...privileges: string[]) =>
+  privileges.map((privilege) => `table:${qualified(name)}:${privilege}`);
 const columns = (name: string, privilege: string, ...names: string[]) =>
-  names.map((column) => `column:public.${name}.${column}:${privilege}`);
+  names.map((column) => `column:${qualified(name)}.${column}:${privilege}`);
 
 // PostgreSQL defaults kept for PUBLIC; migration 0001 revokes TEMPORARY and function EXECUTE.
 const PUBLIC_DEFAULTS = ["database:CONNECT", "schema:public:USAGE"];
@@ -36,6 +39,13 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...table("audit_log", "SELECT", "INSERT"), // append-only (TEN-03)
     ...table("idempotency_key", "SELECT", "INSERT", "DELETE"),
     ...columns("idempotency_key", "UPDATE", "response"),
+    // The web send-only pg-boss instance: enqueue only, never a payload column (migration 0016, install.test.ts).
+    "schema:pgboss:USAGE",
+    ...table("pgboss.version", "SELECT"),
+    ...table("pgboss.queue", "SELECT"),
+    ...table("pgboss.job_common", "INSERT"),
+    ...columns("pgboss.job_common", "SELECT", "id", "start_after"),
+    "function:pgboss.job_now():EXECUTE",
   ],
   crm_worker: PUBLIC_DEFAULTS,
   // Phase 1 part (b1): INSERT on audit_log only, for the purge's own entry (spec "crm_purge in Phase 1").
