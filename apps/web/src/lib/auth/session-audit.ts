@@ -52,8 +52,9 @@ export async function labelSessionIssue(
   }
 }
 
-// The users a serialised request acts for: the email it signs in with, the user of its session cookie and the
-// user of its two-factor challenge cookie. Both cookies are read, because a request may carry both.
+// The users a serialised request acts for: the email it signs in with (lower-cased, as Better Auth looks it up;
+// lockAuthUsers locks the email itself too, account or not), the user of its session cookie and the user of its
+// two-factor challenge cookie. Both cookies are read, because a request may carry both.
 async function actingUsers(ctx: GenericEndpointContext): Promise<AuthUserKey[]> {
   if (ctx.path === "/sign-in/email") {
     const email = (ctx.body as { email?: unknown } | undefined)?.email;

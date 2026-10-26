@@ -18,6 +18,7 @@ import {
   AUTH_EVENTS,
   createAuthTransactions,
   SESSION_ISSUE_LABELS,
+  SIGN_IN_EMAIL_LOCK_SPACE,
 } from "../../db/system";
 import { AUTH_AUDIT_FUNCTIONS, AUTH_AUDIT_TRIGGERS, NO_RLS_ALLOW_LIST, policies, triggersOn } from "../../test/catalog";
 import {
@@ -42,6 +43,7 @@ import {
   sessionsWithoutRow,
   type Stack,
   setsSession,
+  signInEmailLockWaiters,
   TRUST_DEVICE_COOKIE,
   TWO_FACTOR_COOKIE,
   twoFactorState,
@@ -1914,8 +1916,9 @@ describe("T15 (R15): Phase 0 sessions are invalidated at cutover", () => {
 });
 
 // PR #44 P2-1. Each auth POST holds one pool connection from its first query to commit, including the wait for the
-// user's lock. Bound: an unrelated `select 1` on the same pool answers in under 1 000 ms while 30 wrong-password
-// sign-ins for one email wait for that user's lock (Bob's probe: 15 ms with 30 emails, 161 ms with one). The lock is
+// user's lock (since Round 2 P2-2, the first sign-in of a burst waits for the user row and the rest for its email
+// lock). Bound: an unrelated `select 1` on the same pool answers in under 1 000 ms while 30 wrong-password sign-ins
+// for one email wait for that user's lock (Bob's probe: 15 ms with 30 emails, 161 ms with one). The row lock is
 // held from the admin connection, so without the bound the burst holds every connection until it ends (the control).
 describe("PR #44 P2-1: a burst of sign-ins for one email leaves half of the pool to the rest of the app", () => {
   const BURST = 30;
@@ -1962,6 +1965,8 @@ describe("PR #44 P2-1: a burst of sign-ins for one email leaves half of the pool
       await waitUntil(async () => (await lockWaiters(stack.admin)) === 5, "five sign-ins to wait for the lock");
       await new Promise((resolve) => setTimeout(resolve, 300));
       expect(await lockWaiters(stack.admin)).toBe(5);
+      // One waits for the user row, the other four for the email lock the first one holds (Round 2 P2-2).
+      expect(await signInEmailLockWaiters(stack.admin)).toBe(4);
       const started = performance.now();
       expect(await stack.handle.sql`select 1 as ok`).toEqual([{ ok: 1 }]);
       expect(performance.now() - started).toBeLessThan(BOUND_MS);
@@ -1994,6 +1999,122 @@ describe("PR #44 P2-1: a burst of sign-ins for one email leaves half of the pool
     await probe;
     expect((await Promise.all(replies)).map((reply) => reply.status)).toEqual(Array.from({ length: BURST }, () => 401));
   }, 60_000);
+});
+
+// PR #44 Round 2 P2-2 (AUTH-05). Every /sign-in/email request takes a lock on its lower-cased email first, whether
+// or not an account has it, so a burst on an unknown email runs one at a time like a burst on a known one, and meets
+// the same 5 s lock timeout (500). Bob's probe (wrong-password sign-ins in parallel, no added delay), before the fix:
+// 30 known 304 ms total against 94 ms unknown; 80 known 751 ms against 218 ms unknown; all 401.
+//
+// The signal is not wall time alone. Each request's user lookup (findUserByEmail, after the lock) is wrapped with an
+// in-flight counter and a fixed delay of DELAY_MS. Bounds, for both emails: at most one request inside the lookup
+// at once; every status 401; total time at least (BURST - 1) × DELAY_MS (a sleep only runs long, so this cannot
+// flake low). Relative bound: the unknown burst takes at least half the known burst's time. Without the email lock
+// the unknown burst runs 5 at a time (the slot limit): 5 inside the lookup, and about a fifth of the time.
+describe("PR #44 Round 2 P2-2 (AUTH-05): a sign-in burst runs one at a time whether or not the email has an account", () => {
+  const BURST = 20;
+  const DELAY_MS = 20;
+
+  type Burst = { statuses: number[]; maxInFlight: number; totalMs: number };
+
+  async function burst(instance: AuthLike, email: string): Promise<Burst> {
+    type Adapter = Record<string, (...args: unknown[]) => Promise<unknown>>;
+    const adapter = ((await instance.$context) as { internalAdapter: Adapter }).internalAdapter;
+    const original = adapter.findUserByEmail;
+    if (!original) throw new Error("no internal adapter method findUserByEmail");
+    let inFlight = 0;
+    let maxInFlight = 0;
+    adapter.findUserByEmail = async (...args: unknown[]) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+        return await original.apply(adapter, args);
+      } finally {
+        inFlight -= 1;
+      }
+    };
+    try {
+      const started = performance.now();
+      const replies = await Promise.all(
+        Array.from({ length: BURST }, () =>
+          http(instance, "POST", "/sign-in/email", { body: { email, password: `${PASSWORD} wrong` } }),
+        ),
+      );
+      return { statuses: replies.map((reply) => reply.status), maxInFlight, totalMs: performance.now() - started };
+    } finally {
+      adapter.findUserByEmail = original;
+    }
+  }
+
+  // No email in the line: the console is captured, and T13 (c) checks the captured lines.
+  function report(label: string, result: Burst): void {
+    const total = result.totalMs.toFixed(0);
+    process.stdout.write(`[P2-2 burst] ${label}: ${BURST} requests, ${total} ms total, max ${result.maxInFlight} in flight\n`);
+  }
+
+  it("known and unknown email: one request at a time, the same status mix, comparable total time", async () => {
+    const { stack, auth: instance } = await isolated();
+    const person = await signUp(instance, stack.admin);
+    const known = await burst(instance, person.email);
+    const unknown = await burst(instance, newEmail());
+    report("known email", known);
+    report("unknown email", unknown);
+    for (const result of [known, unknown]) {
+      expect(result.statuses).toEqual(Array.from({ length: BURST }, () => 401));
+      expect(result.maxInFlight).toBe(1);
+      expect(result.totalMs).toBeGreaterThanOrEqual((BURST - 1) * DELAY_MS);
+    }
+    expect(unknown.totalMs).toBeGreaterThanOrEqual(0.5 * known.totalMs);
+  }, 60_000);
+
+  it("the email lock is per email and case-blind: the same email in capitals waits, another email does not", async () => {
+    const { stack, auth: instance } = await isolated();
+    const email = newEmail();
+    const holder = await stack.admin.reserve();
+    try {
+      await holder`select pg_advisory_lock(${SIGN_IN_EMAIL_LOCK_SPACE}::int, hashtext(${email}))`;
+      const waiting = passwordStep(instance, email.toUpperCase());
+      await waitUntil(async () => (await signInEmailLockWaiters(stack.admin)) === 1, "the sign-in to wait for its email");
+      expect((await passwordStep(instance, newEmail())).status).toBe(401);
+      expect(await signInEmailLockWaiters(stack.admin)).toBe(1);
+      await holder`select pg_advisory_unlock(${SIGN_IN_EMAIL_LOCK_SPACE}::int, hashtext(${email}))`;
+      expect((await waiting).status).toBe(401);
+    } finally {
+      holder.release();
+    }
+  }, 30_000);
+
+  it("lock-timeout run: an unknown email waits the same 5 s as a known one and fails the same way (500, no change)", async () => {
+    const { stack, auth: instance } = await isolated();
+    const person = await signUp(instance, stack.admin);
+    const unknownEmail = newEmail();
+    const holder = await stack.admin.reserve();
+    const timed = async (email: string) => {
+      const started = Date.now();
+      const reply = await passwordStep(instance, email);
+      return { reply, elapsed: Date.now() - started };
+    };
+    try {
+      await holder`begin`;
+      // The known email waits for its user row (as in T6's lock-timeout run); the unknown one for its email lock.
+      await holder`select id from "user" where id = ${person.id} for update`;
+      await holder`select pg_advisory_xact_lock(${SIGN_IN_EMAIL_LOCK_SPACE}::int, hashtext(${unknownEmail}))`;
+      const before = logged.filter((line) => line.includes("(55P03)")).length;
+      const [known, unknown] = await Promise.all([timed(person.email), timed(unknownEmail)]);
+      for (const { reply, elapsed } of [known, unknown]) {
+        expect(reply.status).toBe(500);
+        expectFailedWithoutSession(reply);
+        expect(elapsed).toBeGreaterThanOrEqual(4_500);
+      }
+      expect(logged.filter((line) => line.includes("(55P03)")).length - before).toBe(2);
+    } finally {
+      await holder`rollback`;
+      holder.release();
+    }
+    expect(await sessionTokens(stack.admin, person.id)).toEqual([]);
+    expect(await auditRows(stack.admin, person.id)).toEqual([]);
+  }, 30_000);
 });
 
 describe("T13 (R13): logs", () => {

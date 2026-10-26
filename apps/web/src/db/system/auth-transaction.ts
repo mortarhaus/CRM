@@ -4,8 +4,8 @@ import { type Database, holdingPool } from "../client";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
-// A request waits at most this long for another request of the same user (lockAuthUsers) or for any other lock,
-// then fails with no change instead of hanging.
+// A request waits at most this long for another request of the same user or the same sign-in email
+// (lockAuthUsers) or for any other lock, then fails with no change instead of hanging.
 const LOCK_TIMEOUT = "5s";
 
 // Auth request transactions hold at most half of the pool's connections (at least one), so a burst of sign-ins

@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { createDb, type DbHandle } from "../db/client";
+import { SIGN_IN_EMAIL_LOCK_SPACE } from "../db/system";
 import { databaseUrl, type TestDatabase } from "./postgres";
 
 // Test-only tools for plan Task 31 (auth-audit.test.ts): HTTP calls with a cookie jar, database fixtures that
@@ -167,12 +168,22 @@ export async function waitUntil(check: () => Promise<boolean>, what: string, tim
   }
 }
 
-// Backends of crm_app in this database waiting for a row or transaction lock (not for a test hold).
+// Backends of crm_app in this database waiting for a row or transaction lock, or for a sign-in email lock
+// (lockAuthUsers), but not for a test hold (a single-bigint advisory key).
 export async function lockWaiters(admin: postgres.Sql): Promise<number> {
   const [row] = await admin<{ count: number }[]>`
-    select count(*)::int as count from pg_stat_activity
-    where datname = current_database() and usename = 'crm_app'
-      and wait_event_type = 'Lock' and wait_event <> 'advisory'`;
+    select count(distinct a.pid)::int as count from pg_stat_activity a join pg_locks l on l.pid = a.pid
+    where a.datname = current_database() and a.usename = 'crm_app' and not l.granted
+      and (l.locktype <> 'advisory' or (l.objsubid = 2 and l.classid = ${SIGN_IN_EMAIL_LOCK_SPACE}::oid))`;
+  return row?.count ?? 0;
+}
+
+// Backends of crm_app in this database waiting for a sign-in email lock only.
+export async function signInEmailLockWaiters(admin: postgres.Sql): Promise<number> {
+  const [row] = await admin<{ count: number }[]>`
+    select count(distinct a.pid)::int as count from pg_stat_activity a join pg_locks l on l.pid = a.pid
+    where a.datname = current_database() and a.usename = 'crm_app' and not l.granted
+      and l.locktype = 'advisory' and l.objsubid = 2 and l.classid = ${SIGN_IN_EMAIL_LOCK_SPACE}::oid`;
   return row?.count ?? 0;
 }
 
@@ -236,7 +247,8 @@ export async function holdAt(admin: postgres.Sql, point: FixturePoint): Promise<
   const waiting = async () => {
     const rows = await admin<{ pid: number }[]>`
       select l.pid from pg_locks l join pg_stat_activity a on a.pid = l.pid
-      where l.locktype = 'advisory' and not l.granted and l.objid = ${key} and a.datname = current_database()`;
+      where l.locktype = 'advisory' and l.objsubid = 1 and not l.granted and l.objid = ${key}
+        and a.datname = current_database()`;
     return rows.map((row) => row.pid);
   };
   let released = false;

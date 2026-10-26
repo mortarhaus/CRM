@@ -9,6 +9,7 @@ export {
   type AuthEvent,
   type AuthUserKey,
   lockAuthUsers,
+  SIGN_IN_EMAIL_LOCK_SPACE,
   SESSION_ISSUE_LABELS,
   type SessionIssueLabel,
 } from "./auth-audit";
