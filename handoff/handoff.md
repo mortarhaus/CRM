@@ -377,3 +377,6 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Review PR-44.md (3 rounds) archived to agent-logs first. Fixed: P1-1/P1-2 (self-check table, all rules, packs line, in PR body), P2-1 (ASK 4 answered), P2-2 (sign-in email advisory lock, AUTH-05, commit e0b63bd), P3-1 (canonical, f29ba42). Head 1f5939e pushed; PR body updated incl. replay-per-workspace note.
 - Builder reran install/typecheck/lint/test (573)/build/audit: all 0. CI pending on new head. E2E not rerun after e3afafd (helper e2e was at b782501).
 - Next: Charlie runs "review 44" (Round 4) once CI is green.
+
+## 2026-10-26 22:53 approved 44
+- Round 4 Approved with conditions at head 1f5939e; CI 4/4 green. Review archived (hash 19f27e13762b3165ebcb96df0c6afaa84ae81a2f) and receipt written on agent-logs. Condition: P2-3 (revoke session by id) in Task 24 / PR 7. Next: Charlie merges, then "merged 44".
