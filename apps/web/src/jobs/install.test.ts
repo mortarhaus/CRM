@@ -81,13 +81,16 @@ describe("pg-boss install migration", () => {
 });
 
 describe("queues (migration, spec: queue options change only in migrations)", () => {
-  it("exist with notify off, the retry defaults and the dead-letter queues", async () => {
+  // Six application queues (migration 0016) and pg-boss's internal cron queue __pgboss__send-it (migration 0017,
+  // created by crm_migrator so the patched worker start() never creates it).
+  it("are the six application queues and the internal cron queue, with notify off", async () => {
     const rows = await admin`
       select name, policy, retry_limit, retry_delay, retry_backoff, dead_letter, notify, partition
-      from pgboss.queue order by name`;
+      from pgboss.queue order by name collate "C"`;
     const retried = { policy: "standard", retry_limit: 5, retry_delay: 30, retry_backoff: true, notify: false, partition: false };
     const plain = { retry_limit: 2, retry_delay: 0, retry_backoff: false, dead_letter: null, notify: false, partition: false };
     expect(rows).toEqual([
+      { name: "__pgboss__send-it", policy: "standard", ...plain },
       { name: "domain_event", ...retried, dead_letter: "domain_event.dead" },
       { name: "domain_event.dead", policy: "standard", ...plain },
       { name: "email.send", ...retried, dead_letter: "email.send.dead" },

@@ -26,4 +26,5 @@ auditConfig:
   ignoreGhsas:
     - GHSA-vfj7-8cjw-p6xm
 patchedDependencies:
+  pg-boss@12.35.0: patches/pg-boss@12.35.0.patch
   postgres@3.4.9: patches/postgres@3.4.9.patch

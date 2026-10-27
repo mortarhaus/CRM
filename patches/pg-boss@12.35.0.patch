@@ -1,0 +1,18 @@
+diff --git a/dist/timekeeper.js b/dist/timekeeper.js
+index 85f41ea75076e1e5b18e9e7c8c9000be5b8c8ef7..542d50ca02cf9cf9c1000c15d8869185508a8f9e 100644
+--- a/dist/timekeeper.js
++++ b/dist/timekeeper.js
+@@ -249,7 +249,12 @@ class Timekeeper extends EventEmitter {
+         // A restart should re-surface a row nobody has fixed yet
+         this.warnedSchedules.clear();
+         await this.cacheClockSkew();
+-        await this.manager.createQueue(QUEUES.SEND_IT);
++        // crm-patch(send-it-exists): create the internal cron queue only when it is missing. The CRM creates it in a
++        // migration, so the worker role needs no EXECUTE on create_queue and no INSERT on the queue table (one
++        // SELECT on the queue table instead). Behaviour is unchanged when the queue does not exist yet.
++        if (!(await this.manager.getQueue(QUEUES.SEND_IT))) {
++            await this.manager.createQueue(QUEUES.SEND_IT);
++        }
+         const options = {
+             pollingIntervalSeconds: this.config.cronWorkerIntervalSeconds,
+             batchSize: 50
