@@ -127,6 +127,13 @@
       "when": 1793063853960,
       "tag": "0017_pgboss_cron_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793063925990,
+      "tag": "0018_pgboss_worker_grants",
+      "breakpoints": true
     }
   ]
 }

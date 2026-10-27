@@ -71,11 +71,15 @@ export function startPostgres(options: { serverLog?: boolean } = {}): Promise<St
   return container.start();
 }
 
-// The server log lines so far (needs startPostgres({ serverLog: true })).
+// The server log lines so far (needs startPostgres({ serverLog: true })). A test that reads only what came after a
+// point takes `(await serverLog(container)).length` first and slices from it.
 export async function serverLog(container: StartedPostgreSqlContainer): Promise<string[]> {
   const { output, exitCode } = await container.exec(["cat", `${SERVER_LOG_DIR}/postgresql.log`]);
   if (exitCode !== 0) throw new Error(`cannot read the server log: ${output}`);
-  return output.split("\n");
+  const lines = output.split("\n");
+  // The file ends with a newline: drop the empty piece after it, so `lines.length` is a safe offset for the next read.
+  if (lines.at(-1) === "") lines.pop();
+  return lines;
 }
 
 // The permission errors (SQLSTATE 42501) the server logged for `role`, each as "<message> | <statement>". The
