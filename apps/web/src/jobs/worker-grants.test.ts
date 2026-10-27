@@ -105,6 +105,23 @@ async function privilege(sql: string): Promise<boolean> {
   return row?.held ?? false;
 }
 
+// A statement crm_worker is denied, run just before the log is read: the permission errors of the slice must be
+// this one and nothing else, so an empty result cannot come from reading the wrong part of the log.
+const SENTINEL = "select 1 from pgboss.bam";
+const SENTINEL_ERROR = `permission denied for table bam | ${SENTINEL}`;
+async function runSentinel(): Promise<void> {
+  const sql = postgres(db.workerUrl, { max: 1, onnotice: () => {} });
+  try {
+    const code = await sql.unsafe(SENTINEL).then(
+      () => "allowed",
+      (error: { code?: string }) => error.code,
+    );
+    expect(code).toBe("42501");
+  } finally {
+    await sql.end();
+  }
+}
+
 describe("the pg-boss patch (patches/pg-boss@12.35.0.patch; docs/DECISIONS.md 2026-10-27)", () => {
   it("is applied to the installed pg-boss: start() creates the cron queue only when it is missing", async () => {
     // Fails when an upgrade or a reinstall drops the patch; the start test below then fails with 42501 as well.
@@ -135,7 +152,8 @@ describe("the pg-boss patch (patches/pg-boss@12.35.0.patch; docs/DECISIONS.md 20
     // A cron pass and a supervise pass at the 1 s intervals.
     await sleep(2_500);
     await worker.boss.stop({ graceful: true, timeout: 10_000 });
-    expect(permissionErrors((await serverLog(db.container)).slice(before), "crm_worker")).toEqual([]);
+    await runSentinel();
+    expect(permissionErrors((await serverLog(db.container)).slice(before), "crm_worker")).toEqual([SENTINEL_ERROR]);
     expect(worker.errors).toEqual([]);
   });
 });
@@ -205,7 +223,8 @@ describe("crm_worker: the worker operation set (plan Task 17 Step 1)", () => {
         await worker.boss.stop({ graceful: true, timeout: 10_000 });
         await sender.boss.stop({ graceful: true });
       }
-      expect(permissionErrors((await serverLog(db.container)).slice(before), "crm_worker")).toEqual([]);
+      await runSentinel();
+      expect(permissionErrors((await serverLog(db.container)).slice(before), "crm_worker")).toEqual([SENTINEL_ERROR]);
       expect(worker.errors).toEqual([]);
       expect(sender.errors).toEqual([]);
       expect(worker.warnings).toEqual([]);

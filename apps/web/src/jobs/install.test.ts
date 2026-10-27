@@ -99,6 +99,29 @@ describe("queues (migration, spec: queue options change only in migrations)", ()
       { name: "rate_limit.cleanup", policy: "singleton", ...plain },
     ]);
   });
+
+  // Unpatched, start() calls createQueue(QUEUES.SEND_IT) with no options, which runs
+  // create_queue('__pgboss__send-it', '{"policy":"standard"}'). The row 0017 made must equal the one that call makes.
+  it("the cron queue row of 0017 is the row unpatched pg-boss start() would create", async () => {
+    const columns = async (sql: postgres.TransactionSql, name: string) => {
+      const [row] = await sql<Record<string, unknown>[]>`select * from pgboss.queue where name = ${name}`;
+      if (!row) throw new Error(`no queue ${name}`);
+      return Object.fromEntries(Object.entries(row).filter(([key]) => !["name", "created_on", "updated_on"].includes(key)));
+    };
+    const rollback = new Error("rollback");
+    const compared = await admin
+      .begin(async (sql) => {
+        await sql`select pgboss.create_queue('crm_probe', '{"policy":"standard"}'::jsonb)`;
+        const probe = await columns(sql, "crm_probe");
+        const sendIt = await columns(sql, "__pgboss__send-it");
+        expect(Object.keys(sendIt).length).toBeGreaterThan(10);
+        expect(sendIt).toEqual(probe);
+        throw rollback;
+      })
+      .catch((error: unknown) => error);
+    expect(compared).toBe(rollback);
+    expect(await admin`select name from pgboss.queue where name = 'crm_probe'`).toEqual([]);
+  });
 });
 
 describe("crm_app: the web send-only instance (enqueue only)", () => {
