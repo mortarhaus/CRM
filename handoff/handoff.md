@@ -394,3 +394,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - STOP: pg-boss 12.35.0 start() with schedule:true calls createQueue('__pgboss__send-it') (dist/timekeeper.js:252, verified by me); crm_worker then needs EXECUTE create_queue + INSERT on pgboss.queue, which plan Settled item 2 and spec §9 forbid. Options: (a) grant the pair; (b) schedule:false + cron in app; (c) pnpm patch pg-boss to skip createQueue when the queue exists + migration creating __pgboss__send-it. Builder recommends (c).
 - Also: boss.retry('email.send.dead', id) is a no-op (plan Task 17 Step 1); jobs:retry must take the original queue + failed id. SELECT(start_after) on job_common unused by send (kept per spec).
 - Parked Task 17 work: scratchpad/task17-parked/. Task 18 not started. Waiting for Charlie's choice.
+
+## 2026-10-27 10:18 build PR 5 pushed: PR #45
+- Charlie chose A (patch pg-boss, with Bob's advice). Tasks 16-18 done, head 06bdd6e, PR #45 opened (ready, not draft). Builder reran install/typecheck/lint/test (736)/build/audit: all 0. Stack and e2e were run by helper before last 5 commits; CI image job covers the final head.
+- Next: Charlie runs "review 45". After merge: PROJECT.md (UNI-04 pg ban, §11 crm_worker grants) and CLAUDE.md Status need the setup reconcile / a docs PR. Next PR 6 (events, Tasks 19-20): handlers must bound their own queries; send() that must commit with the request needs db: fromDrizzle(tx, sql).
+- Open: ASK 5, .env refresh, repo visibility, untracked docker/sync-*.sh and .playwright-mcp/.
