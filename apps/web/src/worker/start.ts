@@ -17,9 +17,10 @@ export interface StartWorkerOptions {
   handlers?: Handlers;
 }
 
-// Under Docker's 10 s between SIGTERM and SIGKILL: active jobs get 8 s to finish, then pg-boss fails them (they are
-// retried by their queue's policy).
-export const STOP_TIMEOUT_MS = 8_000;
+// Under Docker's 10 s between SIGTERM and SIGKILL: active jobs get 6 s to finish, then pg-boss fails them (they are
+// retried by their queue's policy); closing the crm_app pool then takes at most 2 s more (AppDatabase.close), 8 s in
+// all.
+export const STOP_TIMEOUT_MS = 6_000;
 
 export async function startWorker({ appDb, workerUrl, log = console.log, handlers = HANDLERS }: StartWorkerOptions): Promise<WorkerHandle> {
   const boss = createWorkerBoss(workerUrl, log);

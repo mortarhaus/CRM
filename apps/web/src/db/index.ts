@@ -34,9 +34,10 @@ export function openDatabase(url: string, options: { max: number }): AppDatabase
     async ping() {
       await handle.sql`select 1`;
     },
+    // At most 2 s: a query still running then is cancelled, so the worker's stop() stays under Docker's 10 s.
     async close() {
       if (globalCache.crmDb === handle) globalCache.crmDb = undefined;
-      await handle.sql.end({ timeout: 5 });
+      await handle.sql.end({ timeout: 2 });
     },
   };
 }

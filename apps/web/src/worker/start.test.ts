@@ -87,6 +87,51 @@ describe("startWorker", () => {
     await worker.stop();
   });
 
+  it("stops within Docker's 10 s while a handler never finishes and holds a crm_app query, and fails the job", async () => {
+    const appDb = openDatabase(database.appUrl, { max: 3 });
+    const cache = globalThis as typeof globalThis & { crmDb?: { sql: postgres.Sql } };
+    const pool = cache.crmDb?.sql;
+    if (!pool) throw new Error("no crm_app pool");
+    const worker = await startWorker({
+      appDb,
+      workerUrl: database.workerUrl,
+      log: () => {},
+      handlers: {
+        "email.send": async () => {
+          await pool`select pg_sleep(60)`.catch(() => {});
+          await new Promise(() => {});
+        },
+      },
+    });
+    const sender = new PgBoss({ ...SEND_BOSS_OPTIONS, connectionString: database.appUrl });
+    await sender.start();
+    const id = await sender.send("email.send", { workspaceId: crypto.randomUUID(), userId: crypto.randomUUID() });
+    await sender.stop();
+    await waitFor(async () => {
+      const [row] = await admin<{ state: string }[]>`select state from pgboss.job_common where id = ${id ?? ""}`;
+      const [sleeping] = await admin<{ count: number }[]>`
+        select count(*)::int as count from pg_stat_activity where usename = 'crm_app' and query like 'select pg_sleep%'`;
+      return row?.state === "active" && sleeping?.count === 1;
+    });
+
+    const started = Date.now();
+    await worker.stop();
+    const elapsed = Date.now() - started;
+    expect(elapsed).toBeLessThan(10_000);
+    const [row] = await admin<{ state: string }[]>`select state from pgboss.job_common where id = ${id ?? ""}`;
+    expect(["failed", "retry"]).toContain(row?.state);
+    // The pool's sockets are closed, but the server runs the abandoned pg_sleep until it ends (no statement_timeout
+    // is set): only that backend may remain.
+    const others = async () => {
+      const [r] = await admin<{ count: number }[]>`
+        select count(*)::int as count from pg_stat_activity
+         where usename = 'crm_app' and query not like 'select pg_sleep%' and pid <> pg_backend_pid()`;
+      return r?.count ?? 0;
+    };
+    await waitFor(async () => (await connections("crm_worker")) === 0 && (await others()) === 0, 5_000);
+    await admin`select pg_terminate_backend(pid) from pg_stat_activity where usename = 'crm_app'`;
+  });
+
   it("refuses a second crm_app pool in one process", async () => {
     const appDb = openDatabase(database.appUrl, { max: 1 });
     expect(() => openDatabase(database.appUrl, { max: 1 })).toThrow(DatabaseAlreadyOpenError);
