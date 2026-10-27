@@ -405,6 +405,10 @@ pg-boss's pool is not the guarded postgres.js pool: a `send()` inside an auth re
 `PoolBypassError` nor joins that transaction (`boss.test.ts`). A job that must commit with the request's writes
 passes the transaction as pg-boss's `db` (Task 19, `enqueue.ts`).
 
+On SIGTERM or SIGINT the worker stops in at most 8 s, under Docker's 10 s before SIGKILL: active jobs get 6 s, then
+pg-boss fails them (retried by the queue's policy), and the `crm_app` pool closes within 2 s. A statement a handler
+left running keeps running on the server until it ends (no `statement_timeout` is set).
+
 ### The pg-boss patch (12.35.0)
 
 `patches/pg-boss@12.35.0.patch` (pnpm `patchedDependencies`, applied at install, also in the image's deps stage)
