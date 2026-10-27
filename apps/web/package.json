@@ -15,7 +15,8 @@
     "db:migrate": "tsx --env-file=../../.env migrate.ts",
     "smoke:auth-route": "tsx scripts/smoke-auth-route.ts",
     "test:e2e": "playwright test",
-    "worker:dev": "tsx --env-file=../../.env worker.ts"
+    "worker:dev": "tsx --env-file=../../.env worker.ts",
+    "jobs:retry": "tsx --env-file=../../.env scripts/retry-job.ts"
   },
   "dependencies": {
     "@crm/core": "workspace:*",

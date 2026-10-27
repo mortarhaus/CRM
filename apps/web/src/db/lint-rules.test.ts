@@ -160,15 +160,66 @@ describe("TEN-10: import forms and database clients (PR #43 Round 1 P2)", () => 
   it.each([
     ["src/db", "apps/web/src/db/client.ts"],
     ["a test", "apps/web/src/lib/x.test.ts"],
-    ["the Phase 0 worker stub (until PR 5)", "apps/web/worker.ts"],
   ])("allows a postgres client in %s", async (_, filePath) => {
     expect(await tsRestrictedImports('import postgres from "postgres";', filePath)).toEqual([]);
+  });
+
+  it("reports a postgres client in worker.ts (the Phase 0 exemption ended in Phase 1 PR 5)", async () => {
+    expect((await tsRestrictedImports('import postgres from "postgres";', "apps/web/worker.ts")).join("\n")).toContain(DB_CLIENT);
+  });
+
+  it("lets worker.ts open its crm_app pool through the system module", async () => {
+    expect(await allImportMessages('import { openDatabase } from "./src/db/system";', "apps/web/worker.ts")).toBe("");
   });
 
   it("reports schema/system with a .js extension elsewhere in src/db", async () => {
     expect((await restrictedImports('import { billingAccount } from "./schema/system.js";', "apps/web/src/db/x.ts")).join("\n")).toContain(
       TEN_10_SCHEMA,
     );
+  });
+});
+
+// UNI-04 (plan Task 18): node-postgres only inside pg-boss, everywhere in apps/web (src/db and tests included).
+describe("UNI-04: pg is allowed only inside pg-boss", () => {
+  const PG = "pg is allowed only inside pg-boss (Charlie, 2026-09-30)";
+  const allMessages = async (code: string, filePath: string) => {
+    const [result] = await eslint.lintText(code, { filePath });
+    return (result?.messages ?? []).map((message) => message.message);
+  };
+  const PATHS = [
+    "apps/web/src/lib/x.ts",
+    "apps/web/src/app/(app)/x/actions.ts",
+    "apps/web/worker.ts",
+    "apps/web/scripts/x.ts",
+    "apps/web/src/db/x.ts",
+    "apps/web/src/db/client.ts",
+    "apps/web/src/db/workspace.ts",
+    "apps/web/src/db/system/x.ts",
+    "apps/web/src/lib/auth/server.ts",
+    "apps/web/src/test/x.ts",
+    "apps/web/src/lib/x.test.ts",
+    "apps/web/src/db/x.test.ts",
+  ];
+  const FORMS: [form: string, code: string][] = [
+    ["import pg from \"pg\"", 'import pg from "pg";\nexport const client = new pg.Client();'],
+    ["import { Pool } from \"pg-pool\"", 'import { Pool } from "pg-pool";\nexport const pool = new Pool();'],
+    ["await import(\"pg\")", 'export const load = async () => await import("pg");'],
+    ["a pg subpath", 'import { Client } from "pg/lib/client";\nexport const client = Client;'],
+    ["pg-cursor", 'import Cursor from "pg-cursor";\nexport const cursor = Cursor;'],
+    ["pg-native", 'import Native from "pg-native";\nexport const native = Native;'],
+    ["pg-query-stream", 'import QueryStream from "pg-query-stream";\nexport const stream = QueryStream;'],
+  ];
+
+  it.each(PATHS.flatMap((filePath) => FORMS.map(([form, code]) => [form, filePath, code] as const)))(
+    "reports %s in %s",
+    async (_, filePath, code) => {
+      expect((await allMessages(code, filePath)).join("\n")).toContain(PG);
+    },
+  );
+
+  it.each(PATHS)("allows pg-boss in %s", async (filePath) => {
+    const messages = await allMessages('import { PgBoss } from "pg-boss";\nexport const boss = PgBoss;', filePath);
+    expect(messages.filter((message) => message.includes(PG) || message.includes("TEN-10"))).toEqual([]);
   });
 });
 

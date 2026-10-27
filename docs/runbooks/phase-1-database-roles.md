@@ -373,6 +373,38 @@ queue options, `notify` included, and the schema version change only in migratio
 `delete_queue`, no INSERT on `queue`, and nothing in `public` (TEN-02, `privileges.test.ts`). The manifest
 `apps/web/src/db/privileges.ts` holds both lists; `privileges.test.ts` fails on any difference.
 
+### Retrying a failed job (`jobs:retry`)
+
+A job whose retries are exhausted is `failed` in its own queue, and a copy lands in the queue's dead-letter queue
+(`email.send.dead`, `domain_event.dead`) in state `created`. No worker works the dead-letter queues. To run the job
+again once the cause is fixed, retry the **failed original in its original queue**, as `crm_worker`:
+
+```sh
+# host (reads the root .env)
+pnpm --filter @crm/web jobs:retry -- --queue email.send --id <failed job id>
+# image (the running worker container has the URLs)
+docker compose -f docker/compose.dev.yml exec worker node dist/retry-job.mjs --queue email.send --id <failed job id>
+```
+
+It prints `{"level":"info","msg":"job retried"}` (exit 0) and the job goes back to `retry`, then runs. Retrying the
+dead-letter copy is a no-op: `retry()` only matches jobs in state `failed`, so `--queue email.send.dead --id <copy id>`
+prints `job not found` (exit 1) and changes nothing. Find the original from the copy (admin connection):
+`select source_id from pgboss.job where name = 'email.send.dead' and id = '<copy id>'`. An unknown id also prints
+`job not found` (exit 1); a missing or malformed argument exits 2 before connecting. The command starts pg-boss with
+one connection, no maintenance and no cron (`RETRY_BOSS_OPTIONS`), and logs errors by name and SQLSTATE only.
+
+### Connections and pools
+
+| Process | crm_app (postgres.js) | pg-boss (`pg`) | Notes |
+|---|---|---|---|
+| web | 10 (`getDb()`) | 2, `crm_app` (`getSendBoss()`, send only) | the auth-transaction slots (5) and `PoolBypassError` cover the postgres.js pool only |
+| worker | 3 (`openDatabase`, the `getDb()` singleton) | 3, `crm_worker` | one crm_app pool per process: a second `openDatabase` throws |
+| `jobs:retry` | none | 1, `crm_worker` | one-off |
+
+pg-boss's pool is not the guarded postgres.js pool: a `send()` inside an auth request transaction neither fails with
+`PoolBypassError` nor joins that transaction (`boss.test.ts`). A job that must commit with the request's writes
+passes the transaction as pg-boss's `db` (Task 19, `enqueue.ts`).
+
 ### The pg-boss patch (12.35.0)
 
 `patches/pg-boss@12.35.0.patch` (pnpm `patchedDependencies`, applied at install, also in the image's deps stage)

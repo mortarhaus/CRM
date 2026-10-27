@@ -44,6 +44,14 @@ const workspaceContextSyntax = [
   { selector: String.raw`Property[key.value=/^app\./]`, message: workspaceContextMessage },
 ];
 
+// UNI-04: node-postgres only inside pg-boss (Charlie, 2026-09-30). Exact names: a `pg-*` glob would match pg-boss.
+// Everywhere in apps/web, src/db and tests included; every block below that sets no-restricted-imports or
+// no-restricted-syntax for apps/web repeats these, because a later block replaces a rule's options, it does not merge.
+const pgPackages = ["pg", "pg-pool", "pg-cursor", "pg-native", "pg-query-stream"];
+const pgMessage = "pg is allowed only inside pg-boss (Charlie, 2026-09-30)";
+const pgImport = { group: withSubpaths(pgPackages), message: pgMessage };
+const pgDynamicImport = restrictedDynamicImport(pgPackages, pgMessage);
+
 const coreSourceImport = {
   group: ["**/packages/*/src/**"],
   message: "Import core through its package exports (for example @crm/core/password), not its source files.",
@@ -160,7 +168,7 @@ export default defineConfig(
   {
     files: ["apps/web/**/*.{ts,tsx,mts,cts,js,mjs}"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [coreSourceImport] }],
+      "no-restricted-imports": ["error", { patterns: [coreSourceImport, pgImport] }],
     },
   },
   {
@@ -170,7 +178,14 @@ export default defineConfig(
     files: ["apps/web/**/*.{ts,tsx,mts,cts,js,mjs}"],
     ignores: ["apps/web/src/db/workspace.ts"],
     rules: {
-      "no-restricted-syntax": ["error", ...workspaceContextSyntax],
+      "no-restricted-syntax": ["error", ...workspaceContextSyntax, pgDynamicImport],
+    },
+  },
+  {
+    // The one file the TEN-09 block skips keeps the pg ban.
+    files: ["apps/web/src/db/workspace.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", pgDynamicImport],
     },
   },
   {
@@ -188,21 +203,22 @@ export default defineConfig(
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [coreSourceImport, { regex: directDbSource, message: directDbMessage }] },
+        { patterns: [coreSourceImport, pgImport, { regex: directDbSource, message: directDbMessage }] },
       ],
       "no-restricted-syntax": [
         "error",
         ...workspaceContextSyntax,
+        pgDynamicImport,
         { selector: `ImportExpression[source.value=/${directDbSource.replaceAll("/", "\\/")}/i]`, message: directDbMessage },
         { selector: `ImportExpression[source.value=/${dbClientSource.replaceAll("/", "\\/")}/]`, message: dbClientMessage },
       ],
     },
   },
   {
-    // TEN-10: database drivers only in src/db and tests. worker.ts is the Phase 0 worker stub and keeps its own
-    // client until Phase 1 PR 5 replaces it (PR #43 Round 1 P2).
+    // TEN-10: database drivers only in src/db and tests (PR #43 Round 1 P2). The worker opens its crm_app pool
+    // through the system module (openDatabase) since Phase 1 PR 5, so worker.ts has no exemption.
     files: ["apps/web/**/*.{ts,tsx,mts,cts,js,mjs}"],
-    ignores: ["apps/web/src/db/**", "apps/web/src/test/**", "apps/web/**/*.test.ts", "apps/web/worker.ts"],
+    ignores: ["apps/web/src/db/**", "apps/web/src/test/**", "apps/web/**/*.test.ts"],
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
@@ -235,6 +251,7 @@ export default defineConfig(
         {
           patterns: [
             coreSourceImport,
+            pgImport,
             { regex: String.raw`(^|/)schema/(auth|system)${moduleSuffix}$`, message: systemSchemaMessage },
             { regex: String.raw`(^|/)schema(/index)?${moduleSuffix}$`, importNames: systemSchemaExports, message: systemSchemaMessage },
           ],

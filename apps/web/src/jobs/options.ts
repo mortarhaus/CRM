@@ -25,3 +25,13 @@ export const WORKER_BOSS_OPTIONS = {
   persistQueueStats: false,
   persistWarnings: false,
 } as const satisfies ConstructorOptions;
+
+// The retry admin command (scripts/retry-job.ts): crm_worker, one connection, no maintenance and no cron, so a
+// one-off command never runs the worker's timers.
+export const RETRY_BOSS_OPTIONS = {
+  max: 1,
+  migrate: false,
+  createSchema: false,
+  supervise: false,
+  schedule: false,
+} as const satisfies ConstructorOptions;
