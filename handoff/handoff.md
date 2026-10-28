@@ -402,3 +402,8 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 
 ## 2026-10-28 17:49 approved 45
 - Round 1 Approved with conditions at head 06bdd6e; CI 4/4 green. Review archived and receipt written on agent-logs. Deferred: P2-1 -> PR 6 (Task 19), before the first handler can dead-letter a job. P3s: fix the "option (c)" label in DECISIONS; RETRY_HELP image form. Next: Charlie merges, then "merged 45".
+
+## 2026-10-28 17:51 merged 45
+- PR #45 merged 2026-10-28 (c599bd8). Log on agent-logs (log/2026-10-28_PR45_...). Receipt before merge (31 s), no gate breaches. Worktree/branch feat/p1-pgboss removed without --force; local main at c599bd8.
+- Next: Phase 1 PR 6 (events, Tasks 19-20) via "build" (ask Charlie first); carries P2-1 (jobs:retry -> redrive()) before the first handler can dead-letter. Docs debt: PROJECT.md UNI-04 + §11, CLAUDE.md Status, DECISIONS "option (c)" label, RETRY_HELP image form, PR 44 pointers.
+- Open: ASK 5, .env refresh, repo visibility, untracked docker/sync-*.sh and .playwright-mcp/.
