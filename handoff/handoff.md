@@ -399,3 +399,6 @@ Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-
 - Charlie chose A (patch pg-boss, with Bob's advice). Tasks 16-18 done, head 06bdd6e, PR #45 opened (ready, not draft). Builder reran install/typecheck/lint/test (736)/build/audit: all 0. Stack and e2e were run by helper before last 5 commits; CI image job covers the final head.
 - Next: Charlie runs "review 45". After merge: PROJECT.md (UNI-04 pg ban, §11 crm_worker grants) and CLAUDE.md Status need the setup reconcile / a docs PR. Next PR 6 (events, Tasks 19-20): handlers must bound their own queries; send() that must commit with the request needs db: fromDrizzle(tx, sql).
 - Open: ASK 5, .env refresh, repo visibility, untracked docker/sync-*.sh and .playwright-mcp/.
+
+## 2026-10-28 17:49 approved 45
+- Round 1 Approved with conditions at head 06bdd6e; CI 4/4 green. Review archived and receipt written on agent-logs. Deferred: P2-1 -> PR 6 (Task 19), before the first handler can dead-letter a job. P3s: fix the "option (c)" label in DECISIONS; RETRY_HELP image form. Next: Charlie merges, then "merged 45".
