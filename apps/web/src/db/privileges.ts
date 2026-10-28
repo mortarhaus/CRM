@@ -4,9 +4,12 @@
 
 export type ManifestRole = "crm_app" | "crm_worker" | "crm_purge" | "crm_link_resolver" | "PUBLIC";
 
-const table = (name: string, ...privileges: string[]) => privileges.map((privilege) => `table:public.${name}:${privilege}`);
+// A bare table name is in schema public; other schemas are written out ("pgboss.job_common").
+const qualified = (name: string) => (name.includes(".") ? name : `public.${name}`);
+const table = (name: string, ...privileges: string[]) =>
+  privileges.map((privilege) => `table:${qualified(name)}:${privilege}`);
 const columns = (name: string, privilege: string, ...names: string[]) =>
-  names.map((column) => `column:public.${name}.${column}:${privilege}`);
+  names.map((column) => `column:${qualified(name)}.${column}:${privilege}`);
 
 // PostgreSQL defaults kept for PUBLIC; migration 0001 revokes TEMPORARY and function EXECUTE.
 const PUBLIC_DEFAULTS = ["database:CONNECT", "schema:public:USAGE"];
@@ -36,8 +39,43 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...table("audit_log", "SELECT", "INSERT"), // append-only (TEN-03)
     ...table("idempotency_key", "SELECT", "INSERT", "DELETE"),
     ...columns("idempotency_key", "UPDATE", "response"),
+    // The web send-only pg-boss instance: enqueue only, never a payload column (migration 0016, install.test.ts).
+    "schema:pgboss:USAGE",
+    ...table("pgboss.version", "SELECT"),
+    ...table("pgboss.queue", "SELECT"),
+    ...table("pgboss.job_common", "INSERT"),
+    ...columns("pgboss.job_common", "SELECT", "id", "start_after"),
+    "function:pgboss.job_now():EXECUTE",
   ],
-  crm_worker: PUBLIC_DEFAULTS,
+  // The worker's pg-boss instance, pgboss schema only, nothing in public (TEN-02; migration 0018, measured and
+  // ablated in jobs/worker-grants.test.ts). No create_queue, no INSERT on pgboss.queue (the pg-boss patch, UNI-06).
+  crm_worker: [
+    ...PUBLIC_DEFAULTS,
+    "schema:pgboss:USAGE",
+    "function:pgboss.job_now():EXECUTE",
+    ...table("pgboss.version", "SELECT"),
+    ...columns("pgboss.version", "UPDATE", "cron_on", "flow_on", "monitor_backoff_on"),
+    ...table("pgboss.queue", "SELECT"),
+    ...columns(
+      "pgboss.queue",
+      "UPDATE",
+      "monitor_claim_on",
+      "monitor_on",
+      "maintain_on",
+      "deferred_count",
+      "queued_count",
+      "ready_count",
+      "active_count",
+      "failed_count",
+      "total_count",
+      "singletons_active",
+      "ready_history",
+    ),
+    ...table("pgboss.schedule", "SELECT", "INSERT", "UPDATE", "DELETE"),
+    ...table("pgboss.job_common", "SELECT", "INSERT", "UPDATE", "DELETE"),
+    ...table("pgboss.job", "SELECT", "INSERT", "UPDATE"),
+    ...table("pgboss.job_dependency", "SELECT", "DELETE"),
+  ],
   // Phase 1 part (b1): INSERT on audit_log only, for the purge's own entry (spec "crm_purge in Phase 1").
   crm_purge: [...PUBLIC_DEFAULTS, ...table("audit_log", "INSERT")],
   crm_link_resolver: PUBLIC_DEFAULTS,

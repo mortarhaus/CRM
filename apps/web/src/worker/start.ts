@@ -1,25 +1,46 @@
-import type postgres from "postgres";
+import type { AppDatabase } from "../db/system";
+import { createWorkerBoss } from "../jobs/boss";
+import { HANDLERS, type Handlers, type QueueName } from "../jobs/handlers";
+import { type Log, logInfo } from "../jobs/log";
 
 export interface WorkerHandle {
   stop(): Promise<void>;
 }
 
-type Log = (line: string) => void;
-
-function info(log: Log, msg: string): void {
-  log(JSON.stringify({ level: "info", msg }));
+export interface StartWorkerOptions {
+  // The crm_app pool, opened by the caller with openDatabase(); the worker closes it on stop().
+  appDb: AppDatabase;
+  // crm_worker, direct (DATABASE_WORKER_URL): pg-boss only.
+  workerUrl: string;
+  log?: Log;
+  // The queue handlers; tests pass stubs.
+  handlers?: Handlers;
 }
 
-export async function startWorker(sql: postgres.Sql, log: Log = console.log): Promise<WorkerHandle> {
-  await sql`select 1`;
-  // No jobs until pg-boss lands in Phase 1; the timer keeps the process alive the way a consumer loop will.
-  const keepAlive = setInterval(() => {}, 60_000);
-  info(log, "worker ready");
+// Under Docker's 10 s between SIGTERM and SIGKILL: active jobs get 6 s to finish, then pg-boss fails them (they are
+// retried by their queue's policy); closing the crm_app pool then takes at most 2 s more (AppDatabase.close), 8 s in
+// all.
+export const STOP_TIMEOUT_MS = 6_000;
+
+export async function startWorker({ appDb, workerUrl, log = console.log, handlers = HANDLERS }: StartWorkerOptions): Promise<WorkerHandle> {
+  const boss = createWorkerBoss(workerUrl, log);
+  try {
+    await appDb.ping();
+    await boss.start();
+    for (const [queue, handler] of Object.entries(handlers) as [QueueName, NonNullable<Handlers[QueueName]>][]) {
+      await boss.work<object>(queue, (jobs) => handler(jobs, { log }));
+    }
+  } catch (error) {
+    await boss.stop({ graceful: false, timeout: 1_000 }).catch(() => {});
+    await appDb.close();
+    throw error;
+  }
+  logInfo(log, "worker ready");
   return {
     async stop() {
-      clearInterval(keepAlive);
-      await sql.end({ timeout: 5 });
-      info(log, "worker stopped");
+      await boss.stop({ graceful: true, timeout: STOP_TIMEOUT_MS });
+      await appDb.close();
+      logInfo(log, "worker stopped");
     },
   };
 }

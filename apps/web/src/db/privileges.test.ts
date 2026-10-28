@@ -45,6 +45,42 @@ describe("roles", () => {
   });
 });
 
+// TEN-02 condition (Bob R11; plan Task 17 Step 4): the worker role reaches tenant data only through the crm_app pool,
+// never through its own login. The manifest already has no public row for it; this says so directly, for every
+// table, view, sequence and function in public, at table and at column level.
+describe("crm_worker holds nothing in public (TEN-02)", () => {
+  it("has no manifest row in public", () => {
+    expect(EXPECTED_PRIVILEGES.crm_worker.filter((entry) => /^(table|column|sequence|function):public\./.test(entry))).toEqual([]);
+  });
+
+  it("holds no privilege on any table, column, sequence or function in public", async () => {
+    const held = await admin<{ object: string }[]>`
+      select c.relname || ' ' || p.privilege as object
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) p(privilege)
+      where n.nspname = 'public' and c.relkind in ('r', 'p', 'v', 'm', 'f')
+        and (has_table_privilege('crm_worker', c.oid, p.privilege)
+          or (p.privilege in ('SELECT', 'INSERT', 'UPDATE', 'REFERENCES')
+            and has_any_column_privilege('crm_worker', c.oid, p.privilege)))
+      union all
+      select c.relname || ' ' || p.privilege
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      cross join unnest(array['USAGE', 'SELECT', 'UPDATE']) p(privilege)
+      where n.nspname = 'public' and c.relkind = 'S' and has_sequence_privilege('crm_worker', c.oid, p.privilege)
+      union all
+      select f.oid::regprocedure::text || ' EXECUTE'
+      from pg_proc f join pg_namespace n on n.oid = f.pronamespace
+      where n.nspname = 'public' and has_function_privilege('crm_worker', f.oid, 'EXECUTE')
+      order by 1`;
+    const [tables] = await admin<{ count: number }[]>`
+      select count(*)::int as count from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind in ('r', 'p')`;
+    // Not blind: public has the Better Auth, system and tenant tables.
+    expect(tables?.count).toBeGreaterThan(10);
+    expect(held.map((row) => row.object)).toEqual([]);
+  });
+});
+
 // TEN-03 and spec Scalability: no runtime role, and not PUBLIC, can change or remove an audit row, at table or
 // column level; the owner is crm_migrator. Part 1 of the catalog test (plan Task 12 Step 4); domain_event joins
 // it in plan Task 19.

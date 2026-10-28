@@ -21,8 +21,8 @@ None is superuser or has `BYPASSRLS`, `CREATEROLE`, `CREATEDB` or `REPLICATION`
 | Role | Login | What it may do | Connection |
 |---|---|---|---|
 | `crm_migrator` | yes | Owns the database, every schema object and (from PR 5) `pgboss`; runs migrations. Member of `crm_link_resolver` with `INHERIT FALSE, SET TRUE`, only so a migration can make it the owner of `resolve_share_link()` (Phase 7) | `DATABASE_MIGRATOR_URL`, direct, never pooled |
-| `crm_app` | yes | Every web request and the worker's tenant work. Today: the Better Auth tables, exactly as measured below, `billing_account` (SELECT, INSERT), `auth_audit_log` (INSERT), and `workspace_settings`, `audit_log` and `idempotency_key` under RLS | `DATABASE_URL`, may be pooled |
-| `crm_worker` | yes | The worker's pg-boss instance, `pgboss.*` only. No grant yet: PR 5 measures them | `DATABASE_WORKER_URL` (worker only; read since PR 1, used from PR 5) |
+| `crm_app` | yes | Every web request and the worker's tenant work. Today: the Better Auth tables, exactly as measured below, `billing_account` (SELECT, INSERT), `auth_audit_log` (INSERT), `workspace_settings`, `audit_log` and `idempotency_key` under RLS, and enqueue only in `pgboss` (see "pg-boss grants") | `DATABASE_URL`, may be pooled |
+| `crm_worker` | yes | The worker's pg-boss instance, `pgboss.*` only, exactly as measured in "pg-boss grants". Nothing in `public` (TEN-02): the worker's tenant work runs on its `crm_app` pool | `DATABASE_WORKER_URL` (worker only, direct) |
 | `crm_purge` | yes, `NOINHERIT`, `CONNECTION LIMIT 2` | PDPA purge only. INSERT on `audit_log` only, for the purge's own entry, under the RESTRICTIVE workspace policy and `audit_log_purge_insert` (PR 4, migration 0012; `purge-role.test.ts`). No role is a member of it. It has **no password** in dev compose and production until the purge job lands (Phase 9), so nobody can sign in as it | none until Phase 9 (`DATABASE_PURGE_URL`, worker only) |
 | `crm_link_resolver` | no (`NOLOGIN`) | Owns `resolve_share_link()` from Phase 7. No privilege beyond the PUBLIC defaults, which it cannot use | none |
 
@@ -314,6 +314,117 @@ read and write), `apps/web/src/db/workspace.test.ts` (a reused connection after 
 To inspect tenant rows by hand, connect as the admin, or as `crm_app` inside a transaction that first
 runs `select set_config('app.workspace_id', '<workspace uuid>', true)`. Never `SET` it for a session.
 
+## pg-boss grants
+
+pg-boss 12.35.0 lives in schema `pgboss`, installed and upgraded only by `crm_migrator` in migrations (0015
+install, 0016 the Phase 1 queues and the `crm_app` grants, 0017 the internal cron queue, 0018 the `crm_worker`
+grants). Neither app instance migrates, creates the schema or creates a queue; queue options (`notify`
+included, off on every queue) change only in a migration.
+
+Method (plan Settled item 2, Task 17): the instance runs with the production switches (`apps/web/src/jobs/options.ts`)
+and the shortest intervals 12.35.0 allows (1 s; polling 0.5 s), against Testcontainers PostgreSQL 17 started with a
+server log (`log_line_prefix = '%m [%p] user=%u sqlstate=%e '`). With only the grants below the whole operation set
+runs with zero `42501` lines for the role, zero `error` events and zero `warning` events; then each grant is revoked
+in turn and the operation set must hit `permission denied` for that object (`describe.each`, kept as a test so a
+later change keeps the evidence). Measured 2026-10-27, pg-boss 12.35.0 with the CRM patch (below), PostgreSQL 17.11.
+
+**`crm_app`, the web send-only instance** (`migrate`, `createSchema`, `supervise`, `schedule` false, `max` 2;
+`apps/web/src/jobs/install.test.ts`): `start()`, `send()`, the queue-cache refresh, `stop()`.
+
+| Privilege | Object | Operation that needs it |
+|---|---|---|
+| USAGE | schema `pgboss` | every statement |
+| SELECT | `version` | `start()` checks the schema version |
+| SELECT | `queue` | the queue cache (`send()` looks the queue up) |
+| INSERT | `job_common` | `send()` |
+| SELECT (`id`) | `job_common` | `send()`'s `RETURNING id` |
+| SELECT (`start_after`) | `job_common` | not used in Phase 1 (only returned when a queue has `notify` on); kept because the spec lists it |
+| EXECUTE | `job_now()` | `send()` (`created_on`, `start_after`) |
+
+No payload column (`data`, `output`) is readable: `select data from pgboss.job_common` fails `42501`.
+
+**`crm_worker`, the worker instance** (`supervise`, `schedule` true; `migrate`, `createSchema`, `reindex`,
+`persistQueueStats`, `persistWarnings` false; `max` 3; `apps/web/src/jobs/worker-grants.test.ts`). Operation set:
+`start()`; `work()`, fetch and `complete()`; a handler that throws twice then succeeds (retry with backoff); a handler
+that always throws (retries exhausted, a copy in `email.send.dead`); `expireInSeconds` exceeded (maintenance fails the
+job); `deleteAfterSeconds` after completion and `retentionSeconds` on an unfetched job (maintenance deletes both);
+`schedule()` and a cron fire within 75 s; `unschedule()`; `retry()` on the failed job (the admin command); `stop()`.
+
+| Privilege | Object | Statement that fails without it (ablation) |
+|---|---|---|
+| USAGE | schema `pgboss` | every statement (`start()` first) |
+| EXECUTE | `job_now()` | the clock check at `start()`, fetch, the cron and maintenance passes |
+| SELECT | `version` | `start()` reads the schema version |
+| UPDATE (`cron_on`) | `version` | the cron pass claims its minute |
+| UPDATE (`flow_on`) | `version` | the flow (job dependency) pass claims its turn |
+| UPDATE (`monitor_backoff_on`) | `version` | supervise's monitor backoff |
+| SELECT | `queue` | the queue cache, the patched `start()` (does the cron queue exist?) |
+| UPDATE (`monitor_claim_on`, `monitor_on`, `maintain_on`, `deferred_count`, `queued_count`, `ready_count`, `active_count`, `failed_count`, `total_count`, `singletons_active`, `ready_history`) | `queue` | supervise: the monitor claim and queue counts, the maintenance claim (each column ablated on its own) |
+| SELECT, INSERT, UPDATE | `schedule` | `schedule()` (an upsert), the cron pass reads the schedules |
+| DELETE | `schedule` | `unschedule()` |
+| SELECT, UPDATE | `job_common` | fetch, `complete()`, `retry()` |
+| INSERT, DELETE | `job_common` | `fail()` and expiry (pg-boss moves a failed job with a DELETE and an INSERT in one statement); the cron fire (INSERT); maintenance deletion after `deleteAfterSeconds` and `retentionSeconds` (DELETE) |
+| SELECT, INSERT, UPDATE | `job` (the partitioned parent) | the dead-letter copy, `retry()`, the flow pass (`FOR UPDATE` on parents) |
+| SELECT, DELETE | `job_dependency` | the flow pass and maintenance deletion |
+
+Nothing on `subscription`, `bam`, `warning` or `queue_stats` (no statement of the operation set uses them; warnings
+and queue stats are not persisted), no UPDATE on `job_dependency`, no table-level UPDATE on `queue` or `version` (so
+queue options, `notify` included, and the schema version change only in migrations), no EXECUTE on `create_queue` or
+`delete_queue`, no INSERT on `queue`, and nothing in `public` (TEN-02, `privileges.test.ts`). The manifest
+`apps/web/src/db/privileges.ts` holds both lists; `privileges.test.ts` fails on any difference.
+
+### Retrying a failed job (`jobs:retry`)
+
+A job whose retries are exhausted is `failed` in its own queue, and a copy lands in the queue's dead-letter queue
+(`email.send.dead`, `domain_event.dead`) in state `created`. No worker works the dead-letter queues. To run the job
+again once the cause is fixed, retry the **failed original in its original queue**, as `crm_worker`:
+
+```sh
+# host (reads the root .env)
+pnpm --filter @crm/web jobs:retry -- --queue email.send --id <failed job id>
+# image (the running worker container has the URLs)
+docker compose -f docker/compose.dev.yml exec worker node dist/retry-job.mjs --queue email.send --id <failed job id>
+```
+
+It prints `{"level":"info","msg":"job retried"}` (exit 0) and the job goes back to `retry`, then runs. Retrying the
+dead-letter copy is a no-op: `retry()` only matches jobs in state `failed`, so `--queue email.send.dead --id <copy id>`
+prints `job not found` (exit 1) and changes nothing. Find the original from the copy (admin connection):
+`select source_id from pgboss.job where name = 'email.send.dead' and id = '<copy id>'`. An unknown id also prints
+`job not found` (exit 1); a missing or malformed argument exits 2 before connecting. The command starts pg-boss with
+one connection, no maintenance and no cron (`RETRY_BOSS_OPTIONS`), and logs errors by name and SQLSTATE only.
+
+### Connections and pools
+
+| Process | crm_app (postgres.js) | pg-boss (`pg`) | Notes |
+|---|---|---|---|
+| web | 10 (`getDb()`) | 2, `crm_app` (`getSendBoss()`, send only) | the auth-transaction slots (5) and `PoolBypassError` cover the postgres.js pool only |
+| worker | 3 (`openDatabase`, the `getDb()` singleton) | 3, `crm_worker` | one crm_app pool per process: a second `openDatabase` throws |
+| `jobs:retry` | none | 1, `crm_worker` | one-off |
+
+pg-boss's pool is not the guarded postgres.js pool: a `send()` inside an auth request transaction neither fails with
+`PoolBypassError` nor joins that transaction (`boss.test.ts`). A job that must commit with the request's writes
+passes the transaction as pg-boss's `db` (Task 19, `enqueue.ts`).
+
+On SIGTERM or SIGINT the worker stops in at most 8 s, under Docker's 10 s before SIGKILL: active jobs get 6 s, then
+pg-boss fails them (retried by the queue's policy), and the `crm_app` pool closes within 2 s. A statement a handler
+left running keeps running on the server until it ends (no `statement_timeout` is set).
+
+### The pg-boss patch (12.35.0)
+
+`patches/pg-boss@12.35.0.patch` (pnpm `patchedDependencies`, applied at install, also in the image's deps stage)
+changes one line of `dist/timekeeper.js`: with `schedule` on, `start()` called `createQueue('__pgboss__send-it')`
+every time, and `create_queue` inserts into `pgboss.queue` (`ON CONFLICT DO NOTHING`) even when the queue exists, so
+the worker role would have needed EXECUTE on `create_queue` and INSERT on `pgboss.queue`. Patched, `start()` reads
+the queue first (`getQueue`, a SELECT on `pgboss.queue`) and creates it only when it is missing. Migration 0017
+creates it (`notify` off), so on a migrated database the worker never creates a queue. If the queue is missing
+(a database not migrated to 0017), the worker's `start()` fails with `permission denied for function create_queue`
+instead of creating it: run `pnpm db:migrate`.
+
+Checks: `worker-grants.test.ts` "the pg-boss patch" fails if the installed pg-boss is not patched (the marker
+`crm-patch(send-it-exists)`), and the worker start test then fails with that `42501`. Remove the patch when a
+pg-boss release no longer calls `createQueue` when the queue exists (or no longer needs the queue): drop the
+`patchedDependencies` entry and the patch file in the planned upgrade (R5), and keep the start test as the check.
+
 ## Failure recovery
 
 | Symptom | Meaning | Action |
@@ -329,4 +440,6 @@ runs `select set_config('app.workspace_id', '<workspace uuid>', true)`. Never `S
 | `[auth] request failed: … (55P03)` | A request waited 5 s for its user's lock or, on sign-in, its email's lock (`lock_timeout`; the same for an email with no account) | Nothing to repair; the user retries |
 | `[auth] request failed: … (40001)` on a sign-in | A 2FA change of the same user committed during the sign-in; the sign-in was refused | Nothing to repair; the user signs in again |
 | `[auth] request failed: … (23514)` on a session insert | A session insert had no known `issue_reason` label (an auth path the audit does not know) | Do not grant or relabel by hand. Add the path to `labelSessionIssue` with its test |
+| `permission denied for function create_queue` (`42501`) when the worker starts | The pg-boss patch is not applied (a fresh install without `patchedDependencies`), or the database is not migrated to 0017 (the cron queue is missing) | Run `pnpm install` and rebuild the image; run `pnpm db:migrate`. Do not grant `create_queue` to `crm_worker` |
+| `permission denied for table <pgboss table>` (`42501`) in the worker log | A pg-boss path outside the measured operation set (a new option or a pg-boss upgrade) | As for any `42501`: add the path to `worker-grants.test.ts`, measure, and grant in a migration with its manifest row |
 | `[auth] request failed: Error (CONNECTION_CLOSED)` | The request's database backend ended (restart, failover, `pg_terminate_backend`); the request rolled back | Nothing to repair once the database is back. If it is followed by an uncaught `TypeError` in `connection.js`, the postgres.js patch is not applied: run `pnpm install` and rebuild the image |

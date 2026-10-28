@@ -56,8 +56,60 @@ export async function migrationsCopy(
   return folder;
 }
 
-export function startPostgres(): Promise<StartedPostgreSqlContainer> {
-  return new PostgreSqlContainer("postgres:17-alpine").start();
+// Server settings for tests that read the server log (serverLog): the log goes to one file, and every line names the
+// role and the SQLSTATE, so a test can count the permission errors (42501) of one role.
+const SERVER_LOG_DIR = "/tmp/pglog";
+const LOGGED_COMMAND = [
+  "postgres",
+  ...["-c", "logging_collector=on", "-c", `log_directory=${SERVER_LOG_DIR}`, "-c", "log_filename=postgresql.log"],
+  ...["-c", "log_line_prefix=%m [%p] user=%u sqlstate=%e ", "-c", "log_min_error_statement=error"],
+];
+
+export function startPostgres(options: { serverLog?: boolean } = {}): Promise<StartedPostgreSqlContainer> {
+  const container = new PostgreSqlContainer("postgres:17-alpine");
+  if (options.serverLog) container.withCommand(LOGGED_COMMAND);
+  return container.start();
+}
+
+// The server log lines so far (needs startPostgres({ serverLog: true })). A test that reads only what came after a
+// point takes `(await serverLog(container)).length` first and slices from it.
+export async function serverLog(container: StartedPostgreSqlContainer): Promise<string[]> {
+  const { output, exitCode } = await container.exec(["cat", `${SERVER_LOG_DIR}/postgresql.log`]);
+  if (exitCode !== 0) throw new Error(`cannot read the server log: ${output}`);
+  const lines = output.split("\n");
+  // The file ends with a newline: drop the empty piece after it, so `lines.length` is a safe offset for the next read.
+  if (lines.at(-1) === "") lines.pop();
+  return lines;
+}
+
+// The permission errors (SQLSTATE 42501) the server logged for `role`, each as "<message> | <statement>". The
+// statement is the STATEMENT entry log_min_error_statement writes for the same backend after the error (after a
+// CONTEXT entry when the error came from inside a function), joined onto one line.
+export function permissionErrors(lines: readonly string[], role: string): string[] {
+  const entryStart = /^\d{4}-\d{2}-\d{2} /;
+  const entries: string[] = [];
+  for (const line of lines) {
+    if (entryStart.test(line) || entries.length === 0) entries.push(line);
+    else entries[entries.length - 1] += ` ${line}`;
+  }
+  const prefix = `user=${role} sqlstate=42501 `;
+  const found: string[] = [];
+  entries.forEach((entry, index) => {
+    if (!entry.includes(`${prefix}ERROR:`)) return;
+    const pid = /\[(\d+)\]/.exec(entry)?.[1];
+    const message = entry.slice(entry.indexOf("ERROR:") + "ERROR:".length).trim();
+    let statement = "";
+    for (const next of entries.slice(index + 1, index + 6)) {
+      if (!next.includes(`[${pid}] ${prefix}`)) continue;
+      if (next.includes(`${prefix}ERROR:`)) break;
+      if (next.includes(`${prefix}STATEMENT:`)) {
+        statement = next.slice(next.indexOf("STATEMENT:") + "STATEMENT:".length);
+        break;
+      }
+    }
+    found.push(`${message} | ${statement}`.replace(/\s+/g, " ").trim());
+  });
+  return found;
 }
 
 export function roleUrl(adminUrl: string, role: string, password: string): string {
@@ -75,9 +127,12 @@ export function databaseUrl(url: string, database: string): string {
 
 // A fresh Postgres 17 with the five roles bootstrapped and every migration applied as crm_migrator
 // (migrate: false leaves the database empty, for the migration runner's own test; stopBefore applies only the
-// migrations before that tag prefix, so a test can upgrade a database of an earlier phase with applyRemaining).
-export async function startDatabase(options: { migrate?: boolean; stopBefore?: string } = {}): Promise<TestDatabase> {
-  const container = await startPostgres();
+// migrations before that tag prefix, so a test can upgrade a database of an earlier phase with applyRemaining;
+// serverLog writes the server log for serverLog()).
+export async function startDatabase(
+  options: { migrate?: boolean; stopBefore?: string; serverLog?: boolean } = {},
+): Promise<TestDatabase> {
+  const container = await startPostgres({ serverLog: options.serverLog ?? false });
   const adminUrl = container.getConnectionUri();
   const admin = postgres(adminUrl, { max: 1, onnotice: () => {} });
   try {

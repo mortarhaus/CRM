@@ -16,6 +16,8 @@ export {
 export { type AuthTransactions, createAuthTransactions } from "./auth-transaction";
 export { ensureBillingAccount } from "./billing";
 export { pingDatabase } from "./health";
+// The worker opens and closes its crm_app pool through these (no query: see src/db/index.ts).
+export { type AppDatabase, DatabaseAlreadyOpenError, openDatabase } from "../index";
 export {
   ensureWorkspaceSettings,
   findMembership,
