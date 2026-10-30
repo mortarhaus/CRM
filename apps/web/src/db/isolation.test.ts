@@ -6,7 +6,7 @@ import { holdsCommand, tenantTables } from "../test/catalog";
 import { sqlState, startDatabase, type TestDatabase } from "../test/postgres";
 import { createDb, type DbHandle } from "./client";
 import { EXPECTED_PRIVILEGES } from "./privileges";
-import { auditLog, idempotencyKey, organization, workspaceSettings } from "./schema";
+import { auditLog, domainEvent, idempotencyKey, notification, organization, workspaceSettings } from "./schema";
 import { runInWorkspace, type Tx } from "./workspace";
 
 // TEN-08: every tenant table gets read and write isolation tests over two workspaces, as crm_app.
@@ -23,6 +23,12 @@ const TENANT_FIXTURES: Record<string, TenantFixture> = {
   audit_log: {
     async seed(tx, workspaceId) {
       await tx.insert(auditLog).values({ workspaceId, action: "isolation.seed", targetType: "fixture" });
+    },
+  },
+  // Append-only event history (TEN-03): no UPDATE or DELETE for crm_app.
+  domain_event: {
+    async seed(tx, workspaceId) {
+      await tx.insert(domainEvent).values({ workspaceId, name: "invoice.issued", version: 1, payload: { invoiceId: randomUUID() } });
     },
   },
   idempotency_key: {
@@ -47,6 +53,23 @@ const TENANT_FIXTURES: Record<string, TenantFixture> = {
       return result.count;
     },
   },
+  // crm_app marks a notification read (UPDATE of read_at only) and deletes none.
+  notification: {
+    async seed(tx, workspaceId) {
+      await tx.insert(notification).values({
+        id: randomUUID(),
+        workspaceId,
+        userId: notifiedUser,
+        kind: "isolation.seed",
+        targetType: "fixture",
+        targetId: randomUUID(),
+      });
+    },
+    async update(tx, workspaceId) {
+      const result = await tx.update(notification).set({ readAt: new Date() }).where(eq(notification.workspaceId, workspaceId));
+      return result.count;
+    },
+  },
   workspace_settings: {
     async seed(tx, workspaceId) {
       await tx.insert(workspaceSettings).values({ workspaceId });
@@ -67,6 +90,8 @@ let admin: postgres.Sql;
 let handle: DbHandle;
 let workspaceA: string;
 let workspaceB: string;
+// The user every notification fixture is for.
+let notifiedUser: string;
 
 async function createWorkspace(name: string): Promise<string> {
   const [row] = await handle.db
@@ -83,6 +108,10 @@ beforeAll(async () => {
   handle = createDb(database.appUrl, { max: 1 });
   workspaceA = await createWorkspace("isolation-a");
   workspaceB = await createWorkspace("isolation-b");
+  const [user] = await admin<{ id: string }[]>`
+    insert into "user" (name, email) values ('Isolation', ${`isolation-${randomUUID()}@example.test`}) returning id`;
+  if (!user) throw new Error("user not created");
+  notifiedUser = user.id;
 });
 
 afterAll(async () => {
