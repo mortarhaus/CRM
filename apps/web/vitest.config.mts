@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
@@ -10,6 +10,8 @@ export default defineConfig({
     name: "web",
     environment: "node",
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
+    // The gates run with `pnpm test:gates` (vitest.gates.config.mts).
+    exclude: [...configDefaults.exclude, "**/*.gate.test.ts"],
     testTimeout: 30_000,
     hookTimeout: 180_000,
   },
