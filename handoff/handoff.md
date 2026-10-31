@@ -1,4 +1,4 @@
-# Handoff — 2026-10-15 · branch feat/p0-runtime (worktree) · HEAD 074018f
+# Handoff — 2026-10-31 · branch fix/audit-better-auth (worktree) · HEAD c70f3d7
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,63 +6,60 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 4, hash `eb89f4ab817c79c536cd36f8aef7c643a059d697`, equals PROJECT.md §2; Bob spec Round 12 Approved with conditions) · Active PR number: none yet (Phase 0 PR 4)
-- Working folder: `.agent/worktrees/build-feat-p0-runtime` (main checkout `/Users/charlie/Documents/Projects/Personal/CRM` is on `main`, clean apart from untracked `.playwright-mcp/`, not mine)
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: **47**
+- Working folder: `.agent/worktrees/build-fix-audit-better-auth`. Do not touch `.agent/worktrees/build-feat-p1-events` (PR 46). Main checkout is on `main` at `c599bd8`; untracked `.playwright-mcp/` and `docker/sync-export.sh` are not mine.
 
 ## 1. Current PR / branch
-- Branch: `feat/p0-runtime` · Base: `main` at `074018f` (merge of PR #26)
-- Status: ready (in review once Charlie runs `review 27`); head 1bb6dcb pushed
-- Link: https://github.com/charliekhc/CRM/pull/27
+- PR #47 https://github.com/mortarhaus/CRM/pull/47 · branch `fix/audit-better-auth` · base `main` (`c599bd8`) · head **`c70f3d7`** (pushed 2026-10-31; previous head `d8ad272`)
+- Purpose: `better-auth` 1.7.6 -> 1.7.14 (GHSA-965c-763c-88jm, GHSA-r4xp-prcw-77qf, GHSA-44jh-23m7-hpcf) so `pnpm audit --audit-level high` passes on `main`.
+- Status: Bob's Round 6 (Blocked) findings fixed at `c70f3d7`; awaiting `review 47`. CI on `c70f3d7`: Dependency audit and Secret scan pass; Typecheck/lint/test and image jobs were still running at 21:30.
+- Follow-on: PR #46 https://github.com/mortarhaus/CRM/pull/46 (`feat/p1-events`, Phase 1 PR 6, head `0088f8c`) is blocked only by its failing Dependency audit job, which PR 47 fixes. After PR 47 merges, update PR 46 from `main` and rerun its CI.
 
 ## 2. Milestones
-- Done: Phase 0 PR 1 (tooling), PR 2 (#22, auth + DB), PR 3 (#26, health, sign-up/in, 2FA, workspaces; merged 2026-10-15T02:04:21Z, `074018f`). Logs through PR 26 on `agent-logs` (`bc4b678`). Log gate clear.
-- In progress: Phase 0 PR 4 = plan Tasks 15-17 (worker stub + esbuild bundles; Dockerfile/entrypoint/compose; CI image job with Trivy + E2E + CLAUDE.md Commands).
-- Pending: Phase 1 plan (after Charlie picks the VPS provider).
+- Done: Phase 0; Phase 1 PRs 1-5 (#39, #41, #43, #44, #45; last merge #45 `c599bd8` 2026-10-28). Log gate clear through PR 45 (no merge since).
+- In progress: PR 47 (dependency fix), then PR 46 (Phase 1 PR 6, events).
+- Pending: rest of Phase 1.
 
 ## 3. Git state
 ```
-main checkout: ## main, up to date with origin/main, only untracked .playwright-mcp/ (not mine)
-worktree build-feat-p0-runtime: branch feat/p0-runtime == origin/main, clean (git-ignored .env copied in; root .env restored from the old auth-db worktree because removing the PR 3 worktree took its copy)
+worktree build-fix-audit-better-auth: ## fix/audit-better-auth...origin/fix/audit-better-auth (clean)
+c70f3d7 fix(deps): reverify better-auth 1.7.14 sources and update runbooks
+d8ad272 docs: record the kysely-adapter range of GHSA-44jh-23m7-hpcf
+f72b6b3 fix(deps): upgrade better-auth to 1.7.14 (GHSA-965c-763c-88jm, GHSA-r4xp-prcw-77qf)
+c599bd8 Merge pull request #45 from mortarhaus/feat/p1-pgboss
+agent-logs: reviews/PR-47.md (Rounds 1-6) archived 2026-10-31; remote blob equals local file
 ```
 Uncommitted files — fingerprint every staged, modified or untracked path when writing this handoff:
 | Path | Status | Content hash (`git hash-object <path>`, or `deleted`) |
 |---|---|---|
 | (none) | | |
 
-```
-1bb6dcb chore: also ignore nested .env files in the Docker build context
-bed7adc docs: record PR 4 decisions and supply-chain ladder, and add the Docker image and compose stack to the runbook
-447e0f8 ci: cap the image job at 60 minutes
-cc02ba8 ci: build the image, scan it with Trivy and run E2E and the auth route smoke check
-ee46c82 fix(web): send an expired or exhausted 2FA challenge back to sign in
-bf5a58e feat: add single runtime image for web and worker
-188d231 feat(web): add worker entry stub and esbuild bundles
-```
-
 ## 4. Just finished
-2026-10-15: `merged 26` done and verified (GitHub MERGED, `074018f` reachable from origin/main, log `bc4b678`, branch/worktree of feat/p0-auth-ui removed). Charlie typed `build`; spec gate (Round 12, hash eb89f4ab…) and reconcile gate pass; log gate clear (PRs 1-7, 9-26 all logged). Local main fast-forwarded to origin/main. Created branch and worktree for PR 4. Old handoff saved to the session scratchpad (handoff.old.md).
+2026-10-31 `fix` for PR 47 (Bob Round 6: 2 P1 + 1 P2). Review archived to `agent-logs`; commit `c70f3d7` pushed; PR body updated with a rule-by-rule self-check table, the source-audit table and the classification of all 59 `1.7.6` hits (11 code, 5 runbooks, 43 plan). Source audit: the ten Task 31 facts and the plan's limiter/path/hook assumptions re-read in installed better-auth 1.7.14; no fact the code relies on changed; compatible changes recorded in DECISIONS 2026-10-30 (change-password order inside `runWithTransaction`, which runs inline because the Drizzle adapter has `transaction: false`; stronger `incrementOne` re-check; async `onError`, awaited by the router). Local checks on `c70f3d7`: frozen install pass, focused auth tests 221 pass, typecheck 0, lint 0, `pnpm test` 736 pass, build 0, audit (high) 0 with 5 moderate (new: minimatch GHSA-g3hv-75wg-m249, glob GHSA-3g3m-2fjr-6pw4), auth schema byte-identical, smoke:auth-route PASS, E2E 84 pass (dev server :3100, throwaway postgres :5442, both removed). Not run locally: production-image E2E (port 3000 busy; CI covers), grant remeasurement on 1.7.14.
 
 ## 5. Next step (file-level)
-2026-10-15 PR #27 opened (head 1bb6dcb). Builder re-ran typecheck, lint, 146 tests, image secret scan (0 hits, no .env in image). CI: checks/audit/secrets pass; `image` job (Trivy + 84 E2E, ~20+ min) pending. Next: Charlie runs `review 27` after image job is green; then `fix`/`approved 27`/`merged 27`. Old text follows.
-
-Plan Task 15 (apps/web/src/worker/start.ts + test, apps/web/worker.ts, scripts/build-node.mjs, esbuild devDependency with UNI-06 ladder in DECISIONS), then Task 16 (docker/Dockerfile, entrypoint.sh, .dockerignore, compose web+worker), then Task 17 (.github/workflows/ci.yml image job, CLAUDE.md Commands). Also Bob PR #26 deferred items for PR 4: expired/exhausted 2FA challenge message ("sign in again"); wire `pnpm test:e2e` and `smoke:auth-route` into CI. Check real current versions/SHAs (esbuild, Trivy, actions) before pinning; plan values are unverified.
+Charlie runs **`review 47`** (Bob). Then `fix` or `approved 47` -> Charlie merges -> `merged 47`. Then update PR 46 (`feat/p1-events`) from `main` so its Dependency audit job passes, and continue its review.
 
 ## 6. Open ASK items, blockers, and owner answers
-- Open: VPS provider (Hostinger KVM 2 or iCore NODE2; Phase 1 gate); install emilkowalski/skills? (not installed); cleanup of `feat/p0-auth-db` branch + worktree and older merged branches (needs Charlie's OK); PR #21 docs bundle (not requested).
-- Answered this session (question → answer): "all three yes" (FE-32 controls in PR 26); "remove maxLength"; "#2 follow bob" (UI kit option A); `merged 26`; `build`.
-- Ports: Task 16 compose binds 127.0.0.1:3000 and 5433 (crm-dev-postgres-1 already uses 5433; BOMY containers use 5432/6379/9000/1025/8025). Port 3000 was held by an unrelated process earlier; free at 2026-10-15 start.
+- Open: unchanged from 2026-10-28 (see history below), incl. untracked `docker/sync-export.sh` and `.playwright-mcp/` in the main checkout.
+- New moderate advisories (minimatch, glob) are below the high gate; no action taken.
+- No owner answer this session.
 
 ## 7. Open review findings (P0/P1) and verdict
-- Review file: none for PR 4 yet · Verdict: n/a. PR 26 final: Approved with conditions (Round 3); only a P3 PR-text condition, not fixed (merged first); recorded in the PR 26 log.
+- Review file `.agent/reviews/PR-47.md`, newest Round 6 (head `d8ad272`): **Blocked**. Findings and fix status at `c70f3d7`:
+  - [P1] Required guardrail self-check still absent -> fixed (PR body "Self-check").
+  - [P1] Better Auth 1.7.14 compatibility and runbook gate incomplete -> fixed (DECISIONS 2026-10-30 "Source audit on 1.7.14"; comments, runbooks and plan version wording updated; checks rerun).
+  - [P2] Handoff points away from PR 47 -> fixed (this file and the `agent-logs` copy).
+- Awaiting Bob's Round 7.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- None (all PR 26 decisions merged in docs/DECISIONS.md).
+- None (the source audit is in the PR's DECISIONS 2026-10-30 entry).
 
 ## 9. Files touched but not committed
 - None.
 
 ## 10. Model for the next session
-Opus 5.5 for Dockerfile/entrypoint/CI/security work (supply chain, secrets, non-root); Sonnet 5 only for mechanical edits.
+Opus 5.5 (auth/security review and any follow-up on PR 47); Sonnet 5 only for mechanical edits.
 
 - 2026-10-15 (fix, Bob PR #27 R1): review archived (ae70237). Runbook P2 + PR body P3 fixed in 088d013, pushed; CI re-running. Next: Charlie runs `review 27` when CI is green.
 
