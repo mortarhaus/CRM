@@ -18,7 +18,7 @@ export async function setActiveWorkspaceAction(_previous: FormState, form: FormD
 
   const result = await postToAuth("/organization/set-active", { organizationId });
   // Better Auth refuses a workspace the user is not a member of, and then clears the active workspace
-  // (organization plugin 1.7.6), so the page is refreshed after a refusal too.
+  // (organization plugin 1.7.14, crud-org.mjs checkMembership), so the page is refreshed after a refusal too.
   refresh();
   if (!result.ok) {
     return { ...EMPTY_FORM_STATE, error: result.status === 429 ? TOO_MANY_ATTEMPTS : WORKSPACE_SWITCH_FAILED };

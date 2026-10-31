@@ -119,7 +119,7 @@ describe("session cookie attributes", () => {
 describe("session refresh", () => {
   const DAY_MS = 24 * 60 * 60 * 1000;
 
-  // Better Auth 1.7.6 defaults: a session lasts 7 days and is extended once it is a day old.
+  // Better Auth 1.7.14 defaults: a session lasts 7 days and is extended once it is a day old.
   it("extends a day-old session on the next session read, as crm_app", async () => {
     const email = uniqueEmail();
     const headers = await signUpAndSignIn(email);

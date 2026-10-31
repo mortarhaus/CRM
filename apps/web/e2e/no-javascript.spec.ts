@@ -335,7 +335,7 @@ test("the workspace switcher works without JavaScript and the server refuses a f
   expect(await malformed.text()).toContain("Couldn&#x27;t switch workspace. Try again.");
 
   // A workspace the user does not belong to is refused, and Better Auth then clears the active
-  // workspace (organization plugin 1.7.6); the page shows what the server has.
+  // workspace (organization plugin 1.7.14); the page shows what the server has.
   await switcher.locator("option", { hasText: "Alpha Studio" }).evaluate((option: HTMLOptionElement, id) => {
     option.value = id;
   }, randomUUID());
