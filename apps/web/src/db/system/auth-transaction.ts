@@ -72,8 +72,9 @@ function slotQueue(size: number, waitMs: number) {
   };
 }
 
-// Better Auth 1.7.6 makes each write of a sign-in or 2FA flow its own autocommit statement and opens no
-// transaction (plan Task 31, fact iii). run() makes one request one transaction: it commits when keep(result)
+// Better Auth 1.7.14, like 1.7.6, makes each write of a sign-in or 2FA flow its own autocommit statement and opens
+// no transaction (plan Task 31, fact iii): its runWithTransaction calls (sign-up, change-password) run inline,
+// because the Drizzle adapter is built without `transaction` (reverified 2026-10-31, DECISIONS 2026-10-30). run() makes one request one transaction: it commits when keep(result)
 // holds and rolls back otherwise, or when the work throws. auth_audit_log's triggers read crm.auth_client_ip.
 // Inside run() a query on `db`'s pool that misses the transaction fails at once (PoolBypassError), and the request
 // rolls back even if the work swallowed that error.

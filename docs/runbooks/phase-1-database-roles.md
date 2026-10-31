@@ -88,6 +88,9 @@ switch, invitations) and the Phase 0 E2E suite (`pnpm test:e2e`, 84 tests, again
 URLs). Measured 2026-10-24, better-auth 1.7.6, drizzle-orm 0.45.3, Postgres 17: every statement `crm_app`
 ran was logged (`log_statement = all` on a throwaway database), each grant below comes from those
 statements, and with only these grants both suites pass and the Postgres log shows no `permission denied`.
+Not remeasured on better-auth 1.7.14 (PR #47, 2026-10-31; DECISIONS 2026-10-30): there the full unit suite
+(`auth.test.ts`, `auth-audit.test.ts`, `privileges.test.ts`) and the Phase 0 E2E suite pass as `crm_app` with
+these grants; the statement log was not re-collected.
 
 | Table | SELECT | INSERT | UPDATE (columns) | DELETE | Why |
 |---|---|---|---|---|---|

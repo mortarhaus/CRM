@@ -56,7 +56,7 @@ import { totpFromUri, wrongTotpCode } from "../../test/totp";
 import { authOptions, createAuth, type Auth } from "./config";
 import { withRequestTransactions } from "./request-transaction";
 
-// Plan Task 31 (31.B, T1 to T15): auth_audit_log and the 2FA session rules, against a real Better Auth 1.7.6 built
+// Plan Task 31 (31.B, T1 to T15): auth_audit_log and the 2FA session rules, against a real Better Auth 1.7.14 built
 // by createAuth, as crm_app, over HTTP (auth.handler) unless a test names another path. State is read as the
 // admin. A test that injects a fault or holds a statement gets a database of its own (a copy of a migrated
 // template). After every test, every open database holds the session invariant and only allow-listed row content.
@@ -184,7 +184,7 @@ async function isolated(): Promise<{ stack: Stack; auth: Auth }> {
 }
 
 // Control: the configured options (labels, triggers, plugins), but no request transaction: every statement
-// autocommits, as stock Better Auth 1.7.6 runs them, so the user lock ends with its own statement.
+// autocommits, as stock Better Auth 1.7.14 runs them (as 1.7.6 did), so the user lock ends with its own statement.
 function unserialised(db: Database): AuthLike {
   return betterAuth(authOptions({ db, secret: SECRET, baseURL: BASE_URL }));
 }

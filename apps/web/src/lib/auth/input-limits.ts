@@ -10,7 +10,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 
 export type LimitErrorCode = "PASSWORD_TOO_SHORT" | "PASSWORD_TOO_LONG" | "NAME_TOO_LONG" | "WORKSPACE_NAME_TOO_LONG";
 
-// Every Better Auth 1.7.6 endpoint with a path that stores a new password, a user name or a workspace
+// Every Better Auth 1.7.14 endpoint with a path that stores a new password, a user name or a workspace
 // name, and where its body holds that value. The server-only `setPassword` has no path and is unused.
 const NEW_PASSWORD_FIELD: Record<string, string> = {
   "/sign-up/email": "password",

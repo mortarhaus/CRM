@@ -10,7 +10,7 @@ const METHODS = {
   recovery: { path: "/two-factor/verify-backup-code", extra: {}, wrong: WRONG_RECOVERY_CODE },
 } as const;
 
-// Better Auth 1.7.6 codes for a challenge that can no longer be used: the two-factor cookie is missing,
+// Better Auth 1.7.14 codes (unchanged from 1.7.6) for a challenge that can no longer be used: the two-factor cookie is missing,
 // expired or already consumed, or the challenge's attempts ran out (the library then deletes it).
 // Only a fresh sign-in starts a new challenge, so these go back to sign-in instead of the wrong-code text.
 const CHALLENGE_ENDED = new Set(["INVALID_TWO_FACTOR_COOKIE", "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE"]);

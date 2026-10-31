@@ -16,7 +16,7 @@ export const SERIALISED_PATHS = new Set([
   "/two-factor/generate-backup-codes",
 ]);
 
-// Better Auth 1.7.6's two-factor challenge cookie (plugins/two-factor/constant.mjs).
+// Better Auth 1.7.14's two-factor challenge cookie (plugins/two-factor/constant.mjs).
 const TWO_FACTOR_COOKIE = "two_factor";
 
 // The session fields /list-sessions may return (plan Task 31 R10): never the token.
