@@ -155,7 +155,7 @@ describe("getMembership", () => {
 });
 
 describe("Better Auth endpoints: U1 cannot read or change W2", () => {
-  // Better Auth 1.7.6 also clears the active workspace on a refused set-active (crud-org.mjs, checkMembership).
+  // Better Auth 1.7.14 also clears the active workspace on a refused set-active (crud-org.mjs, checkMembership).
   it("/organization/set-active refuses W2 by id and never makes it active", async () => {
     expect((await http("POST", "/organization/set-active", { organizationId: u2.workspaceId }, u1.headers)).status).toBe(403);
     expect((await sessionsOf(u1.userId)).map((row) => row.activeOrganizationId)).toEqual([null]);

@@ -1,4 +1,5 @@
-// Better Auth 1.7.6's schema generator cannot reference a table it does not own (it throws "Model not found"),
+// Better Auth 1.7.6's schema generator could not reference a table it does not own (it threw "Model not found";
+// not retried without this step on 1.7.14, where `auth:generate` plus this step still reproduce the schema),
 // so organization.billing_account_id is declared to Better Auth as a plain field and turned into the uuid
 // foreign key to billing_account here, after every `auth generate`.
 const GENERATED_COLUMN = 'billingAccountId: text("billing_account_id")';

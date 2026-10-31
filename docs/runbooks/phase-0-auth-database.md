@@ -44,7 +44,7 @@ first. To build like CI locally, move the root `.env` aside, run
 
 - Generate: `openssl rand -base64 32` (44 characters). Put it in `.env` locally, or in the host's
   secret store in any shared environment. Never commit it, paste it into tickets, or log it.
-- Rotation: do not rotate in Phase 0. Verified in the installed better-auth 1.7.6 source: the session
+- Rotation: do not rotate in Phase 0. Verified in the installed better-auth 1.7.6 source and reverified in 1.7.14 (2026-10-31): the session
   cookie is signed with this secret (a new secret signs every user out), and TOTP secrets are
   encrypted with it (a plain replacement makes enrolled 2FA unusable). Better Auth has a versioned
   multi-secret option for rotation; it is not configured here and the procedure is unverified.
@@ -85,7 +85,7 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 - 2FA enrolment: the user enters the password, adds the setup key to an authenticator app, and confirms
   with a 6-digit code. A wrong code leaves 2FA off. Recovery codes are shown once; the page does not store or log them.
   The TOTP secret and URI never appear in a URL or in logs.
-- Better Auth 1.7.6 defaults, not set in our config: 5 attempts per 2FA challenge, then the user must sign in
+- Better Auth 1.7.14 defaults (unchanged from 1.7.6), not set in our config: 5 attempts per 2FA challenge, then the user must sign in
   again; 10 consecutive failures lock the account for 900 seconds. When the challenge has ended (Better Auth
   answers `INVALID_TWO_FACTOR_COOKIE` for a missing, expired or used challenge cookie, and
   `TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE` once its attempts ran out), `/two-factor` sends the user to
@@ -135,7 +135,7 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
     yet, so none was converted.
   - Workspace switcher: a native `<select>` and a visible "Switch" button. With JavaScript a change submits at
     once; the select keeps focus and nothing is disabled while it switches (A11Y-01). A blank id or an id that is not a
-    uuid is refused before Better Auth is asked (a malformed id would otherwise reach its uuid lookup and give a 500). Better Auth 1.7.6 refuses a workspace the user is not a member of and then
+    uuid is refused before Better Auth is asked (a malformed id would otherwise reach its uuid lookup and give a 500). Better Auth 1.7.14 refuses a workspace the user is not a member of and then
     clears the session's active workspace; the page refreshes and shows "Choose a workspace".
   - Sign-out: posts to the server, which goes to `/sign-in` only after Better Auth confirms the sign-out.
   Next encrypts server action ids per build; a deployment with several app instances needs the same
@@ -217,7 +217,7 @@ failure it uploads the Playwright report, traces and the stack logs for 7 days.
   sessions"). The value is `INVITATION_EXPIRY_SECONDS` in `packages/core/src/security/limits.ts`, the one
   place for fixed security values (DECISIONS 2026-10-13); changing it needs a reviewed PR.
 - Password reset is not enabled in Phase 0. When it is, set `emailAndPassword.resetPasswordTokenExpiresIn`
-  to the spec's 30 minutes (in seconds); the better-auth 1.7.6 default is 1 hour.
+  to the spec's 30 minutes (in seconds); the better-auth 1.7.14 default is 1 hour (as in 1.7.6).
 
 ## Failure recovery
 
