@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-rate-limits (worktree) · HEAD 5efa3b0
+# Handoff — 2026-11-01 · branch feat/p1-rate-limits (worktree) · HEAD 5d76e37 · PR #48
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,23 +6,25 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: **none yet** (Phase 1 PR 7 not opened: held, see §6)
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: **48** (Phase 1 PR 7)
 - Working folder: `.agent/worktrees/build-feat-p1-rate-limits`. Main checkout untouched (untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine).
 
 ## 1. Current PR / branch
-- Branch `feat/p1-rate-limits` (base origin/main `fe8664e`, PR 46 merged) · pushed normally, head **`5efa3b0`** · no PR opened.
-- Purpose: Phase 1 PR 7 (plan Tasks 21-24): database rate limits, one client-IP derivation, Better Auth on the database limiter, enabled-path allow-list, cleanup schedules.
-- Commits: `8e730a6` Task 21 (limits in `limits.ts`, `rate_limit` table, migrations **0021** table + **0022** grants (the plan said 0014), `system/rate-limit.ts` consume/giveBack/cleanupExpired, manifest, lint list, allow-list-exists test); `5efa3b0` Task 22 (`client-ip.ts`, `handle.ts`, `TRUSTED_CLIENT_IP_HEADER` env (required in production), `forward.ts` and route through `handleAuthRequest`, `ipAddressHeaders: [x-crm-client-ip]`, harness header switch, Step 3a audit-IP test, `.env.example`, compose web env).
-- Task 23 started, NOT committed (see §3, §9). Task 24 not started.
+- PR #48 https://github.com/mortarhaus/CRM/pull/48 · branch `feat/p1-rate-limits` (base origin/main `fe8664e`) · pushed normally, head **`5d76e37`**.
+- Purpose: Phase 1 PR 7 (plan Tasks 21-24): database rate limits, one client-IP derivation, Better Auth on the database limiter, per-account sign-in cap, uniform 429, Phase 1 enabled-path allow-list, AUTH-07, revoke-session-by-id, cleanup schedules.
+- Commits: `8e730a6` Task 21; `5efa3b0` Task 22; `0c23559` Task 23 (limiter on its own `crm_app` pool, Charlie 1A); `967c395` Task 24 (enabled paths + 404 layer, AUTH-07 hook + migration 0023, revokeOwnSession/revokeMySession, cleanups, origin pin, security-scan fix, Playwright per-test IP, runbook `phase-1-security.md`, DECISIONS); `5d76e37` docs (fourth PR #44 test named).
 
 ## 2. Milestones
-- Done: Phase 0; Phase 1 PRs 1-6 (#39, #41, #43, #44, #45, #46) and #47. Log gate clear through PR 46.
-- In progress: Phase 1 PR 7 (Tasks 21-22 committed; Task 23 blocked; Task 24 not started).
+- Done: Phase 0; Phase 1 PRs 1-6 (#39, #41, #43, #44, #45, #46) and #47.
+- In progress: Phase 1 PR 7 = PR #48, awaiting review.
 - Pending: PR 8 (Tasks 25-29).
 
 ## 3. Git state
 ```
-worktree build-feat-p1-rate-limits: ## feat/p1-rate-limits...origin/feat/p1-rate-limits (4 files changed, uncommitted Task 23 work)
+worktree build-feat-p1-rate-limits: ## feat/p1-rate-limits...origin/feat/p1-rate-limits (clean)
+5d76e37 docs: name the fourth PR #44 test in the PR 7 decision
+967c395 feat(auth): only Phase 1 Better Auth paths reachable; worker-owned cleanup schedules
+0c23559 feat(auth): database-backed Better Auth limits, per-account sign-in failures, uniform 429
 5efa3b0 feat(auth): one trusted client-IP derivation for /api/auth and form submits
 8e730a6 feat(auth): database rate-limit counters with one atomic consume statement
 fe8664e Merge pull request #46 from mortarhaus/feat/p1-events
@@ -30,37 +32,31 @@ fe8664e Merge pull request #46 from mortarhaus/feat/p1-events
 Uncommitted files — fingerprint every staged, modified or untracked path when writing this handoff:
 | Path | Status | Content hash (`git hash-object <path>`, or `deleted`) |
 |---|---|---|
-| apps/web/src/lib/auth/rate-limit-rules.ts | untracked | f3e7ccc138116125d99ddeb0f2ffb093f211f41b |
-| apps/web/src/lib/auth/config.ts | modified | 3c49387fba606f359b2020bb573a901b39f8ac3e |
-| apps/web/src/lib/auth/auth.test.ts | modified | 8774cb71b0f0fc57bfd21ffbb402755306d36c54 |
-| apps/web/src/lib/auth/auth-audit.test.ts | modified | 166a70a3ff171458e27ae34460c980798753215f |
+| (none) | clean | - |
 
 ## 4. Just finished
-2026-11-01 build of PR 7 by an Opus 5.5 helper. Tasks 21 and 22 committed and pushed (checks at `5efa3b0`: typecheck 0, lint 0, `pnpm test` 840 passed in 39 files). Task 23 started: `rate-limit-rules.ts` (customStorage keyed `ba:<row>:<ip>` per spec row, customRules for every named path) wired in `config.ts`; counter resets before each test in `auth.test.ts` and `auth-audit.test.ts`. With the limiter on, 4 tests in `auth-audit.test.ts` fail (PR #44 P2-1 "as configured" and "control"; PR #44 Round 2 P2-2 "known and unknown email" and "the email lock is per email and case-blind"). Lock measurement: uncontended burst of 15 sign-ins from one IP, 150 ms total, 10 granted, 5 x 429, no 500. Contended probe: one sign-in held on its email lock keeps the `ba:sign-in:<ip>` counter row locked (the consume runs in the request transaction), so a sign-in for another email from the same IP waited 4,755 ms and the held one ended 500 at the 5 s lock timeout.
+2026-11-01 PR #48 opened by the Opus 5.5 helper. Checks at `967c395`: typecheck 0, lint 0, `pnpm test` 45 files 921 passed 1 skipped (runIf), `test:gates` 1 passed, build 0, audit 0 (5 moderate), auth E2E 84 passed (throwaway Postgres, `next dev` 3100, no `E2E_RATE_LIMITED`), `git diff --check` clean. Security scan finding (HIGH, parser differential in `request-handler.ts`) fixed fail-closed: 415 for non-JSON sign-in, shared `acct:signin:unreadable` key; in DECISIONS and PR body. `pnpm smoke:auth-route` FAILED locally only because the worktree root `.env` is stale (Phase 0 user `crm`); CI image job runs it. CI on `5d76e37` pending at PR open.
 
 ## 5. Next step (file-level)
-Charlie decides the limiter connection (§6 item 1) and AUTH-07 (§6 item 2). Then the builder finishes Task 23 in `apps/web/src/lib/auth/rate-limit-rules.ts` / `handle.ts` (account key, uniform 429, `rate-limit.test.ts` with two `next start` processes and a test edge), fixes the burst tests' volume, then Task 24, full checks, PR. Not `review <n>` yet: no PR exists.
+`review 48` (Bob), on head `5d76e37`, once CI is green.
 
 ## 6. Open ASK items, blockers, and owner answers
-1. **Blocker, needs Charlie (with Bob): where Better Auth's limiter consume runs.** Plan Task 23 + Task 22 note put it on the routed db, inside the request transaction. Measured: the counter row lock is then held for the whole request, so one stalled sign-in serializes every sign-in from that IP (or the whole deployment under the placeholder IP) and others hit the 5 s lock timeout (500). Options: (A) `customStorage.consume` on its own small autocommit `crm_app` pool (Better Auth limiter stays as planned; more connections per web process, R4 budget); (B) consume the IP row in `handleAuthRequest` before `getAuth().handler`, on the pool before any transaction, with Better Auth's limiter off (no new connections; differs from Task 23 Step 1 and the spec wording "via Better Auth"; same coverage, since Better Auth's limiter only runs in the HTTP handler). Either way a granted unit is no longer undone when the request later fails with 500.
-2. **Blocker, needs Charlie (with Bob): AUTH-07 on password change.** Better Auth 1.7.14 `/change-password` revokes other sessions only when the body sends `revokeOtherSessions: true` (default false). The plan's AUTH-07 row says the builder stops and raises it before PR 7. Proposed fix: a before hook on `/change-password` that refuses (or forces) a body without `revokeOtherSessions: true`, like the trustDevice refusal.
-3. For Bob: per-row keying (`ba:<row>:<ip>`) instead of the plan's `"ba:" + key` (Better Auth keys per path, so 2FA verify would be 20 per 60 s and password check about 5 x 10 per 15 min).
-4. Carried: ASK 5, the `.env` refresh, repo visibility, untracked files in the main checkout. Bob PR 39 P2 (invitation grants) and PR 44 P2-3 (revoke-session-by-id) land in Task 24.
+1. Decided (Charlie 1A, 2026-11-01): limiter on its own autocommit `crm_app` pool (`LIMITER_POOL_MAX` 2; R4 14 per web process). In DECISIONS and PR #48.
+2. Decided (Charlie 2A, 2026-11-01): `/change-password` refused without `revokeOtherSessions: true`. In DECISIONS and PR #48.
+3. Recorded for Bob: per-row keys `ba:<row>:<ip>` (DECISIONS + PR "Differences" item 3).
+4. Carried: ASK 5, the `.env` refresh (now also blocks local `pnpm smoke:auth-route`: `/api/auth/ok` needs the database since PR 7), repo visibility, untracked files in the main checkout. Dev volume `crm-dev_pgdata` not migrated to 0021-0023.
 
 ## 7. Open review findings (P0/P1) and verdict
-- No review yet for PR 7 (no PR). PR 46: merged; review, receipt and log on agent-logs.
+- No review yet for PR #48. PR 46: merged; review, receipt and log on agent-logs.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- Migrations are 0021 (table) and 0022 (grants), not 0014. DECISIONS entry due in Task 24.
-- Step 3a: the 2FA change rows carry the edge IP, not null (migration 0009 writes `crm.auth_client_ip` on every row of a request). Recorded in the test comment; DECISIONS entry due.
-- `client-ip.ts` keys IPv6 by /64 in expanded form; IPv4-mapped IPv6 becomes the IPv4 address.
-- `session.ts` strips a caller's `x-crm-client-ip` before `auth.api.getSession`/`listOrganizations` (defence; neither writes an IP in 1.7.14).
+- None: all in `docs/DECISIONS.md` 2026-11-01 PR 7 entry.
 
 ## 9. Files touched but not committed
-- The four paths in §3 (Task 23 work in progress). Nothing else; scratch files only in the helper's scratchpad.
+- None in the worktree. Scratch files only in the helper's scratchpad.
 
 ## 10. Model for the next session
-Opus 5.5 (auth, rate limits and lock design are the deep tier). Sonnet 5 only for mechanical edits.
+Opus 5.5 (auth, rate limits and review fixes are the deep tier). Sonnet 5 only for mechanical edits.
 
 
 - 2026-10-15 (fix, Bob PR #27 R1): review archived (ae70237). Runbook P2 + PR body P3 fixed in 088d013, pushed; CI re-running. Next: Charlie runs `review 27` when CI is green.
@@ -412,3 +408,5 @@ Opus 5.5 (auth, rate limits and lock design are the deep tier). Sonnet 5 only fo
 
 ## 2026-11-01 build PR 7 (feat/p1-rate-limits) partial
 - Tasks 21-22 committed and pushed (8e730a6, 5efa3b0). Task 23 uncommitted (4 files, §3). No PR. Blocked on two decisions for Charlie: limiter consume inside the request transaction (lock scope, 500s under contention) and AUTH-07 password change. Next: those answers, then finish Tasks 23-24.
+
+- 2026-11-01 Phase 1 PR 7 opened: PR #48 (feat/p1-rate-limits, head 5d76e37). Charlie 1A/2A built; security-scan HIGH fixed. Next: review 48.
