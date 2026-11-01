@@ -7,6 +7,7 @@ import type { Database } from "../../db/client";
 import * as schema from "../../db/schema";
 import { createAuthTransactions, ensureBillingAccount, ensureWorkspaceSettings, lockAuthUsers } from "../../db/system";
 import { isHttpsUrl, isLoopbackUrl } from "../origin";
+import { CLIENT_IP_HEADER } from "./client-ip";
 import { enforceInputLimits } from "./input-limits";
 import { logAuth } from "./log";
 import { withRequestTransactions } from "./request-transaction";
@@ -43,6 +44,8 @@ export function authOptions({ db, secret, baseURL, adapterDb = db }: AuthDeps & 
       useSecureCookies: isHttpsUrl(baseURL) || !isLoopbackUrl(baseURL),
       // Postgres-generated uuids so Phase 1 RLS policies can compare against current_setting(...)::uuid.
       database: { generateId: "uuid" },
+      // Only the address prepareAuthRequest derived (plan Task 22): it strips any caller copy first.
+      ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
     },
     // Info-level lines include user emails (e.g. duplicate sign-up attempts); logs must carry no PII. logAuth
     // also drops a failed query's SQL and parameters.

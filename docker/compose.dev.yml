@@ -57,6 +57,11 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     command: ["web"]
+    environment:
+      <<: *db-urls
+      # Dev only: no edge in front, and Next fills a missing X-Forwarded-For from the socket address. The port is
+      # reachable only on 127.0.0.1, so a forged header only fools a local test (E2E sends one per test).
+      TRUSTED_CLIENT_IP_HEADER: x-forwarded-for
     ports:
       - "127.0.0.1:3000:3000"
     tmpfs:

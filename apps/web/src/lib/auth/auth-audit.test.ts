@@ -65,6 +65,7 @@ const next = vi.hoisted(() => ({
   headers: new Headers(),
   auth: undefined as unknown,
   setCookie: () => {},
+  env: { APP_URL: "http://localhost:3000", TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for" },
 }));
 vi.mock("next/headers", () => ({ headers: async () => next.headers, cookies: async () => ({ set: next.setCookie }) }));
 vi.mock("next/navigation", () => ({
@@ -73,7 +74,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("./server", () => ({ getAuth: () => next.auth }));
-vi.mock("../env", () => ({ getEnv: () => ({ APP_URL: "http://localhost:3000" }) }));
+vi.mock("../env", async (importOriginal) => ({ ...(await importOriginal<object>()), getEnv: () => next.env }));
 
 const TEMPLATE = "auth_audit_template";
 const NAME = "Audit Person";
@@ -427,6 +428,44 @@ describe("T1 (R1): one row per event, keyed by user, with no workspace", () => {
     const rows = await auditRows(main.admin, person.id);
     expect(shape(rows)).toEqual([LOGIN]);
     expect(rows[0]?.ip).toBe(CLIENT_IP);
+  });
+});
+
+describe("Step 3a (plan Task 22): the audit IP is the derived client IP, never a caller-supplied one", () => {
+  // The edge in front of handleAuthRequest (SaaS setting): it sets CF-Connecting-IP, and the caller forges the
+  // internal header. The edge IP is the harness CLIENT_IP so the every-test row-content check (T13 b) still holds.
+  function behindEdge(instance: Auth): AuthLike {
+    return {
+      $context: instance.$context,
+      async handler(request) {
+        next.auth = instance;
+        const headers = new Headers(request.headers);
+        headers.set("cf-connecting-ip", CLIENT_IP);
+        headers.set("x-crm-client-ip", "198.51.100.9");
+        const { handleAuthRequest } = await import("./handle");
+        return handleAuthRequest(new Request(request, { headers }));
+      },
+    };
+  }
+
+  // The plan's Step 3a expected the 2FA change rows to keep ip null (Task 31 open point 4). The merged mechanism
+  // (migration 0009) writes crm.auth_client_ip on every row of a request, so they carry the edge IP too.
+  it("session_issued, two_factor_verified and the 2FA change rows carry the edge IP, never the forged one", async () => {
+    next.env = { ...next.env, TRUSTED_CLIENT_IP_HEADER: "cf-connecting-ip" };
+    try {
+      const edge = behindEdge(auth);
+      const person = await withTwoFactor(edge, main.admin);
+      await signInWithTotp(edge, person);
+      const rows = await auditRows(main.admin, person.id);
+      const ips = new Map<string, Set<string | null>>();
+      for (const row of rows) ips.set(row.event, (ips.get(row.event) ?? new Set()).add(row.ip));
+      expect(ips.get("session_issued")).toEqual(new Set([CLIENT_IP]));
+      expect(ips.get("two_factor_verified")).toEqual(new Set([CLIENT_IP]));
+      expect(ips.get("two_factor_enabled")).toEqual(new Set([CLIENT_IP]));
+      for (const row of rows) expect(row.ip).not.toBe("198.51.100.9");
+    } finally {
+      next.env = { ...next.env, TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for" };
+    }
   });
 });
 

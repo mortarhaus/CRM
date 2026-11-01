@@ -1,16 +1,16 @@
 import { parseSetCookieHeader, toCookieOptions } from "better-auth/cookies";
 import { cookies, headers } from "next/headers";
-import { getEnv } from "../env";
-import { getAuth } from "./server";
+import { getEnv, trustedClientIpHeader } from "../env";
+import { handleAuthRequest } from "./handle";
 
-// What Better Auth reads from a request besides the body: the session and 2FA cookies, the origin
-// and Fetch Metadata for its CSRF checks, and the client IP for its rate-limit key.
+// What Better Auth reads from a request besides the body: the session and 2FA cookies, the origin and Fetch
+// Metadata for its CSRF checks. The client IP comes only from the deployment's trusted header, which
+// handleAuthRequest turns into the internal client-IP header (spec "Required Phase 1 change to forward.ts").
 const FORWARDED_HEADERS = [
   "cookie",
   "origin",
   "referer",
   "user-agent",
-  "x-forwarded-for",
   "sec-fetch-site",
   "sec-fetch-mode",
   "sec-fetch-dest",
@@ -32,13 +32,15 @@ function codeOf(data: unknown): string | undefined {
 // and origin checks run only in that handler, so the form path gets the same guards as `/api/auth/*`.
 export async function postToAuth(path: string, body: Record<string, unknown>): Promise<AuthResult> {
   const incoming = await headers();
+  const env = getEnv();
+  const trusted = trustedClientIpHeader(env);
   const forwarded = new Headers({ "content-type": "application/json" });
-  for (const name of FORWARDED_HEADERS) {
+  for (const name of trusted === "none" ? FORWARDED_HEADERS : [...FORWARDED_HEADERS, trusted]) {
     const value = incoming.get(name);
     if (value !== null) forwarded.set(name, value);
   }
-  const response = await getAuth().handler(
-    new Request(new URL(`/api/auth${path}`, getEnv().APP_URL), {
+  const response = await handleAuthRequest(
+    new Request(new URL(`/api/auth${path}`, env.APP_URL), {
       method: "POST",
       headers: forwarded,
       body: JSON.stringify(body),

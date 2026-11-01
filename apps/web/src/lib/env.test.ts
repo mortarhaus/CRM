@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EnvError, parseBootstrapEnv, parseEnv, parseWorkerEnv } from "./env";
+import { EnvError, parseBootstrapEnv, parseEnv, parseWorkerEnv, trustedClientIpHeader } from "./env";
 
 const valid = {
   DEPLOYMENT_MODE: "selfhost",
@@ -8,6 +8,8 @@ const valid = {
   DATABASE_URL: "postgres://crm_app:app-password@localhost:5433/crm",
   DATABASE_MIGRATOR_URL: "postgres://crm_migrator:migrator-password@localhost:5433/crm",
 };
+
+const production = { ...valid, NODE_ENV: "production", TRUSTED_CLIENT_IP_HEADER: "cf-connecting-ip" };
 
 function messageOf(run: () => unknown): string {
   try {
@@ -67,7 +69,7 @@ describe("parseEnv", () => {
   });
 
   it("accepts an https APP_URL in production", () => {
-    expect(parseEnv({ ...valid, NODE_ENV: "production", APP_URL: "https://crm.example.test" }).APP_URL).toBe(
+    expect(parseEnv({ ...production, APP_URL: "https://crm.example.test" }).APP_URL).toBe(
       "https://crm.example.test",
     );
   });
@@ -75,9 +77,31 @@ describe("parseEnv", () => {
   it.each(["http://localhost:3000", "http://127.0.0.1:3000", "http://[::1]:3000"])(
     "accepts the loopback origin %s over http in production",
     (appUrl) => {
-      expect(parseEnv({ ...valid, NODE_ENV: "production", APP_URL: appUrl }).APP_URL).toBe(appUrl);
+      expect(parseEnv({ ...production, APP_URL: appUrl }).APP_URL).toBe(appUrl);
     },
   );
+
+  it("requires TRUSTED_CLIENT_IP_HEADER in production, naming it", () => {
+    const withoutHeader = { ...production, TRUSTED_CLIENT_IP_HEADER: undefined };
+    expect(messageOf(() => parseEnv(withoutHeader))).toContain("TRUSTED_CLIENT_IP_HEADER: must be set in production");
+  });
+
+  it.each(["cf-connecting-ip", "x-forwarded-for", "none"])("accepts TRUSTED_CLIENT_IP_HEADER=%s", (value) => {
+    expect(parseEnv({ ...production, TRUSTED_CLIENT_IP_HEADER: value }).TRUSTED_CLIENT_IP_HEADER).toBe(value);
+  });
+
+  it("rejects any other TRUSTED_CLIENT_IP_HEADER", () => {
+    expect(messageOf(() => parseEnv({ ...valid, TRUSTED_CLIENT_IP_HEADER: "x-real-ip" }))).toContain(
+      "TRUSTED_CLIENT_IP_HEADER",
+    );
+  });
+
+  it("defaults the client-IP setting to none outside production", () => {
+    expect(trustedClientIpHeader(parseEnv(valid))).toBe("none");
+    expect(trustedClientIpHeader(parseEnv({ ...valid, TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for" }))).toBe(
+      "x-forwarded-for",
+    );
+  });
 
   it("accepts a loopback http APP_URL in development", () => {
     expect(parseEnv({ ...valid, NODE_ENV: "development", APP_URL: "http://localhost:3000" }).APP_URL).toBe(

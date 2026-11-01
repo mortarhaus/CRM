@@ -21,7 +21,18 @@ function withAppUrlRule<T extends z.infer<typeof webFields>>(schema: z.ZodType<T
   });
 }
 
-const envSchema = withAppUrlRule(webFields);
+// Spec "Rate limits" → "Client IP": the one header the deployment's edge sets to the client address. Own SaaS
+// (Cloudflare Tunnel) reads cf-connecting-ip; self-host (Caddy or similar) reads x-forwarded-for. Required in
+// production; `none` (dev and tests without an edge) gives every request the shared placeholder address.
+export const TRUSTED_CLIENT_IP_HEADERS = ["cf-connecting-ip", "x-forwarded-for", "none"] as const;
+export type TrustedClientIpHeader = (typeof TRUSTED_CLIENT_IP_HEADERS)[number];
+
+const envSchema = withAppUrlRule(
+  webFields.extend({ TRUSTED_CLIENT_IP_HEADER: z.enum(TRUSTED_CLIENT_IP_HEADERS).optional() }),
+).refine((env) => env.NODE_ENV !== "production" || env.TRUSTED_CLIENT_IP_HEADER !== undefined, {
+  path: ["TRUSTED_CLIENT_IP_HEADER"],
+  error: "must be set in production (cf-connecting-ip, x-forwarded-for or none)",
+});
 const workerEnvSchema = withAppUrlRule(webFields.extend({ DATABASE_WORKER_URL: postgresUrl }));
 
 // Printable ASCII only: the bootstrap hashes the password itself (SCRAM-SHA-256), and SASLprep is the
@@ -65,6 +76,10 @@ export function parseWorkerEnv(source: Record<string, string | undefined>): Work
 
 export function parseBootstrapEnv(source: Record<string, string | undefined>): BootstrapEnv {
   return parseWith(bootstrapEnvSchema, source);
+}
+
+export function trustedClientIpHeader(env: Env): TrustedClientIpHeader {
+  return env.TRUSTED_CLIENT_IP_HEADER ?? "none";
 }
 
 let cached: Env | undefined;

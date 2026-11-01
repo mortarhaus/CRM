@@ -63,7 +63,7 @@ export class CookieJar {
 
   headers(extra: HeadersInit = {}): Headers {
     const headers = new Headers(extra);
-    headers.set("x-forwarded-for", CLIENT_IP);
+    headers.set("x-crm-client-ip", CLIENT_IP);
     headers.set("user-agent", USER_AGENT);
     if (this.values.size > 0) headers.set("cookie", this.header());
     return headers;
