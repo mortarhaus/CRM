@@ -1,4 +1,4 @@
-# Handoff — 2026-11-02 · main checkout · HEAD 516c6ec · no PR in flight
+# Handoff — 2026-11-02 · main checkout · HEAD 516c6ec · reconcile branch local
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -30,13 +30,13 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 2026-11-02 `merged 49` done. Log 2617536 on agent-logs. No gate breach (receipt 69 s before merge). Bob's review ran on Sonnet 5.5, below the Opus tier for security review; Charlie merged without a second pass.
 
 ## 5. Next step (file-level)
-Waiting for Charlie: option A = `setup` reconcile (PROJECT.md §7/§9, CLAUDE.md Status) to close Phase 1; then design direction + VPS spec-text revision before the Phase 2 plan.
+`setup` reconcile done on branch chore/setup-reconcile-phase-1-close (worktree .agent/worktrees/build-chore-setup-reconcile-phase-1-close, commits 7e60db3 + one UNI-04 line fix), NOT pushed. Waiting for Charlie's yes to push and open the PR; then Bob `review`, `approved`, merge, `merged`. After that: Phase 2 needs Charlie's design direction.
 
 ## 6. Open ASK items, blockers, and owner answers
 1. ASK 7 (production `EMAIL_FROM`, SPF/DKIM/DMARC owner) open for Charlie.
 2. ASK 9 (`require_2fa` timing; builder proposal Phase 2) open.
 3. Charlie to confirm the `RATE_LIMITED` wording and numbers (5 per user, 20 per workspace per hour).
-4. Spec text still names Singapore/DigitalOcean; Charlie chose Hostinger KVM 2 (2026-10-15): spec revision needed.
+4. (Corrected 2026-11-02) The spec already says Hostinger KVM 2 (rev 5/6). No hosting revision is owed. Stage 3 database provider is still open (chosen at first sale).
 5. Carried: rotate dev AUTH_SECRET, refresh local `.env`, repo visibility, untracked files in main checkout, optional P3s from the PR 49 log, old worktrees `build-feat-p1-events`, `build-feat-p1-rate-limits`, `build-fix-audit-better-auth` (merged; remove when Charlie agrees).
 
 ## 7. Open review findings (P0/P1) and verdict
