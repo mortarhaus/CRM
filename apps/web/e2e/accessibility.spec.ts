@@ -2,12 +2,14 @@ import { randomUUID } from "node:crypto";
 import { WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
 import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
+import { SEND_TEST_EMAIL, TEST_EMAIL_FAILED, TEST_EMAIL_FORBIDDEN, TEST_EMAIL_QUEUED } from "../src/lib/auth/messages";
 import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { expectAccessible, expectVisibleFocus, tabTo } from "./a11y";
 import {
   failServerActions,
   PASSWORD,
   respectRateLimit,
+  setMemberRole,
   signIn,
   signUp,
   startTotpEnrolment,
@@ -24,6 +26,18 @@ async function createWorkspace(page: Page, name: string): Promise<void> {
   await page.getByLabel("Workspace name").fill(name);
   await page.getByRole("button", { name: "Create workspace" }).click();
   await expect(page.getByRole("list", { name: "Your workspaces" })).toContainText(name);
+}
+
+// A new Owner of one workspace, on /settings/email.
+async function openEmailSettingsAsOwner(page: Page): Promise<string> {
+  const email = uniqueEmail();
+  await signUp(page, email);
+  await signIn(page, email);
+  await expect(page).toHaveURL(/\/workspaces$/);
+  await createWorkspace(page, "Mail Studio");
+  await page.goto("/settings/email");
+  await expect(page.getByRole("button", { name: SEND_TEST_EMAIL })).toBeVisible();
+  return email;
 }
 
 async function serverSession(page: Page): Promise<unknown> {
@@ -143,6 +157,28 @@ test.describe("axe scan, light and dark, no horizontal overflow", () => {
     await expectAccessible(page, "/workspaces sign-out error");
     await restore();
   });
+
+  test("email settings page in its initial, queued, failed and Staff states", async ({ page }) => {
+    const email = await openEmailSettingsAsOwner(page);
+    await expectAccessible(page, "/settings/email initial");
+
+    const button = page.getByRole("button", { name: SEND_TEST_EMAIL });
+    await button.click();
+    await expect(page.getByRole("main").getByRole("status")).toHaveText(TEST_EMAIL_QUEUED);
+    await expectAccessible(page, "/settings/email queued");
+
+    // The longest message on the page (FE-71).
+    const restore = await failServerActions(page, "server");
+    await button.click();
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(TEST_EMAIL_FAILED);
+    await expectAccessible(page, "/settings/email failed");
+    await restore();
+
+    await setMemberRole(email, "staff");
+    await page.reload();
+    await expect(page.getByRole("main")).toContainText(TEST_EMAIL_FORBIDDEN);
+    await expectAccessible(page, "/settings/email Staff");
+  });
 });
 
 test.describe("keyboard only", () => {
@@ -184,6 +220,16 @@ test.describe("keyboard only", () => {
     await tabTo(page, page.getByRole("button", { name: "Verify and turn on" }));
     await page.keyboard.press("Enter");
     await expect(page.getByRole("status")).toHaveText("Two-factor authentication is on.");
+  });
+
+  test("test email", async ({ page }) => {
+    await openEmailSettingsAsOwner(page);
+    const button = page.getByRole("button", { name: SEND_TEST_EMAIL });
+    await tabTo(page, button);
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("main").getByRole("status")).toHaveText(TEST_EMAIL_QUEUED);
+    // The button was disabled while the post was in flight; focus is back on it.
+    await expectVisibleFocus(button);
   });
 
   test("workspace switch and sign out", async ({ page }) => {

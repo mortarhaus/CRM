@@ -1,6 +1,7 @@
 import type { Job } from "pg-boss";
 import { idempotencyCleanupHandler, rateLimitCleanupHandler } from "./cleanup";
 import { domainEventHandler } from "./domain-event";
+import { emailSendHandler } from "./email-send";
 import type { Log } from "./log";
 
 // The application queues the worker works (migrations 0016 and 0017 create them). The dead-letter queues have no
@@ -21,6 +22,7 @@ export type Handlers = { readonly [Queue in QueueName]?: Handler };
 // queue without a handler is not worked, so its jobs wait in `created`; a placeholder would complete or fail real jobs.
 export const HANDLERS: Handlers = {
   domain_event: domainEventHandler(),
+  "email.send": emailSendHandler(),
   "rate_limit.cleanup": rateLimitCleanupHandler(),
   "idempotency.cleanup": idempotencyCleanupHandler(),
 };

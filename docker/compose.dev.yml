@@ -85,6 +85,22 @@ services:
     environment:
       <<: *db-urls
       DATABASE_WORKER_URL: postgres://crm_worker:crm-worker-dev-only@postgres:5432/crm
+      # Email is worker only (web never sends); dev mail goes to Mailpit (docs/runbooks/phase-1-security.md, "Email").
+      EMAIL_PROVIDER: smtp
+      SMTP_URL: smtp://mailpit:1025
+      EMAIL_FROM: "CRM Dev <dev@localhost>"
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+
+  # Dev mail catcher. UI and API on http://localhost:8025; SMTP on 1025, also on 127.0.0.1 for `pnpm worker:dev`.
+  mailpit:
+    image: axllent/mailpit:v1.33.0@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
 
 volumes:
   pgdata:

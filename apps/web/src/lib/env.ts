@@ -33,7 +33,32 @@ const envSchema = withAppUrlRule(
   path: ["TRUSTED_CLIENT_IP_HEADER"],
   error: "must be set in production (cf-connecting-ip, x-forwarded-for or none)",
 });
-const workerEnvSchema = withAppUrlRule(webFields.extend({ DATABASE_WORKER_URL: postgresUrl }));
+// Email is sent only by the worker (plan Task 26), so these are worker-only: the web container never gets them, and
+// RESEND_API_KEY lives only in the worker's environment. EMAIL_FROM is one address with a display name, on one line.
+export const EMAIL_PROVIDERS = ["smtp", "resend"] as const;
+const emailFields = {
+  EMAIL_PROVIDER: z.enum(EMAIL_PROVIDERS),
+  EMAIL_FROM: z.string().regex(/^[^<>\r\n]+ <[^\s<>@]+@[^\s<>@]+>$/, {
+    error: "must be a display name and an address, for example: CRM <crm@example.com>",
+  }),
+  SMTP_URL: z
+    .url()
+    .refine((value) => /^smtps?:\/\//.test(value), { error: "must be an smtp:// or smtps:// URL" })
+    .optional(),
+  RESEND_API_KEY: z.string().min(1).optional(),
+};
+
+const workerEnvSchema = withAppUrlRule(webFields.extend({ DATABASE_WORKER_URL: postgresUrl, ...emailFields }))
+  .refine((env) => env.EMAIL_PROVIDER !== "smtp" || env.SMTP_URL !== undefined, {
+    path: ["SMTP_URL"],
+    error: "must be set when EMAIL_PROVIDER is smtp",
+  })
+  .refine((env) => env.EMAIL_PROVIDER !== "resend" || env.RESEND_API_KEY !== undefined, {
+    path: ["RESEND_API_KEY"],
+    error: "must be set when EMAIL_PROVIDER is resend",
+  });
+// The retry admin command (scripts/retry-job.ts) opens only the crm_worker connection.
+const jobsAdminEnvSchema = z.object({ DATABASE_WORKER_URL: postgresUrl });
 // `migrate.mjs` runs first in every app container (docker/entrypoint.sh: web and worker), so it reads only its own
 // connection and never a setting that only one of those containers has (TRUSTED_CLIENT_IP_HEADER is web-only).
 const migrateEnvSchema = z.object({ DATABASE_MIGRATOR_URL: postgresUrl });
@@ -54,6 +79,8 @@ const bootstrapEnvSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 export type WorkerEnv = z.infer<typeof workerEnvSchema>;
+export type EmailEnv = Pick<WorkerEnv, "EMAIL_PROVIDER" | "EMAIL_FROM" | "SMTP_URL" | "RESEND_API_KEY">;
+export type JobsAdminEnv = z.infer<typeof jobsAdminEnvSchema>;
 export type BootstrapEnv = z.infer<typeof bootstrapEnvSchema>;
 export type MigrateEnv = z.infer<typeof migrateEnvSchema>;
 
@@ -76,6 +103,10 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
 
 export function parseWorkerEnv(source: Record<string, string | undefined>): WorkerEnv {
   return parseWith(workerEnvSchema, source);
+}
+
+export function parseJobsAdminEnv(source: Record<string, string | undefined>): JobsAdminEnv {
+  return parseWith(jobsAdminEnvSchema, source);
 }
 
 export function parseMigrateEnv(source: Record<string, string | undefined>): MigrateEnv {

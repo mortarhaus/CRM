@@ -5,6 +5,7 @@ import {
   migrateEnvFor,
   parseBootstrapEnv,
   parseEnv,
+  parseJobsAdminEnv,
   parseMigrateEnv,
   parseWorkerEnv,
   trustedClientIpHeader,
@@ -19,6 +20,12 @@ const valid = {
 };
 
 const production = { ...valid, NODE_ENV: "production", TRUSTED_CLIENT_IP_HEADER: "cf-connecting-ip" };
+
+const smtpEmail = {
+  EMAIL_PROVIDER: "smtp",
+  EMAIL_FROM: "CRM Dev <dev@localhost>",
+  SMTP_URL: "smtp://mailpit:1025",
+};
 
 function messageOf(run: () => unknown): string {
   try {
@@ -120,16 +127,67 @@ describe("parseEnv", () => {
 });
 
 describe("parseWorkerEnv", () => {
-  const worker = { ...valid, DATABASE_WORKER_URL: "postgres://crm_worker:worker-password@localhost:5433/crm" };
+  const worker = {
+    ...valid,
+    ...smtpEmail,
+    DATABASE_WORKER_URL: "postgres://crm_worker:worker-password@localhost:5433/crm",
+  };
+  const resendWorker = {
+    ...worker,
+    EMAIL_PROVIDER: "resend",
+    SMTP_URL: undefined,
+    RESEND_API_KEY: "re_test_key_value",
+  };
 
-  it("returns the web values plus the worker's pg-boss connection", () => {
+  it("returns the web values plus the worker's pg-boss connection and email settings", () => {
     expect(parseWorkerEnv(worker)).toEqual(worker);
   });
 
   it("requires DATABASE_WORKER_URL, which the web process does not", () => {
     expect(parseEnv(valid)).toEqual(valid);
-    expect(messageOf(() => parseWorkerEnv(valid))).toContain("DATABASE_WORKER_URL");
+    expect(messageOf(() => parseWorkerEnv({ ...valid, ...smtpEmail }))).toContain("DATABASE_WORKER_URL");
   });
+
+  // Email is sent only by the worker (plan Task 26): the web schema neither needs nor keeps any email setting.
+  it("requires EMAIL_PROVIDER and EMAIL_FROM, which the web process neither needs nor keeps", () => {
+    const message = messageOf(() => parseWorkerEnv({ ...worker, EMAIL_PROVIDER: undefined, EMAIL_FROM: undefined }));
+    expect(message).toContain("EMAIL_PROVIDER");
+    expect(message).toContain("EMAIL_FROM");
+    expect(parseEnv({ ...valid, ...smtpEmail, RESEND_API_KEY: "re_test_key_value" })).toEqual(valid);
+  });
+
+  it("rejects any other EMAIL_PROVIDER", () => {
+    expect(messageOf(() => parseWorkerEnv({ ...worker, EMAIL_PROVIDER: "sendgrid" }))).toContain("EMAIL_PROVIDER");
+  });
+
+  it("requires SMTP_URL for smtp, without echoing it", () => {
+    expect(messageOf(() => parseWorkerEnv({ ...worker, SMTP_URL: undefined }))).toContain(
+      "SMTP_URL: must be set when EMAIL_PROVIDER is smtp",
+    );
+    const message = messageOf(() => parseWorkerEnv({ ...worker, SMTP_URL: "http://user:hunter2@mail.example.test" }));
+    expect(message).toContain("SMTP_URL: must be an smtp:// or smtps:// URL");
+    expect(message).not.toContain("hunter2");
+  });
+
+  it("requires RESEND_API_KEY for resend, and not SMTP_URL", () => {
+    expect(parseWorkerEnv(resendWorker).RESEND_API_KEY).toBe("re_test_key_value");
+    expect(messageOf(() => parseWorkerEnv({ ...resendWorker, RESEND_API_KEY: undefined }))).toContain(
+      "RESEND_API_KEY: must be set when EMAIL_PROVIDER is resend",
+    );
+  });
+
+  it.each(["CRM <crm@mail.example.test>", "CRM Dev <dev@localhost>"])("accepts EMAIL_FROM %s", (from) => {
+    expect(parseWorkerEnv({ ...worker, EMAIL_FROM: from }).EMAIL_FROM).toBe(from);
+  });
+
+  it.each(["crm@mail.example.test", "CRM <not-an-address>", "CRM <a@b.example>\r\nBcc: x@y.example"])(
+    "rejects EMAIL_FROM without a display name and one address, without echoing it",
+    (from) => {
+      const message = messageOf(() => parseWorkerEnv({ ...worker, EMAIL_FROM: from }));
+      expect(message).toContain("EMAIL_FROM: must be a display name and an address");
+      expect(message).not.toContain(from);
+    },
+  );
 
   it("rejects a non-Postgres DATABASE_WORKER_URL without echoing the URL", () => {
     const message = messageOf(() => parseWorkerEnv({ ...worker, DATABASE_WORKER_URL: "mysql://w:hunter2@db/crm" }));
@@ -150,6 +208,7 @@ describe("parseWorkerEnv", () => {
 describe("parseMigrateEnv", () => {
   const workerContainer = {
     ...valid,
+    ...smtpEmail,
     NODE_ENV: "production",
     DATABASE_WORKER_URL: "postgres://crm_worker:worker-password@localhost:5433/crm",
   };
@@ -185,6 +244,13 @@ describe("parseMigrateEnv", () => {
     expect(migrateEnvFor("web", production)).toEqual({ DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL });
   });
 
+  it("checks the container's own schema: the web container passes without any email setting", () => {
+    expect(migrateEnvFor("web", production)).toEqual({ DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL });
+    expect(messageOf(() => migrateEnvFor("worker", { ...workerContainer, EMAIL_PROVIDER: undefined }))).toContain(
+      "EMAIL_PROVIDER",
+    );
+  });
+
   it("a standalone migration (no role) needs only its own connection", () => {
     expect(migrateEnvFor(undefined, { DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL })).toEqual({
       DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL,
@@ -199,6 +265,40 @@ describe("parseMigrateEnv", () => {
     expect(readFileSync(new URL("../../../../docker/entrypoint.sh", import.meta.url), "utf8")).toMatch(
       /web\)\n\s+node dist\/migrate\.mjs web\n[\s\S]*worker\)\n\s+node dist\/migrate\.mjs worker\n/,
     );
+  });
+});
+
+// The retry admin command (scripts/retry-job.ts) opens only the crm_worker connection, so it does not need the
+// worker's email settings (an operator on the host runs it with the root .env, which has none).
+describe("parseJobsAdminEnv", () => {
+  it("needs only DATABASE_WORKER_URL", () => {
+    const url = "postgres://crm_worker:worker-password@localhost:5433/crm";
+    expect(parseJobsAdminEnv({ ...valid, DATABASE_WORKER_URL: url })).toEqual({ DATABASE_WORKER_URL: url });
+    expect(messageOf(() => parseJobsAdminEnv(valid))).toContain("DATABASE_WORKER_URL");
+  });
+});
+
+// Email settings, and RESEND_API_KEY above all, reach only the worker container (plan Task 26). The compose file
+// gives them to `worker` under `environment:`; the shared `.env` (env_file of every app container) must not hold
+// them, and the `web` service must not name them.
+describe("compose.dev.yml", () => {
+  const compose = readFileSync(new URL("../../../../docker/compose.dev.yml", import.meta.url), "utf8");
+  const service = (name: string) => {
+    const match = compose.match(new RegExp(`\\n  ${name}:\\n([\\s\\S]*?)(?=\\n  [a-z-]+:\\n|\\nvolumes:)`));
+    if (!match?.[1]) throw new Error(`no ${name} service in compose.dev.yml`);
+    return match[1];
+  };
+
+  it("gives the email settings to the worker only", () => {
+    expect(service("worker")).toMatch(/EMAIL_PROVIDER: smtp\n\s+SMTP_URL: smtp:\/\/mailpit:1025\n/);
+    for (const name of ["web", "bootstrap", "postgres", "mailpit"]) {
+      expect(service(name), name).not.toMatch(/EMAIL_|SMTP_|RESEND_/);
+    }
+    expect(compose).not.toMatch(/RESEND_API_KEY/);
+  });
+
+  it("pins the Mailpit image by tag and digest", () => {
+    expect(service("mailpit")).toMatch(/image: axllent\/mailpit:v\d+\.\d+\.\d+@sha256:[0-9a-f]{64}\n/);
   });
 });
 

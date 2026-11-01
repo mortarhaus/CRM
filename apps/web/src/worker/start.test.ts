@@ -79,8 +79,8 @@ describe("startWorker", () => {
     const worker = await startWorker({ appDb, workerUrl: database.workerUrl, log: () => {} });
     const sender = new PgBoss({ ...SEND_BOSS_OPTIONS, connectionString: database.appUrl });
     await sender.start();
-    // email.send has no handler until plan Task 27 (domain_event since Task 19, the two cleanups since Task 24).
-    const id = await sender.send("email.send", { workspaceId: crypto.randomUUID(), userId: crypto.randomUUID() });
+    // Every application queue has a handler since plan Task 27; a dead-letter queue never has one (handlers.ts).
+    const id = await sender.send("email.send.dead", { workspaceId: crypto.randomUUID(), userId: crypto.randomUUID() });
     await sender.stop();
     await new Promise((resolve) => setTimeout(resolve, 3_000));
     const [row] = await admin<{ state: string }[]>`select state from pgboss.job_common where id = ${id ?? ""}`;

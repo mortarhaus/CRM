@@ -1,8 +1,9 @@
-# Runbook: Phase 1 security (rate limits, client IP, Better Auth surface)
+# Runbook: Phase 1 security (rate limits, client IP, Better Auth surface, security headers)
 
 Scope: Phase 1 PR 7 (plan `docs/superpowers/plans/2026-10-20-phase-1-tenancy-security-jobs.md`, Tasks 21-24):
 database-backed rate limits, the trusted client IP, the per-account sign-in failure cap, the uniform 429, the
 Phase 1 Better Auth paths, password change (AUTH-07) and the two daily cleanup jobs. Better Auth 1.7.14.
+PR 8 adds the security headers (Task 25) and the email sections (Tasks 26-27).
 
 "Verified" means the test named was run on 2026-11-01 against a Testcontainers Postgres 17 and, where it says so,
 two `next start` processes behind a test edge (`apps/web/src/lib/auth/rate-limit.test.ts`).
@@ -124,9 +125,84 @@ The worker schedules both at start (`apps/web/src/worker/start.ts`), daily, UTC.
 To check the schedules: `select name, cron from pgboss.schedule;` as `crm_migrator`. Each run logs one line
 from the worker with the number of rows it deleted; a failed run is retried like any job.
 
+## Security headers (PR 8, Task 25)
+
+The app sets every security header itself; the edge adds none.
+
+| Header | Value | Set by | On |
+|---|---|---|---|
+| `Content-Security-Policy` (pages) | `buildCsp(nonce)` in `apps/web/src/lib/security-headers.ts`: `script-src` and `style-src` allow `'self'` and the request's nonce, `frame-ancestors 'none'`, no `'unsafe-inline'` | `apps/web/src/proxy.ts`, a new nonce per request | every path except `/api/*`, `/_next/static/*`, `/_next/image*`, `/favicon.ico` and prefetches |
+| `Content-Security-Policy` (API) | `default-src 'none'; frame-ancestors 'none'` | `next.config.ts` `headers()` | `/api/*` |
+| `Strict-Transport-Security` | `max-age=31536000` (no `includeSubDomains`, no `preload`; Charlie, ASK 6 option A) | `next.config.ts` | every response |
+| `X-Content-Type-Options` | `nosniff` | `next.config.ts` | every response |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | `next.config.ts` | every response |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` | `next.config.ts` | every response |
+
+- In development (`pnpm dev`) the page CSP also allows `'unsafe-eval'` for scripts and `'unsafe-inline'` (no nonce)
+  for styles, which React's dev tooling needs. Production has neither.
+- Every page renders per request (the root layout calls `connection()`): a nonce cannot be put into a prerendered
+  page, so no page can be served from a CDN cache.
+- **The edge must not add or rewrite these headers.** On Cloudflare, leave HSTS (SSL/TLS → Edge Certificates) off
+  and add no rule that sets a CSP; on Caddy, the `reverse_proxy` block above has no `header` directive. A second
+  CSP from the edge would be enforced alongside the app's, and a second HSTS value would make the effective one
+  unclear.
+- **HSTS:** browsers ignore it over plain HTTP, so local `http://localhost` is unaffected. Adding
+  `includeSubDomains` or `preload` later is the owner's call: `includeSubDomains` forces HTTPS on every other
+  subdomain of the domain, and preload is hard to undo.
+- Session cookie (UNI-18): `HttpOnly` and `SameSite=Lax` always; `Secure` for an https or non-loopback `APP_URL`
+  (`useSecureCookies` in `apps/web/src/lib/auth/config.ts`).
+
+Verified: `security-headers.test.ts` (the policy strings and the header table); `e2e/security-headers.spec.ts` (the
+nonce differs per load and is on every `<script>`; no CSP violation through sign-in, 2FA enrolment and workspace
+switching; `/api/health`'s policy; the cookie flags).
+
+## Email (PR 8, Task 26)
+
+Only the worker sends email; the web app queues an `email.send` job. The four settings go to the **worker
+container only**. The web container must not get them, and `RESEND_API_KEY` above all: the worker schema
+(`parseWorkerEnv`, `apps/web/src/lib/env.ts`) requires them, while the web schema neither needs nor keeps them.
+
+| Variable | Value | When |
+|---|---|---|
+| `EMAIL_PROVIDER` | `smtp` or `resend` | always |
+| `EMAIL_FROM` | a display name and one address, `Name <address>` | always. Dev: `CRM Dev <dev@localhost>`. Production (SaaS): to be set by Charlie (ASK 7) |
+| `SMTP_URL` | `smtp://` or `smtps://` URL, credentials in the URL if the server needs them | `EMAIL_PROVIDER=smtp` |
+| `RESEND_API_KEY` | the Resend API key | `EMAIL_PROVIDER=resend` |
+
+A missing or invalid setting stops the worker container at start (the entrypoint's environment check) with the
+variable's name, never its value. A failed send throws `EmailSendError`, whose message is the provider and its
+status only (SMTP reply code, HTTP status or a short code such as `network`), never the address or the key; the
+job is retried and then dead-lettered like any job (`jobs:retry`, `phase-1-database-roles.md`). `jobs:retry`
+reads only `DATABASE_WORKER_URL`, so it needs no email setting.
+
+- **Dev:** `docker/compose.dev.yml` sets the three SMTP settings on the `worker` service and runs Mailpit
+  (`axllent/mailpit`, pinned by tag and digest). Every message the worker sends is caught there: UI and API on
+  http://localhost:8025, SMTP on `127.0.0.1:1025`. For `pnpm worker:dev` on the host, uncomment the email lines in
+  `.env` (`SMTP_URL=smtp://localhost:1025`). The root `.env` is the `env_file` of every app container, web
+  included, so under compose it holds no email setting, and it never holds `RESEND_API_KEY`.
+- **Switching provider:** set `EMAIL_PROVIDER` and the matching `SMTP_URL` or `RESEND_API_KEY` in the worker's
+  environment, then restart `worker`. Jobs still queued are sent by the new provider.
+- **Rotating `RESEND_API_KEY`:** create a new key in Resend, put it in the host's secret store for the worker
+  (UNI-08; never in `.env` or the repository), restart `worker`, send a test email, then revoke the old key in
+  Resend.
+- **Sending domain (production):** the domain of `EMAIL_FROM` needs SPF, DKIM and DMARC records for the chosen
+  provider. The address and the owner of those DNS records: to be set by Charlie (ASK 7).
+- **Test email wording** (Charlie, ASK 8 = A, 2026-11-01): subject "Test email from CRM", body "This is a test
+  email sent from your CRM workspace settings. If you received it, email delivery works."
+  (`apps/web/src/emails/test-email.tsx`).
+- **Test email limit** (review P2-1, 2026-11-01): 5 per user and 20 per workspace per hour (`TEST_EMAIL_USER_LIMIT`,
+  `TEST_EMAIL_WORKSPACE_LIMIT`), counted in `rate_limit` under `email-test:user:<user id>` and
+  `email-test:ws:<workspace id>`; to let a user send again before the hour ends, delete that user's row.
+
+Verified: `apps/web/src/adapters/email/contract.test.ts` runs the same cases against both adapters: SMTP against a
+Mailpit Testcontainer, Resend against a local stand-in server (no test calls the real Resend API, UNI-11).
+
 ## Commands
 
 | What | Command | Result |
 |---|---|---|
 | Rate-limit and surface tests | `pnpm vitest run apps/web/src/lib/auth/rate-limit.test.ts apps/web/src/lib/auth/enabled-paths.test.ts` | Verified 2026-11-01 (part of `pnpm test`) |
 | Cleanup jobs | `pnpm vitest run apps/web/src/jobs/cleanup.test.ts` | Verified 2026-11-01 |
+| Header unit test | `pnpm vitest run apps/web/src/lib/security-headers.test.ts` | Verified 2026-11-01 |
+| Header E2E | `pnpm test:e2e e2e/security-headers.spec.ts` (from `apps/web`) | Verified 2026-11-01 against `next start` and `next dev` on a Testcontainers database (9 passed each) |
+| Email adapter contract | `pnpm vitest run apps/web/src/adapters` (Docker running: Mailpit Testcontainer) | Verified 2026-11-01 (5 passed) |

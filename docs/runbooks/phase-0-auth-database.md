@@ -6,8 +6,9 @@ Phase 0 PR 4 slice (worker stub, Docker image and entrypoint, dev compose stack,
 Tasks 15-17, see "Docker image and compose stack" below).
 
 **Do not deploy Phase 0 anywhere reachable from outside.** It is a local or private staging slice
-only, until Phase 1 lands: persistent, database-backed auth rate limits (AUTH-06; today Better Auth's
-limiter is in memory per process), the five DB roles with RLS, and the `action()` wrapper.
+only, until Phase 1 is closed (plan PR 8). Phase 1 has since added persistent, database-backed auth rate limits (AUTH-06,
+PR 7), the five DB roles with RLS (PR 1-2) and the `action()` wrapper (PR 4); see
+`docs/runbooks/phase-1-database-roles.md` and `docs/runbooks/phase-1-security.md`.
 
 "Verified" below means the command was run on 2026-10-13 against the dev compose Postgres.
 
@@ -39,6 +40,8 @@ first. To build like CI locally, move the root `.env` aside, run
 | `AUTH_SECRET` | At least 32 characters |
 | `DATABASE_URL` | `postgres://` or `postgresql://` URL used by the app |
 | `DATABASE_MIGRATOR_URL` | `postgres://` or `postgresql://` URL used only by migrations; must be a direct connection |
+| `DATABASE_WORKER_URL` | `postgres://` or `postgresql://` URL of `crm_worker`; required by the worker (and `jobs:retry`) only |
+| `TRUSTED_CLIENT_IP_HEADER` | Web only: `cf-connecting-ip`, `x-forwarded-for` or `none`; required when `NODE_ENV=production` (see `phase-1-security.md`) |
 
 `NODE_ENV` is read only for the `APP_URL` rule above.
 
@@ -79,9 +82,12 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 
 ## Health check, sign-in, 2FA and workspaces (Phase 0 PR 3)
 
-- `GET /api/health` is unauthenticated. It answers `200 {"status":"ok","db":"ok"}` when the database
-  answers within 2 seconds, otherwise `503 {"status":"error","db":"error"}`. It always sends
-  `Cache-Control: no-store` and never shows the database error text. Verified with the dev Postgres up and stopped.
+- `GET /api/health` is unauthenticated. It answers `200 {"status":"ok","db":"ok","queue":"ok"}` when the
+  database answers and the pg-boss schema version is the expected one, each within 2 seconds (the `queue` check was
+  added in Phase 1 PR 6; the Phase 0 body had only `db`). Otherwise it answers `503` with `"status":"error"` and
+  `"error"` against each check that failed, for example `{"status":"error","db":"error","queue":"error"}`. It always sends
+  `Cache-Control: no-store` and never shows the error text. Verified in Phase 0 with the dev Postgres up and stopped;
+  `apps/web/src/lib/health.test.ts` covers both checks.
 - Pages: `/sign-up`, `/sign-in`, `/two-factor` (code step of a 2FA sign-in), `/workspaces` and
   `/settings/security` (2FA enrolment). The last two need a session; the `(app)` layout redirects to `/sign-in` without one.
 - 2FA enrolment: the user enters the password, adds the setup key to an authenticator app, and confirms
@@ -154,7 +160,10 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   scans the same states with it on. By hand: in Chrome DevTools open the command menu
   (Cmd+Shift+P), run "Disable JavaScript", and reload.
 - End-to-end tests: `pnpm test:e2e` (Playwright 1.63.0, Chrome for Testing 153.0.8010.12). It starts its own dev server
-  and needs the dev Postgres (`docker compose -f docker/compose.dev.yml up -d --wait postgres`) and a root `.env`. Every spec runs at three widths (Playwright projects
+  and needs the dev Postgres (`docker compose -f docker/compose.dev.yml up -d --wait postgres`) and a root `.env`.
+  Since Phase 1 PR 8 it also starts `pnpm worker:dev`, so it needs Mailpit on `127.0.0.1:1025` and `127.0.0.1:8025`
+  (`docker compose -f docker/compose.dev.yml up -d --wait postgres mailpit`; `MAILPIT_URL` overrides the API address only)
+  and `DATABASE_WORKER_URL` in the root `.env`. Every spec runs at three widths (Playwright projects
   `chromium` 1280x720, `tablet-768` 768x1024, `mobile-320` 320x640). `e2e/accessibility.spec.ts` runs an axe-core 4.13.0
   scan (WCAG 2.0-2.2 A and AA tags, including `color-contrast`) of each auth, 2FA and workspace state in light and dark,
   checks for horizontal overflow, and walks the sign-up, 2FA enrolment, workspace switch and sign-out paths by keyboard.
@@ -176,8 +185,8 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   the other finds nothing to do. The image runs as `node` (uid 1000); compose mounts the root filesystem
   read-only with tmpfs on `/tmp` (and `.next/cache` for `web`). npm, npx, corepack and yarn are removed from
   the runtime stage.
-- The worker is a stub until Phase 1 (pg-boss): it checks the database, logs
-  `{"level":"info","msg":"worker ready"}`, and on SIGTERM or SIGINT logs `{"level":"info","msg":"worker stopped"}` and exits 0.
+- The worker was a stub in Phase 0. Since Phase 1 it runs pg-boss (`apps/web/src/worker/start.ts`): it logs
+  `{"level":"info","msg":"worker ready"}` once started, and on SIGTERM or SIGINT logs `{"level":"info","msg":"worker stopped"}` and exits 0.
 - `pnpm build` runs `next build` and then `scripts/build-node.mjs` (esbuild 0.28.2), which bundles
   `worker.ts` and `migrate.ts` into `apps/web/dist/`. `pnpm --filter @crm/web build:node` rebuilds only the
   bundles; `pnpm worker:dev` runs the worker from source with the root `.env`.
@@ -188,7 +197,7 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 | Step | Command | Status |
 |---|---|---|
 | Build and start postgres, web and worker | `pnpm stack:up` | Verified 2026-10-15: postgres and web `Healthy`, worker started, both app containers log `migrations applied` |
-| Health | `curl -s http://localhost:3000/api/health` | Verified; `{"status":"ok","db":"ok"}` |
+| Health | `curl -s http://localhost:3000/api/health` | Verified; `{"status":"ok","db":"ok","queue":"ok"}` (the Phase 0 body had no `queue`) |
 | Missing root `.env` | `docker compose -f docker/compose.dev.yml up -d` | Verified; fails at once with `env file .../.env not found`, exit 1, no container starts |
 | Blank `AUTH_SECRET` | (set `AUTH_SECRET=` in `.env`) `docker compose -f docker/compose.dev.yml up -d --wait web` | Verified; exit 1, `web` exits 1 logging `Invalid environment configuration:` and `AUTH_SECRET: must be at least 32 characters`; no value is logged |
 | First boot on an empty database | `docker compose -f docker/compose.dev.yml down -v` then `pnpm stack:up` (`down -v` deletes the dev database) | Verified; one migration row, all eight auth tables, no restarts |
@@ -228,7 +237,7 @@ failure it uploads the Playwright report, traces and the stack logs for 7 days.
 | `Invalid environment configuration:` then lines like `DATABASE_MIGRATOR_URL: must be a postgres:// URL` | A variable is missing or invalid; only its name is printed. In the Docker image it shows at container start and the container exits 1 before it listens. Under `pnpm dev` it shows on the first `/api/auth/*` or signed-in page request, which returns 500. If it shows during `pnpm build`, a page started auth before reading `headers()` (see "Required environment") | Fix that variable in `.env` (compare with `.env.example`), check it is not overridden by an exported shell variable, and restart |
 | `connect ECONNREFUSED 127.0.0.1:5433` | Postgres is not running or the port is wrong | `docker compose -f docker/compose.dev.yml up -d --wait postgres`, then rerun |
 | `pnpm stack:up` fails to bind port 3000 (exact message not captured) | `pnpm dev` (or another server) holds port 3000 | Stop that server, or start only Postgres (above) |
-| `password authentication failed for user "crm"` | Wrong credentials in the URL | Fix the URL in `.env` |
+| `password authentication failed for user "crm_app"` (or `crm_migrator`, `crm_worker`; Phase 0 used `crm`) | Wrong credentials in the URL, or bootstrap has not run on this cluster | Fix the URL in `.env`, or run `pnpm db:bootstrap` (`phase-1-database-roles.md`) |
 | `pnpm db:migrate` hangs with no output | Another runner holds the migration lock; this one waits without a timeout | Find the holder: `docker exec crm-dev-postgres-1 psql -U postgres -d crm -c "select l.pid, l.granted, a.state, a.query_start from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory'"` (verified). Wait for it to finish. If the holder is a dead session, end it with `select pg_terminate_backend(<pid>)` (unverified) and rerun |
 | A migration fails with a SQL error | Drizzle runs all pending files in one transaction (verified in drizzle-orm 0.45.3 source), so nothing from the run is applied and no row is added to `drizzle.__drizzle_migrations` | Fix the migration in a new PR, then rerun. Never edit an applied migration file |
 

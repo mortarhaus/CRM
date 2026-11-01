@@ -1,6 +1,7 @@
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import type { NextConfig } from "next";
+import { SECURITY_HEADER_ROUTES } from "./src/lib/security-headers";
 
 const repoRoot = path.join(__dirname, "../..");
 
@@ -21,6 +22,8 @@ const config: NextConfig = {
   transpilePackages: ["@crm/core"],
   serverExternalPackages: ["@node-rs/argon2"],
   poweredByHeader: false,
+  // The page CSP comes from src/proxy.ts (a nonce per request); docs/DECISIONS.md records where each header is set.
+  headers: async () => SECURITY_HEADER_ROUTES,
 };
 
 export default config;

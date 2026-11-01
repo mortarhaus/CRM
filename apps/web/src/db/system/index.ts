@@ -17,7 +17,16 @@ export { type AuthTransactions, createAuthTransactions } from "./auth-transactio
 export { ensureBillingAccount } from "./billing";
 export { PGBOSS_SCHEMA_VERSION, pingDatabase, pingQueue } from "./health";
 export { revokeOwnSession } from "./sessions";
-export { cleanupExpired, cleanupExpiredCounters, type ConsumeResult, consume, giveBack } from "./rate-limit";
+export { getUserEmail } from "./users";
+export {
+  cleanupExpired,
+  cleanupExpiredCounters,
+  type ConsumeResult,
+  consume,
+  consumeUnit,
+  giveBack,
+  giveBackUnit,
+} from "./rate-limit";
 // The worker opens and closes its crm_app pool through these (no query: see src/db/index.ts).
 export { type AppDatabase, DatabaseAlreadyOpenError, openDatabase } from "../index";
 export {

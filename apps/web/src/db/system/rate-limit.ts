@@ -1,11 +1,12 @@
-import { RATE_LIMIT_ROW_RETENTION_SECONDS } from "@crm/core/security";
+import { RATE_LIMIT_ROW_RETENTION_SECONDS, type RateLimit } from "@crm/core/security";
 import { sql } from "drizzle-orm";
 import type { Database } from "../client";
-import { getDb } from "../index";
+import { getDb, getLimiterDb } from "../index";
 
 // The database rate-limit counters (spec "Authentication and sessions" → "Rate limits"; AUTH-06; plan Task 21).
 // `rate_limit` is a system table without RLS: only this module reads or writes it (TEN-10). Keys are prefixed
-// `ba:` (Better Auth's limiter) or `acct:` (the per-account sign-in counter, an HMAC); never a raw email or token.
+// `ba:` (Better Auth's limiter), `acct:` (the per-account sign-in counter, an HMAC) or `email-test:` (the settings
+// test email, by user or workspace ID); never a raw email or token.
 //
 // `now` is injectable for tests; production passes null and the database clock decides (clock_timestamp()).
 
@@ -50,6 +51,16 @@ export async function giveBack(db: Database, key: string, windowStart: string): 
   await db.execute(sql`
     update rate_limit set count = count - 1
     where key = ${key} and window_start = ${windowStart}::timestamptz and count > 0`);
+}
+
+// A limit taken inside a server action, on the limiter's own pool (getLimiterDb; DECISIONS "Phase 1 PR 7", 1A): the
+// unit autocommits, so the counter row is never held for the action's transaction, and stays spent if it rolls back.
+export function consumeUnit(key: string, limit: RateLimit): Promise<ConsumeResult> {
+  return consume(getLimiterDb().db, key, limit.max, limit.windowSeconds, null);
+}
+
+export function giveBackUnit(key: string, windowStart: string): Promise<void> {
+  return giveBack(getLimiterDb().db, key, windowStart);
 }
 
 // The daily cleanup (worker job `rate_limit.cleanup`): deletes rows whose window ended more than 24 hours ago.

@@ -28,6 +28,11 @@ export const PASSWORD_CHECK_IP_LIMIT: RateLimit = { windowSeconds: 15 * 60, max:
 // The daily cleanup removes counter rows whose window ended more than this long ago.
 export const RATE_LIMIT_ROW_RETENTION_SECONDS = 24 * 60 * 60;
 
+// Not spec rows (builder proposal, review P2-1, DECISIONS 2026-11-01): the settings test email goes to the user's own
+// address, which sign-up does not verify, so it is capped per user and per workspace.
+export const TEST_EMAIL_USER_LIMIT: RateLimit = { windowSeconds: 60 * 60, max: 5 };
+export const TEST_EMAIL_WORKSPACE_LIMIT: RateLimit = { windowSeconds: 60 * 60, max: 20 };
+
 // A code point, not a UTF-16 unit: an emoji counts once, like NIST and unlike String#length.
 export function characterCount(value: string): number {
   return [...value].length;
