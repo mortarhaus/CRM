@@ -8,7 +8,8 @@ workspace context"). PR 3 (Tasks 8-11) adds the system table `billing_account` (
 beyond Better Auth") and the polymorphic-reference trigger functions. PR 4 (Tasks 12-15 and 31) adds the
 tenant tables `audit_log` and `idempotency_key`, `crm_purge`'s one grant and the system table
 `auth_audit_log` (sections "Auth audit and 2FA sessions" and "Upgrading a Phase 0 database to Phase 1:
-every user is signed out once"). PR 5 adds the pg-boss grants.
+every user is signed out once"). PR 5 adds the pg-boss grants. PR 6 adds the tenant tables `domain_event` and
+`notification`; PR 7 adds the system table `rate_limit` and the `account.password` grant (section "Rate-limit counters").
 
 "Verified" means the command was run on 2026-10-24 against the dev compose Postgres 17 or a Testcontainers
 Postgres 17.
@@ -21,7 +22,7 @@ None is superuser or has `BYPASSRLS`, `CREATEROLE`, `CREATEDB` or `REPLICATION`
 | Role | Login | What it may do | Connection |
 |---|---|---|---|
 | `crm_migrator` | yes | Owns the database, every schema object and (from PR 5) `pgboss`; runs migrations. Member of `crm_link_resolver` with `INHERIT FALSE, SET TRUE`, only so a migration can make it the owner of `resolve_share_link()` (Phase 7) | `DATABASE_MIGRATOR_URL`, direct, never pooled |
-| `crm_app` | yes | Every web request and the worker's tenant work. Today: the Better Auth tables, exactly as measured below, `billing_account` (SELECT, INSERT), `auth_audit_log` (INSERT), `workspace_settings`, `audit_log` and `idempotency_key` under RLS, and enqueue only in `pgboss` (see "pg-boss grants") | `DATABASE_URL`, may be pooled |
+| `crm_app` | yes | Every web request and the worker's tenant work. Today: the Better Auth tables, exactly as measured below, `billing_account` (SELECT, INSERT), `auth_audit_log` (INSERT), `rate_limit` (SELECT, INSERT, UPDATE, DELETE), `workspace_settings`, `audit_log`, `idempotency_key`, `domain_event` and `notification` under RLS, and enqueue only in `pgboss` (see "pg-boss grants") | `DATABASE_URL`, may be pooled |
 | `crm_worker` | yes | The worker's pg-boss instance, `pgboss.*` only, exactly as measured in "pg-boss grants". Nothing in `public` (TEN-02): the worker's tenant work runs on its `crm_app` pool | `DATABASE_WORKER_URL` (worker only, direct) |
 | `crm_purge` | yes, `NOINHERIT`, `CONNECTION LIMIT 2` | PDPA purge only. INSERT on `audit_log` only, for the purge's own entry, under the RESTRICTIVE workspace policy and `audit_log_purge_insert` (PR 4, migration 0012; `purge-role.test.ts`). No role is a member of it. It has **no password** in dev compose and production until the purge job lands (Phase 9), so nobody can sign in as it | none until Phase 9 (`DATABASE_PURGE_URL`, worker only) |
 | `crm_link_resolver` | no (`NOLOGIN`) | Owns `resolve_share_link()` from Phase 7. No privilege beyond the PUBLIC defaults, which it cannot use | none |
@@ -124,6 +125,14 @@ One row per owner (`UNIQUE (owner_user_id)`), created by the organization plugin
 user's first workspace; `organization.billing_account_id` points at it (`ON DELETE RESTRICT`; nullable, so
 workspaces created before PR 3 have none). `plan` is locked to `free` and `status` to `active` by CHECK
 constraints until Part 3, so any other value fails with `23514`, also for the admin.
+
+## Rate-limit counters
+
+`rate_limit` (migration 0021, grants in 0022) is a system table with no RLS: counters keyed by text (`ba:`,
+`acct:`, `email-test:` prefixes), reached only through the system module (`apps/web/src/db/system/rate-limit.ts`).
+`crm_app` holds SELECT, INSERT, UPDATE and DELETE; the web process uses a pool of its own for it
+(`getLimiterDb`, 2 connections), so a counter row is never held for a whole request. Limits, keys and cleanup:
+`docs/runbooks/phase-1-security.md`.
 
 ## Polymorphic-reference trigger functions
 
@@ -286,7 +295,7 @@ where not exists (select 1 from auth_audit_log a
 
 ## Tenant tables and the workspace context
 
-Every table in `public` that is not a system table (today: the Better Auth tables, `billing_account` and `auth_audit_log`) is a tenant table:
+Every table in `public` that is not a system table (today: the Better Auth tables, `billing_account`, `auth_audit_log` and `rate_limit`) is a tenant table:
 it has a non-null `workspace_id`, row-level security `ENABLE`d and `FORCE`d, one RESTRICTIVE workspace
 policy `FOR ALL TO crm_app, crm_purge`, and one PERMISSIVE policy per command `crm_app` holds (spec
 Tenancy, revision 7). The predicate is always
@@ -305,6 +314,8 @@ errors in `apps/web` (TEN-09). `crm_migrator` and `crm_worker` have no policy on
 | `workspace_settings` | SELECT, INSERT, UPDATE (no DELETE: workspace deletion is Phase 9) | `workspace_settings_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update` | migrations 0002 (table) and 0003 (RLS, grants) |
 | `audit_log` | SELECT, INSERT (append-only: no role but the owner updates, deletes or truncates, TEN-03); `crm_purge` INSERT only | `audit_log_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_purge_insert` | migrations 0011 (table) and 0012 (RLS, grants) |
 | `idempotency_key` | SELECT, INSERT, DELETE, UPDATE (`response` only) | `idempotency_key_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update`, `_app_delete` | migrations 0013 (table) and 0014 (RLS, grants) |
+| `domain_event` | SELECT, INSERT (append-only, TEN-03) | `domain_event_workspace` (RESTRICTIVE), `_app_select`, `_app_insert` | migrations 0019 (table) and 0020 (RLS, grants) |
+| `notification` | SELECT, INSERT, UPDATE (`read_at` only) | `notification_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update` | migrations 0019 (table) and 0020 (RLS, grants) |
 
 Every new workspace gets its `workspace_settings` row from Better Auth's `afterCreateOrganization` hook
 (`apps/web/src/db/system/workspaces.ts`, `ensureWorkspaceSettings`). It is a second write after Better
@@ -424,7 +435,7 @@ it and left the copy behind (PR #45 deferred P2-1).
 
 | Process | crm_app (postgres.js) | pg-boss (`pg`) | Notes |
 |---|---|---|---|
-| web | 10 (`getDb()`) | 2, `crm_app` (`getSendBoss()`, send only) | the auth-transaction slots (5) and `PoolBypassError` cover the postgres.js pool only |
+| web | 10 (`getDb()`), plus 2 for the rate limiter (`getLimiterDb()`) | 2, `crm_app` (`getSendBoss()`, send only) | the auth-transaction slots (5) and `PoolBypassError` cover the postgres.js pool only |
 | worker | 3 (`openDatabase`, the `getDb()` singleton) | 3, `crm_worker` | one crm_app pool per process: a second `openDatabase` throws |
 | `jobs:retry` | none | 1, `crm_worker` | one-off |
 

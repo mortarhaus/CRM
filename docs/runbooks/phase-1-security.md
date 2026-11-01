@@ -3,7 +3,7 @@
 Scope: Phase 1 PR 7 (plan `docs/superpowers/plans/2026-10-20-phase-1-tenancy-security-jobs.md`, Tasks 21-24):
 database-backed rate limits, the trusted client IP, the per-account sign-in failure cap, the uniform 429, the
 Phase 1 Better Auth paths, password change (AUTH-07) and the two daily cleanup jobs. Better Auth 1.7.14.
-PR 8 (Task 25) adds the security headers section.
+PR 8 adds the security headers (Task 25) and the email sections (Tasks 26-27).
 
 "Verified" means the test named was run on 2026-11-01 against a Testcontainers Postgres 17 and, where it says so,
 two `next start` processes behind a test edge (`apps/web/src/lib/auth/rate-limit.test.ts`).

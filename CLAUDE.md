@@ -27,12 +27,15 @@ The single `.env` lives at the repo root (copy `.env.example`; `AUTH_SECRET` via
 | Typecheck | `pnpm typecheck` |
 | Lint (incl. boundaries) | `pnpm lint` |
 | Unit + integration tests (Docker running) | `pnpm test` · one file: `pnpm vitest run <path>` |
+| Gate tests (pg-boss through PgBouncer, 60 s+; Docker running; in CI) | `pnpm test:gates` |
 | Production build (Next + worker/migrate bundles) | `pnpm build` |
-| E2E vs dev server (starts `pnpm dev`) | `pnpm test:e2e` |
+| E2E vs dev server (starts `pnpm dev` and `pnpm worker:dev`) | `pnpm test:e2e`. Without `E2E_BASE_URL` it needs Mailpit on `127.0.0.1:1025` (SMTP) and `127.0.0.1:8025` (API; `MAILPIT_URL` overrides the API address only) and `DATABASE_WORKER_URL` in the root `.env` |
 | E2E vs the image | `pnpm stack:up` then `E2E_BASE_URL=http://localhost:3000 E2E_RATE_LIMITED=1 pnpm test:e2e` |
 | Auth route smoke check (`pnpm dev`, root `.env` only) | `pnpm smoke:auth-route` |
 | Dev Postgres only | `docker compose -f docker/compose.dev.yml up -d --wait postgres` |
+| Create or repair the five DB roles (once per cluster, before migrations; needs the `DATABASE_ADMIN_URL` and `CRM_*_PASSWORD` lines of `.env`) | `pnpm db:bootstrap` |
 | Apply migrations (host) | `pnpm db:migrate` |
+| Redrive a failed job from its dead-letter queue (needs `DATABASE_WORKER_URL`) | `pnpm --filter @crm/web jobs:retry -- --queue <queue> --id <dead-letter job id>` |
 | New migration after schema change | `pnpm db:generate --name <change>` |
 | Regenerate Better Auth schema | `pnpm --filter @crm/web auth:generate` then `pnpm db:generate --name <change>` |
 | Dev server / worker | `pnpm dev` · `pnpm worker:dev` |
