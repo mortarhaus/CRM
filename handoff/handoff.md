@@ -35,7 +35,7 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 | (none) | | |
 
 ## 4. Just finished
-2026-11-01 `fix` for PR 46 (Bob Round 1: 1 P1 + 2 P2). The review was archived to `agent-logs` first. The PR body was rewritten for the current head `34a489df`: the three commits, base `751ba3bd`, the merge resolution, and the drafting model. It also has a full rule-by-rule self-check (universal, tenancy-rls, events-jobs, money, PROJECT.md §9, and the packs judged not relevant), plus updated differences, size and not-verified sections. I re-ran the checks on `34a489df`: frozen install 0, typecheck 0, lint 0, `pnpm test` 790 passed, `pnpm test:gates` 1 passed (79.62 s), build 0, audit (high) 0 with 5 moderate, worktree clean. Not re-run at this head: `stack:up` with the health curl, local E2E and the mutation checks (all done at `0088f8c`; CI's image E2E passed on `34a489df`).
+2026-11-01 `fix` for PR 46 (Bob Round 1: 1 P1 + 2 P2). The review was archived to `agent-logs` first. The PR body was rewritten for the current head `34a489df`: the three commits, base `751ba3bd`, the merge resolution, and the drafting model. It also has a full rule-by-rule self-check (universal, tenancy-rls, events-jobs, money, PROJECT.md §9, and the packs judged not relevant), plus updated differences, size and not-verified sections. I re-ran the checks on `34a489df`, in order and after the frozen install: frozen install 0, typecheck 0, lint 0, `pnpm test` 790 passed, `pnpm test:gates` 1 passed (79.59 s), build 0, audit (high) 0 with 5 moderate, worktree clean. Not re-run at this head: `stack:up` with the health curl, local E2E and the mutation checks (all done at `0088f8c`; CI's image E2E passed on `34a489df`).
 
 ## 5. Next step (file-level)
 Charlie decides the EVT-05 item in §6. Then Charlie runs **`review 46`** (Bob, on Opus 5.5, as Round 1 asked). If Charlie wants the `redrive()` fix in this PR, the builder runs `fix` first: `apps/web/src/jobs/retry.ts`, its test and the runbook retry section; that gives a new head. Then `approved 46` before the merge, and `merged 46` after it.
@@ -48,7 +48,7 @@ Charlie decides the EVT-05 item in §6. Then Charlie runs **`review 46`** (Bob, 
 
 ## 7. Open review findings (P0/P1) and verdict
 - Review file `.agent/reviews/PR-46.md`, newest Round 1 (head `34a489df`): **Blocked**. Status of each finding:
-  - [P1] No guardrail self-check table -> fixed (PR body "Self-check": 40 rows: 32 pass, 2 pass with a stated gap or note (UNI-16, §9 payload), 1 partial (EVT-05), 4 n-a with reasons, plus n-a lines for the other rules and the 6 packs judged not relevant).
+  - [P1] No guardrail self-check table -> fixed (PR body "Self-check": 39 rows: 32 pass, 2 pass with a stated gap or note (UNI-16, §9 payload), 1 partial (EVT-05), 4 n-a with reasons, plus n-a lines for the other rules and the 6 packs judged not relevant).
   - [P2] PR body stale after the merge from `main` -> fixed (PR body updated to `34a489df`, base `751ba3bd`, merge `34a489d`; checks re-run).
   - [P2] Handoff does not describe PR 46 -> fixed (this file and the `agent-logs` copy).
   - [P3] `emitEvent` does not check the event name or version -> optional, not done.
