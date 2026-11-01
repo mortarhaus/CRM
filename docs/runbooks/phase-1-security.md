@@ -1,8 +1,9 @@
-# Runbook: Phase 1 security (rate limits, client IP, Better Auth surface)
+# Runbook: Phase 1 security (rate limits, client IP, Better Auth surface, security headers)
 
 Scope: Phase 1 PR 7 (plan `docs/superpowers/plans/2026-10-20-phase-1-tenancy-security-jobs.md`, Tasks 21-24):
 database-backed rate limits, the trusted client IP, the per-account sign-in failure cap, the uniform 429, the
 Phase 1 Better Auth paths, password change (AUTH-07) and the two daily cleanup jobs. Better Auth 1.7.14.
+PR 8 (Task 25) adds the security headers section.
 
 "Verified" means the test named was run on 2026-11-01 against a Testcontainers Postgres 17 and, where it says so,
 two `next start` processes behind a test edge (`apps/web/src/lib/auth/rate-limit.test.ts`).
@@ -124,9 +125,42 @@ The worker schedules both at start (`apps/web/src/worker/start.ts`), daily, UTC.
 To check the schedules: `select name, cron from pgboss.schedule;` as `crm_migrator`. Each run logs one line
 from the worker with the number of rows it deleted; a failed run is retried like any job.
 
+## Security headers (PR 8, Task 25)
+
+The app sets every security header itself; the edge adds none.
+
+| Header | Value | Set by | On |
+|---|---|---|---|
+| `Content-Security-Policy` (pages) | `buildCsp(nonce)` in `apps/web/src/lib/security-headers.ts`: `script-src` and `style-src` allow `'self'` and the request's nonce, `frame-ancestors 'none'`, no `'unsafe-inline'` | `apps/web/src/proxy.ts`, a new nonce per request | every path except `/api/*`, `/_next/static/*`, `/_next/image*`, `/favicon.ico` and prefetches |
+| `Content-Security-Policy` (API) | `default-src 'none'; frame-ancestors 'none'` | `next.config.ts` `headers()` | `/api/*` |
+| `Strict-Transport-Security` | `max-age=31536000` (no `includeSubDomains`, no `preload`; Charlie, ASK 6 option A) | `next.config.ts` | every response |
+| `X-Content-Type-Options` | `nosniff` | `next.config.ts` | every response |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | `next.config.ts` | every response |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` | `next.config.ts` | every response |
+
+- In development (`pnpm dev`) the page CSP also allows `'unsafe-eval'` for scripts and `'unsafe-inline'` (no nonce)
+  for styles, which React's dev tooling needs. Production has neither.
+- Every page renders per request (the root layout calls `connection()`): a nonce cannot be put into a prerendered
+  page, so no page can be served from a CDN cache.
+- **The edge must not add or rewrite these headers.** On Cloudflare, leave HSTS (SSL/TLS → Edge Certificates) off
+  and add no rule that sets a CSP; on Caddy, the `reverse_proxy` block above has no `header` directive. A second
+  CSP from the edge would be enforced alongside the app's, and a second HSTS value would make the effective one
+  unclear.
+- **HSTS:** browsers ignore it over plain HTTP, so local `http://localhost` is unaffected. Adding
+  `includeSubDomains` or `preload` later is the owner's call: `includeSubDomains` forces HTTPS on every other
+  subdomain of the domain, and preload is hard to undo.
+- Session cookie (UNI-18): `HttpOnly` and `SameSite=Lax` always; `Secure` for an https or non-loopback `APP_URL`
+  (`useSecureCookies` in `apps/web/src/lib/auth/config.ts`).
+
+Verified: `security-headers.test.ts` (the policy strings and the header table); `e2e/security-headers.spec.ts` (the
+nonce differs per load and is on every `<script>`; no CSP violation through sign-in, 2FA enrolment and workspace
+switching; `/api/health`'s policy; the cookie flags).
+
 ## Commands
 
 | What | Command | Result |
 |---|---|---|
 | Rate-limit and surface tests | `pnpm vitest run apps/web/src/lib/auth/rate-limit.test.ts apps/web/src/lib/auth/enabled-paths.test.ts` | Verified 2026-11-01 (part of `pnpm test`) |
 | Cleanup jobs | `pnpm vitest run apps/web/src/jobs/cleanup.test.ts` | Verified 2026-11-01 |
+| Header unit test | `pnpm vitest run apps/web/src/lib/security-headers.test.ts` | Verified 2026-11-01 |
+| Header E2E | `pnpm test:e2e e2e/security-headers.spec.ts` (from `apps/web`) | Verified 2026-11-01 against `next start` and `next dev` on a Testcontainers database (9 passed each) |
