@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-headers-email (worktree) · HEAD f1d2e01 · no PR yet
+# Handoff — 2026-11-01 · branch feat/p1-headers-email (worktree) · HEAD bdc72d9 · no PR yet
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -15,8 +15,8 @@
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1 PRs 1-7 (#39, #41, #43, #44, #45, #46, #48) and side fixes #35, #37, #40, #47. All logged on agent-logs.
-- In progress: PR 8, Task 25 not started.
-- Pending: Tasks 26-29; then Task 30 (separate spec revision 8 PR).
+- In progress: PR 8. Task 25 done (commit `bdc72d9`, verified: unit 14 pass, typecheck, lint). Task 26 started.
+- Pending: Tasks 27-29; then Task 30 (separate spec revision 8 PR).
 
 ## 3. Git state
 ```
@@ -31,12 +31,12 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 2026-11-01 `merged 48` done earlier. Status page made for Charlie (artifact 6de91JGVRQedUZ9YB3z3UQ). Gates checked: spec gate (Round 27 Approved for 733cc0e9), reconcile gate, log gate clear. Local main fast-forwarded to f1d2e01.
 
 ## 5. Next step (file-level)
-Task 25 (`apps/web/proxy.ts`, `apps/web/src/lib/security-headers.ts` + test, `apps/web/e2e/security-headers.spec.ts`, `next.config.ts`, `layout.tsx`, runbook `phase-1-security.md`, DECISIONS), test first, on Opus 5.5.
+Task 26 (email adapter SMTP/Resend, React Email, Mailpit), then Task 27. Task 25 deviations for Bob (in DECISIONS 2026-11-01): proxy at `src/proxy.ts`; `API_CSP` separate; matcher excludes `api`.
 
 ## 6. Open ASK items, blockers, and owner answers
 1. ASK 6 answered by Charlie 2026-11-01: "A" = HSTS `max-age=31536000`, no `includeSubDomains`, no `preload`. Record in DECISIONS (Task 25 Step 4).
 2. ASK 7 (production `EMAIL_FROM`, SPF/DKIM/DMARC owner) open; blocks only the production runbook line (Task 26).
-3. ASK 8 (test-email and `/settings/email` wording) open; blocks Task 27's commit. Draft text is in the plan.
+3. ASK 8 answered by Charlie 2026-11-01: "a" = ship the plan's draft wording (test email subject and body; `/settings/email` copy). Record in DECISIONS.
 4. ASK 9 (`require_2fa` in Phase 2) open; confirm with Charlie.
 5. Carried: stale health body in `phase-0-auth-database.md` (Task 29), "3 moderate" count fix, `migrateEnvFor` DECISIONS entry, optional P3s, rotate dev AUTH_SECRET, refresh local `.env`, repo visibility, untracked files in main checkout.
 
@@ -44,7 +44,7 @@ Task 25 (`apps/web/proxy.ts`, `apps/web/src/lib/security-headers.ts` + test, `ap
 - None. No PR yet.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- ASK 6 = A (HSTS values above). Goes into DECISIONS in Task 25.
+- ASK 6 = A is in DECISIONS (Task 25). ASK 8 = A (draft wording) not yet in DECISIONS; goes in with Task 26/27.
 
 ## 9. Files touched but not committed
 - None.
