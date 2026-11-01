@@ -8,7 +8,7 @@ const { incoming, setCookie, handler, env } = vi.hoisted(() => ({
 }));
 
 vi.mock("next/headers", () => ({ headers: async () => incoming, cookies: async () => ({ set: setCookie }) }));
-vi.mock("./server", () => ({ getAuth: () => ({ handler }) }));
+vi.mock("./server", () => ({ getAuthHandler: () => handler }));
 vi.mock("../env", async (importOriginal) => ({ ...(await importOriginal<object>()), getEnv: () => env }));
 
 const { postToAuth } = await import("./forward");

@@ -57,5 +57,13 @@ export function prepareAuthRequest(
   const headers = new Headers(request.headers);
   for (const name of FORWARDING_HEADERS) headers.delete(name);
   headers.set(CLIENT_IP_HEADER, ip);
-  return new Request(request, { headers });
+  // Built from the request's parts, not `new Request(request, …)`: under `next start` the route's request is not an
+  // instance of this realm's Request, and the copy constructor then throws (rate-limit.test.ts runs the build).
+  const hasBody = request.method !== "GET" && request.method !== "HEAD";
+  return new Request(request.url, {
+    method: request.method,
+    headers,
+    signal: request.signal,
+    ...(hasBody ? { body: request.body, duplex: "half" } : {}),
+  } as RequestInit);
 }

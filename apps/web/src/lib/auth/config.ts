@@ -10,6 +10,7 @@ import { isHttpsUrl, isLoopbackUrl } from "../origin";
 import { CLIENT_IP_HEADER } from "./client-ip";
 import { enforceInputLimits } from "./input-limits";
 import { logAuth } from "./log";
+import { rateLimitOptions } from "./rate-limit-rules";
 import { withRequestTransactions } from "./request-transaction";
 import { crmSessionAudit, labelSessionIssue } from "./session-audit";
 
@@ -29,11 +30,19 @@ export interface AuthDeps {
   db: Database;
   secret: string;
   baseURL: string;
+  // The rate limiter's own pool (getLimiterDb): its consumes autocommit outside the request transaction.
+  limiterDb: Database;
 }
 
 // The Better Auth options. `adapterDb` is the database Better Auth's adapter uses: createAuth passes the one that
 // routes each request to its transaction. Tests build an instance without that wrapper only as a control.
-export function authOptions({ db, secret, baseURL, adapterDb = db }: AuthDeps & { adapterDb?: Database }) {
+export function authOptions({
+  db,
+  secret,
+  baseURL,
+  adapterDb = db,
+  limiterDb = db,
+}: Omit<AuthDeps, "limiterDb"> & { adapterDb?: Database; limiterDb?: Database }) {
   return {
     appName: "CRM",
     secret,
@@ -67,6 +76,8 @@ export function authOptions({ db, secret, baseURL, adapterDb = db }: AuthDeps & 
       },
     },
     disabledPaths: [...INVITATION_PATHS],
+    // Database-backed limits (spec "Rate limits"; plan Task 23), consumed on the limiter's own pool.
+    rateLimit: rateLimitOptions(limiterDb),
     emailAndPassword: {
       enabled: true,
       // Spec: uniform responses on sign-up. With auto sign-in off, a duplicate email gets the same
@@ -104,7 +115,18 @@ export function authOptions({ db, secret, baseURL, adapterDb = db }: AuthDeps & 
   } satisfies BetterAuthOptions;
 }
 
+export class SharedLimiterPoolError extends Error {
+  override readonly name = "SharedLimiterPoolError";
+
+  constructor() {
+    super("the rate limiter needs a pool of its own, not the request transactions' pool");
+  }
+}
+
 export function createAuth(deps: AuthDeps) {
+  // On the request pool a consume inside a request transaction would fail (PoolBypassError) or, routed into the
+  // transaction, hold the counter row until commit.
+  if (deps.limiterDb.$client === deps.db.$client) throw new SharedLimiterPoolError();
   const transactions = createAuthTransactions(deps.db);
   return withRequestTransactions(betterAuth(authOptions({ ...deps, adapterDb: transactions.db })), transactions);
 }

@@ -6,7 +6,7 @@ import {
 } from "@crm/core/security";
 import { and, eq } from "drizzle-orm";
 import postgres from "postgres";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createDb, type DbHandle } from "../../db/client";
 import {
   account,
@@ -30,12 +30,17 @@ const PASSWORD = "correct horse battery staple 42";
 let database: TestDatabase;
 let handle: DbHandle;
 let auth: Auth;
+let limiterAdmin: postgres.Sql;
+let limiter: DbHandle;
 
 beforeAll(async () => {
   database = await startDatabase();
+  limiterAdmin = postgres(database.adminUrl, { max: 1, onnotice: () => {} });
   handle = createDb(database.appUrl);
+  limiter = createDb(database.appUrl, { max: 2 });
   auth = createAuth({
     db: handle.db,
+    limiterDb: limiter.db,
     secret: "integration test secret, not a real key",
     baseURL: "http://localhost:3000",
   });
@@ -43,7 +48,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await handle?.sql.end();
+  await limiterAdmin?.end();
+  await limiter?.sql.end();
   await database?.stop();
+});
+
+// The limits are on (spec "Rate limits": tests run with them on) and every request here shares one IP; each test
+// starts with no counters, so a test only meets a limit it sets out to reach (rate-limit.test.ts).
+beforeEach(async () => {
+  await limiterAdmin`delete from rate_limit`;
 });
 
 let emailCounter = 0;
@@ -81,7 +94,7 @@ async function findUser(email: string) {
 
 describe("session cookie attributes", () => {
   function authAt(baseURL: string): Auth {
-    return createAuth({ db: handle.db, secret: "integration test secret, not a real key", baseURL });
+    return createAuth({ db: handle.db, limiterDb: limiter.db, secret: "integration test secret, not a real key", baseURL });
   }
 
   async function signInCookies(instance: Auth): Promise<string[]> {
@@ -264,7 +277,8 @@ describe("input limits enforced on the server (owner decision 2026-10-14)", () =
 
   it("applies the password limits to a password change", async () => {
     const headers = await signUpAndSignIn(uniqueEmail());
-    const change = (newPassword: string) => viaHttp("/change-password", { currentPassword: PASSWORD, newPassword }, headers);
+    const change = (newPassword: string) =>
+      viaHttp("/change-password", { currentPassword: PASSWORD, newPassword, revokeOtherSessions: true }, headers);
     expect(await change(ascii(PASSWORD_MIN_LENGTH - 1))).toEqual({ status: 400, code: "PASSWORD_TOO_SHORT" });
     expect(await change(astral(PASSWORD_MAX_LENGTH + 1))).toEqual({ status: 400, code: "PASSWORD_TOO_LONG" });
   });

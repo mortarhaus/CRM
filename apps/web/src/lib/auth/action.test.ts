@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { DbHandle } from "../../db/client";
+import { createDb, type DbHandle } from "../../db/client";
 import * as schema from "../../db/schema";
 import type { Tx } from "../../db/workspace";
 import { startDatabase, type TestDatabase } from "../../test/postgres";
@@ -20,6 +20,7 @@ const ORIGIN = "http://localhost:3000";
 let requestHeaders = new Headers();
 const steps: string[] = [];
 let handle: DbHandle;
+let limiter: DbHandle;
 
 vi.mock("next/headers", () => ({
   headers: async () => requestHeaders,
@@ -153,13 +154,15 @@ beforeAll(async () => {
   const debug = (_connection: number, query: string) => recordQuery(query);
   const client = postgres(database.appUrl, { max: 4, prepare: false, onnotice: () => {}, debug });
   handle = { sql: client, db: drizzle({ client, schema }) };
-  auth = createAuth({ db: handle.db, secret: "integration test secret, not a real key", baseURL: ORIGIN });
+  limiter = createDb(database.appUrl, { max: 2 });
+  auth = createAuth({ db: handle.db, limiterDb: limiter.db, secret: "integration test secret, not a real key", baseURL: ORIGIN });
   owner = await newParty("owner");
   other = await newParty("other");
 });
 
 afterAll(async () => {
   await handle?.sql.end();
+  await limiter?.sql.end();
   await admin?.end();
   await database?.stop();
 });

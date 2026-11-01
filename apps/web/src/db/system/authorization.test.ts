@@ -28,6 +28,7 @@ interface Party {
 
 let database: TestDatabase;
 let handle: DbHandle;
+let limiter: DbHandle;
 let admin: postgres.Sql;
 let auth: Auth;
 let counter = 0;
@@ -100,13 +101,15 @@ async function makeStale(party: Party, workspaceId: string): Promise<void> {
 beforeAll(async () => {
   database = await startDatabase();
   handle = createDb(database.appUrl);
+  limiter = createDb(database.appUrl, { max: 2 });
   admin = postgres(database.adminUrl, { max: 1, onnotice: () => {} });
-  auth = createAuth({ db: handle.db, secret: "integration test secret, not a real key", baseURL: ORIGIN });
+  auth = createAuth({ db: handle.db, limiterDb: limiter.db, secret: "integration test secret, not a real key", baseURL: ORIGIN });
 });
 
 afterAll(async () => {
   await admin?.end();
   await handle?.sql.end();
+  await limiter?.sql.end();
   await database?.stop();
 });
 
