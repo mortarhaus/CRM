@@ -4,22 +4,25 @@ import { z } from "zod";
 import { type Log, logJobError } from "./log";
 import { RETRY_BOSS_OPTIONS } from "./options";
 
-// The retry admin command (EVT-05; plan Task 18): puts a failed job back in its queue. pg-boss's retry() matches
-// only jobs in state `failed`. The copy a dead-letter queue holds is a new job in state `created`, not a failed
-// one, so retrying it changes nothing: retry the failed original in its own queue.
-export const RETRY_HELP = `Usage: pnpm --filter @crm/web jobs:retry -- --queue <original queue> --id <failed job id>
+// The retry admin command (EVT-05; plan Task 18): runs a dead-lettered job again. A job whose retries are exhausted
+// is `failed` in its queue (pg-boss deletes it after the queue's deleteAfterSeconds, 7 days by default) and a copy
+// lands in the queue's dead-letter queue in state `created`. pg-boss's redrive() moves that copy: it creates a new job
+// in the copy's source queue (new id, retry_count 0, the queue's current retry settings) and deletes the copy, in one
+// statement. retry() on the failed original stopped working once it was deleted and left the copy behind (PR 45
+// deferred P2-1), so the command takes the copy's id.
+export const RETRY_HELP = `Usage: pnpm --filter @crm/web jobs:retry -- --queue <original queue> --id <dead-letter job id>
 
-Retries a failed pg-boss job, as crm_worker (DATABASE_WORKER_URL).
+Runs a dead-lettered pg-boss job again, as crm_worker (DATABASE_WORKER_URL): pg-boss redrive() moves the copy from
+the queue's dead-letter queue back to the queue as a new job (new id, retry_count 0) and deletes the copy.
 
-  --queue  The queue the job failed in, for example email.send or domain_event.
-  --id     The id of the failed job in that queue (pgboss.job_common.id, state failed).
+  --queue  The queue the job failed in, for example email.send or domain_event (not the .dead queue).
+  --id     The id of the job's copy in that queue's dead-letter queue (email.send.dead, domain_event.dead).
   --help   Show this text.
 
-A job in a dead-letter queue (email.send.dead, domain_event.dead) is a copy in state created, not a failed job:
-retrying it there is a no-op and reports "job not found". Find the original by the copy's source_id and retry
-that id in the original queue.`;
+The failed original's id is not accepted: it stays failed until pg-boss deletes it. Do not also retry it, or the
+job runs twice.`;
 
-const MISSING = "use --queue <original queue> --id <failed job id> (see --help)";
+const MISSING = "use --queue <original queue> --id <dead-letter job id> (see --help)";
 
 export interface RetryCommandIo {
   workerUrl: () => string;
@@ -27,7 +30,7 @@ export interface RetryCommandIo {
   err: Log;
 }
 
-// Exit code: 0 retried (or --help), 1 not retried, 2 bad arguments.
+// Exit code: 0 redriven (or --help), 1 not redriven, 2 bad arguments.
 export async function runRetryCommand(argv: readonly string[], io: RetryCommandIo): Promise<number> {
   const args = argv[0] === "--" ? argv.slice(1) : argv;
   let values: { queue?: string; id?: string; help?: boolean };
@@ -59,18 +62,31 @@ export async function runRetryCommand(argv: readonly string[], io: RetryCommandI
   boss.on("error", (error) => logJobError(io.err, "pg-boss error", error));
   try {
     await boss.start();
-    if (!(await boss.getQueue(values.queue))) {
+    const queue = await boss.getQueue(values.queue);
+    if (!queue) {
       io.err(JSON.stringify({ level: "error", msg: "queue not found", queue: values.queue }));
       return 1;
     }
-    // 12.35.0 types CommandResponse as an empty interface; at runtime it is { jobs, requested, affected }.
-    const { affected } = (await boss.retry(values.queue, values.id)) as { affected?: number };
-    if (affected !== 1) {
-      const hint = values.queue.endsWith(".dead") ? "; a dead-letter copy is not a failed job, retry the original queue" : "";
-      io.err(JSON.stringify({ level: "error", msg: `job not found${hint}`, queue: values.queue }));
+    if (!queue.deadLetter) {
+      io.err(
+        JSON.stringify({ level: "error", msg: "queue has no dead-letter queue; pass the original queue", queue: values.queue }),
+      );
       return 1;
     }
-    io.out(JSON.stringify({ level: "info", msg: "job retried" }));
+    // No destination: the new job goes to the copy's source queue. sourceName keeps a copy from another queue (one
+    // dead-letter queue can collect from several) from moving under this queue's name.
+    const moved = await boss.redrive(queue.deadLetter, { ids: [values.id], sourceName: values.queue, limit: 1 });
+    if (moved !== 1) {
+      io.err(
+        JSON.stringify({
+          level: "error",
+          msg: "job not found; pass the id of the copy in the dead-letter queue (see --help)",
+          queue: values.queue,
+        }),
+      );
+      return 1;
+    }
+    io.out(JSON.stringify({ level: "info", msg: "job redriven", queue: values.queue }));
     return 0;
   } catch (error) {
     logJobError(io.err, "retry failed", error);

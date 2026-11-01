@@ -1,8 +1,9 @@
 import type { Job } from "pg-boss";
+import { domainEventHandler } from "./domain-event";
 import type { Log } from "./log";
 
 // The application queues the worker works (migrations 0016 and 0017 create them). The dead-letter queues have no
-// handler: a job there waits for the admin command (scripts/retry-job.ts retries the failed original).
+// handler: a job there waits for the admin command (scripts/retry-job.ts redrives the copy back to its queue).
 export const QUEUE_NAMES = ["domain_event", "email.send", "rate_limit.cleanup", "idempotency.cleanup"] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];
 
@@ -15,7 +16,6 @@ export interface HandlerContext {
 export type Handler = (jobs: Job<object>[], context: HandlerContext) => Promise<void>;
 export type Handlers = { readonly [Queue in QueueName]?: Handler };
 
-// Empty in Phase 1 PR 5: each handler lands with its feature (domain_event in Task 19, the cleanups in Task 24,
-// email.send in Task 27). A queue without a handler is not worked, so its jobs wait in `created`; a placeholder
-// would complete or fail real jobs.
-export const HANDLERS: Handlers = {};
+// Each handler lands with its feature (domain_event in Task 19, the cleanups in Task 24, email.send in Task 27). A
+// queue without a handler is not worked, so its jobs wait in `created`; a placeholder would complete or fail real jobs.
+export const HANDLERS: Handlers = { domain_event: domainEventHandler() };

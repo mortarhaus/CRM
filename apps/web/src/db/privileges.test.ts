@@ -82,9 +82,9 @@ describe("crm_worker holds nothing in public (TEN-02)", () => {
 });
 
 // TEN-03 and spec Scalability: no runtime role, and not PUBLIC, can change or remove an audit row, at table or
-// column level; the owner is crm_migrator. Part 1 of the catalog test (plan Task 12 Step 4); domain_event joins
-// it in plan Task 19.
-const APPEND_ONLY_TABLES = ["audit_log", "auth_audit_log"] as const;
+// column level; the owner is crm_migrator. Part 1 of the catalog test (plan Task 12 Step 4); part 2 is domain_event,
+// the event history (plan Task 19; UNI-10).
+const APPEND_ONLY_TABLES = ["audit_log", "auth_audit_log", "domain_event"] as const;
 
 describe("append-only audit tables (TEN-03)", () => {
   it.each(APPEND_ONLY_TABLES)("no runtime role holds DELETE, UPDATE or TRUNCATE on %s", async (table) => {

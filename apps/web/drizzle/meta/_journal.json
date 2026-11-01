@@ -134,6 +134,20 @@
       "when": 1793063925990,
       "tag": "0018_pgboss_worker_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793324392788,
+      "tag": "0019_domain_event_notification",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793324397837,
+      "tag": "0020_rls_domain_event_notification",
+      "breakpoints": true
     }
   ]
 }

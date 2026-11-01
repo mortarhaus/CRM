@@ -11,6 +11,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:gates": "pnpm --filter @crm/web test:gates",
     "test:e2e": "pnpm --filter @crm/web test:e2e",
     "db:generate": "pnpm --filter @crm/web db:generate",
     "db:bootstrap": "pnpm --filter @crm/web db:bootstrap",

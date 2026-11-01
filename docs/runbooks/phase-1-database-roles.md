@@ -351,7 +351,8 @@ No payload column (`data`, `output`) is readable: `select data from pgboss.job_c
 `start()`; `work()`, fetch and `complete()`; a handler that throws twice then succeeds (retry with backoff); a handler
 that always throws (retries exhausted, a copy in `email.send.dead`); `expireInSeconds` exceeded (maintenance fails the
 job); `deleteAfterSeconds` after completion and `retentionSeconds` on an unfetched job (maintenance deletes both);
-`schedule()` and a cron fire within 75 s; `unschedule()`; `retry()` on the failed job (the admin command); `stop()`.
+`schedule()` and a cron fire within 75 s; `unschedule()`; `redrive()` of the dead-letter copy (the admin command,
+`jobs:retry`); `stop()`.
 
 | Privilege | Object | Statement that fails without it (ablation) |
 |---|---|---|
@@ -365,9 +366,9 @@ job); `deleteAfterSeconds` after completion and `retentionSeconds` on an unfetch
 | UPDATE (`monitor_claim_on`, `monitor_on`, `maintain_on`, `deferred_count`, `queued_count`, `ready_count`, `active_count`, `failed_count`, `total_count`, `singletons_active`, `ready_history`) | `queue` | supervise: the monitor claim and queue counts, the maintenance claim (each column ablated on its own) |
 | SELECT, INSERT, UPDATE | `schedule` | `schedule()` (an upsert), the cron pass reads the schedules |
 | DELETE | `schedule` | `unschedule()` |
-| SELECT, UPDATE | `job_common` | fetch, `complete()`, `retry()` |
-| INSERT, DELETE | `job_common` | `fail()` and expiry (pg-boss moves a failed job with a DELETE and an INSERT in one statement); the cron fire (INSERT); maintenance deletion after `deleteAfterSeconds` and `retentionSeconds` (DELETE) |
-| SELECT, INSERT, UPDATE | `job` (the partitioned parent) | the dead-letter copy, `retry()`, the flow pass (`FOR UPDATE` on parents) |
+| SELECT, UPDATE | `job_common` | fetch, `complete()`, `redrive()` (locks the dead-letter copy `FOR UPDATE`) |
+| INSERT, DELETE | `job_common` | `fail()` and expiry (pg-boss moves a failed job with a DELETE and an INSERT in one statement); the cron fire (INSERT); maintenance deletion after `deleteAfterSeconds` and `retentionSeconds` (DELETE); `redrive()` deletes the copy (DELETE) |
+| SELECT, INSERT, UPDATE | `job` (the partitioned parent) | the dead-letter copy, `redrive()` (inserts the new job), the flow pass (`FOR UPDATE` on parents) |
 | SELECT, DELETE | `job_dependency` | the flow pass and maintenance deletion |
 
 Nothing on `subscription`, `bam`, `warning` or `queue_stats` (no statement of the operation set uses them; warnings
@@ -379,22 +380,43 @@ queue options, `notify` included, and the schema version change only in migratio
 ### Retrying a failed job (`jobs:retry`)
 
 A job whose retries are exhausted is `failed` in its own queue, and a copy lands in the queue's dead-letter queue
-(`email.send.dead`, `domain_event.dead`) in state `created`. No worker works the dead-letter queues. To run the job
-again once the cause is fixed, retry the **failed original in its original queue**, as `crm_worker`:
+(`email.send.dead`, `domain_event.dead`) in state `created`. No worker works the dead-letter queues. pg-boss deletes
+the failed original after the queue's `deleteAfterSeconds` (7 days by default). The copy is never fetched, so
+maintenance deletes it when its `retentionSeconds` ends (14 days by default; migration 0016 sets no retention on the
+`.dead` queues): **redrive within 14 days of the failure**, or the job is gone. To run the job again once the cause is fixed, **redrive the copy**: pass the **original queue** and
+the **copy's id**, as `crm_worker`:
+
+```sql
+-- the copy's id (admin connection): every copy in the queue, or the copy of one failed job
+select id, source_id, created_on from pgboss.job where name = 'email.send.dead' order by created_on;
+select id from pgboss.job where name = 'email.send.dead' and source_id = '<failed job id>';
+```
 
 ```sh
 # host (reads the root .env)
-pnpm --filter @crm/web jobs:retry -- --queue email.send --id <failed job id>
+pnpm --filter @crm/web jobs:retry -- --queue email.send --id <dead-letter job id>
 # image (the running worker container has the URLs)
-docker compose -f docker/compose.dev.yml exec worker node dist/retry-job.mjs --queue email.send --id <failed job id>
+docker compose -f docker/compose.dev.yml exec worker node dist/retry-job.mjs --queue email.send --id <dead-letter job id>
 ```
 
-It prints `{"level":"info","msg":"job retried"}` (exit 0) and the job goes back to `retry`, then runs. Retrying the
-dead-letter copy is a no-op: `retry()` only matches jobs in state `failed`, so `--queue email.send.dead --id <copy id>`
-prints `job not found` (exit 1) and changes nothing. Find the original from the copy (admin connection):
-`select source_id from pgboss.job where name = 'email.send.dead' and id = '<copy id>'`. An unknown id also prints
-`job not found` (exit 1); a missing or malformed argument exits 2 before connecting. The command starts pg-boss with
-one connection, no maintenance and no cron (`RETRY_BOSS_OPTIONS`), and logs errors by name and SQLSTATE only.
+It calls pg-boss `redrive('email.send.dead', { ids: [<id>], sourceName: 'email.send', limit: 1 })`, which in one
+statement creates a **new job** in `email.send` (a new id, state `created`, `retry_count` 0) and deletes the copy, then
+prints `{"level":"info","msg":"job redriven","queue":"email.send"}` (exit 0). It works whether or not the failed
+original still exists. The new job takes the queue's **current** retry, expiry and dead-letter settings: per-send
+overrides from the original `send()` are not kept. Its `source_root_id` is the original job's id, so
+`select id, state from pgboss.job where name = 'email.send' and source_root_id = '<failed job id>'` finds it. If it fails
+again, a new copy lands in the dead-letter queue and can be redriven the same way.
+
+The failed original stays `failed` until pg-boss deletes it. Do **not** also run pg-boss `retry()` on it, or the job
+runs twice. Passing the failed original's id, an unknown id, or a copy that came from another queue prints
+`job not found; pass the id of the copy in the dead-letter queue (see --help)` (exit 1) and changes nothing. An unknown
+queue prints `queue not found`; a queue with no dead-letter queue (a `.dead` queue itself, `rate_limit.cleanup`)
+prints `queue has no dead-letter queue; pass the original queue` (exit 1). A missing or malformed argument exits 2
+before connecting. The command starts pg-boss with one connection, no maintenance and no cron
+(`RETRY_BOSS_OPTIONS`), never prints a payload value, and logs errors by name and SQLSTATE only (UNI-09). It needs
+no grant beyond the worker's (`worker-grants.test.ts` runs the redrive in the operation set with zero permission
+errors). Before PR #46 the command called `retry()` on the failed original, which stopped working once pg-boss deleted
+it and left the copy behind (PR #45 deferred P2-1).
 
 ### Connections and pools
 
