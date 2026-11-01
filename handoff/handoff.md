@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-headers-email (worktree) · HEAD 1396475 · no PR yet (push waits for Charlie's yes)
+# Handoff — 2026-11-01 · branch feat/p1-headers-email (worktree) · HEAD 6550472 · PR #49
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -15,8 +15,8 @@
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1 PRs 1-7 (#39, #41, #43, #44, #45, #46, #48) and side fixes #35, #37, #40, #47. All logged on agent-logs.
-- In progress: PR 8. Task 25 done (commit `bdc72d9`, verified: unit 14 pass, typecheck, lint). Task 26 done (commit `3fdbb7b`, verified: adapters+env 56 pass, typecheck, lint; compose/CI image not run). Task 27 done (`d776980`), review by independent Opus: no P0/P1, P2-1 fixed in `253a406` (5/user/h, 20/ws/h, RATE_LIMITED), P3-2 guard. Task 29 docs done (`1396475`). Task 28 (push + read CI) waits for Charlie's yes; done-when run is CI's job.
-- Pending: Task 28 push + CI; then Task 30 (separate spec revision 8 PR).
+- In progress: PR 8. Task 25 done (commit `bdc72d9`, verified: unit 14 pass, typecheck, lint). Task 26 done (commit `3fdbb7b`, verified: adapters+env 56 pass, typecheck, lint; compose/CI image not run). Task 27 done (`d776980`), review by independent Opus: no P0/P1, P2-1 fixed in `253a406` (5/user/h, 20/ws/h, RATE_LIMITED), P3-2 guard. Task 29 docs done (`1396475`). Pushed and PR #49 opened 2026-11-01 (https://github.com/mortarhaus/CRM/pull/49). Task 28 = read the CI run; done-when run is CI's job.
+- Pending: PR #49 CI result (Task 28), `review 49` by Bob, then Task 30 (separate spec revision 8 PR).
 
 ## 3. Git state
 ```
@@ -31,7 +31,7 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 2026-11-01 `merged 48` done earlier. Status page made for Charlie (artifact 6de91JGVRQedUZ9YB3z3UQ). Gates checked: spec gate (Round 27 Approved for 733cc0e9), reconcile gate, log gate clear. Local main fast-forwarded to f1d2e01.
 
 ## 5. Next step (file-level)
-Task 27 (test email, /settings/email, email.send job, E2E). Task 26 notes for Bob: trailer says Opus 5.5 (Opus did the work); Mailpit SMTP also on 127.0.0.1:1025 (dev); jobs:retry reads only DATABASE_WORKER_URL; low advisory deepmerge via @react-email/render (2.2.0 fixes, 4 days old, separate PR); Resend fetch has no timeout; compose test keeps email vars worker-only. Task 25 deviations for Bob (in DECISIONS 2026-11-01): proxy at `src/proxy.ts`; `API_CSP` separate; matcher excludes `api`.
+Read CI on PR #49; if green tell Charlie to run `review 49` in Bob's window; add the Done-when and Verification map to the PR body from CI results. Task 26 notes for Bob: trailer says Opus 5.5 (Opus did the work); Mailpit SMTP also on 127.0.0.1:1025 (dev); jobs:retry reads only DATABASE_WORKER_URL; low advisory deepmerge via @react-email/render (2.2.0 fixes, 4 days old, separate PR); Resend fetch has no timeout; compose test keeps email vars worker-only. Task 25 deviations for Bob (in DECISIONS 2026-11-01): proxy at `src/proxy.ts`; `API_CSP` separate; matcher excludes `api`.
 
 ## 6. Open ASK items, blockers, and owner answers
 1. ASK 6 answered by Charlie 2026-11-01: "A" = HSTS `max-age=31536000`, no `includeSubDomains`, no `preload`. Record in DECISIONS (Task 25 Step 4).
