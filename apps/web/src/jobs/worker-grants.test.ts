@@ -97,8 +97,8 @@ function emailHandler(state: { attempts: Map<string, number>; fixed: boolean }) 
   };
 }
 
-// 12.35.0 types CommandResponse as an empty interface; at runtime it is { jobs, requested, affected }.
-const affected = (response: unknown) => (response as { affected?: number }).affected;
+// The redrive the admin command makes (src/jobs/retry.ts): one email.send.dead copy back to email.send.
+const REDRIVE = (copyId: string) => ({ ids: [copyId], sourceName: "email.send", limit: 1 });
 
 async function privilege(sql: string): Promise<boolean> {
   const [row] = await admin.unsafe<{ held: boolean }[]>(`select ${sql} as held`);
@@ -207,12 +207,16 @@ describe("crm_worker: the worker operation set (plan Task 17 Step 1)", () => {
         await waitFor("slow failed by expiry", stateIs(slow, "failed"), 30_000);
         await waitFor("retention job deleted", gone(kept), 30_000);
 
-        // The admin command (Task 18): retry the failed job in its own queue. The dead-letter copy is a new job in
-        // state created, so retry() on it changes nothing.
-        expect(affected(await worker.boss.retry("email.send.dead", deadLetter?.id ?? ""))).toBe(0);
+        // The admin command (jobs:retry): redrive the dead-letter copy, as the command does. It becomes a new job in
+        // email.send (found by source_root_id, the original's id) and the copy is deleted.
         handlerState.fixed = true;
-        expect(affected(await worker.boss.retry("email.send", dead))).toBe(1);
-        await waitFor("retried job completed", stateIs(dead, "completed"));
+        expect(await worker.boss.redrive("email.send.dead", REDRIVE(deadLetter?.id ?? ""))).toBe(1);
+        expect(await jobState(deadLetter?.id ?? "")).toBeUndefined();
+        await waitFor("redriven job completed", async () => {
+          const rows = await admin<{ state: string }[]>`
+            select state from pgboss.job where name = 'email.send' and source_root_id = ${dead}`;
+          return rows.length === 1 && rows[0]?.state === "completed" ? true : undefined;
+        });
 
         await waitFor("cron fired", async () => (cronRuns.length > 0 ? true : undefined), 75_000);
         await worker.boss.unschedule("rate_limit.cleanup");
@@ -233,7 +237,7 @@ describe("crm_worker: the worker operation set (plan Task 17 Step 1)", () => {
   );
 });
 
-// Runs the worker operation set (start, work, complete, fail to the dead letter, retry, expiry, deletion, schedule,
+// Runs the worker operation set (start, work, complete, fail to the dead letter, redrive, expiry, deletion, schedule,
 // unschedule, the cron and maintenance loops) until crm_worker hits a permission error that starts with `expected`,
 // or the time runs out. Returns the permission errors seen.
 async function runUntilDenied(expected: string, timeoutMs = 15_000): Promise<string[]> {
@@ -267,11 +271,13 @@ async function runUntilDenied(expected: string, timeoutMs = 15_000): Promise<str
     await sender.boss.send("email.send", { scenario: "slow", key: "slow" }, { expireInSeconds: 1, retryLimit: 0 });
     await sender.boss.send("domain_event", { key: "retention" }, { retentionSeconds: 1 });
     const deadline = Date.now() + timeoutMs;
-    let retried = false;
+    let redriven = false;
     while (Date.now() < deadline && (await denied()).length === 0) {
-      if (!retried && dead && (await jobState(dead))?.state === "failed") {
-        retried = true;
-        await attempt(() => worker.boss.retry("email.send", dead));
+      if (!redriven && dead && (await jobState(dead))?.state === "failed") {
+        redriven = true;
+        const [copy] = await admin<{ id: string }[]>`
+          select id from pgboss.job where name = 'email.send.dead' and source_id = ${dead}`;
+        await attempt(() => worker.boss.redrive("email.send.dead", REDRIVE(copy?.id ?? crypto.randomUUID())));
       }
       await sleep(500);
     }

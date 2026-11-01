@@ -68,7 +68,6 @@ const stateIs = (id: string, state: string) => async () => {
   return row?.state === state ? row : undefined;
 };
 const gone = (id: string) => async () => ((await jobState(id)) === undefined ? true : undefined);
-const affected = (response: unknown) => (response as { affected?: number }).affected;
 
 function emailHandler(state: { attempts: Map<string, number>; fixed: boolean }) {
   return async ([job]: Job<Data>[]) => {
@@ -154,10 +153,14 @@ describe("pg-boss through PgBouncer (transaction mode), crm_worker and crm_app",
       await waitFor("slow failed by expiry", stateIs(slow, "failed"), 30_000);
       await waitFor("retention job deleted", gone(kept), 30_000);
 
-      expect(affected(await worker.retry("email.send.dead", deadLetter?.id ?? ""))).toBe(0);
+      // The admin command (jobs:retry, src/jobs/retry.ts): redrive the dead-letter copy back to email.send.
       handlerState.fixed = true;
-      expect(affected(await worker.retry("email.send", dead))).toBe(1);
-      await waitFor("retried job completed", stateIs(dead, "completed"));
+      expect(await worker.redrive("email.send.dead", { ids: [deadLetter?.id ?? ""], sourceName: "email.send", limit: 1 })).toBe(1);
+      await waitFor("redriven job completed", async () => {
+        const rows = await admin<{ state: string }[]>`
+          select state from pgboss.job where name = 'email.send' and source_root_id = ${dead}`;
+        return rows.length === 1 && rows[0]?.state === "completed" ? true : undefined;
+      });
 
       await waitFor("cron fired", async () => (cronRuns.length > 0 ? true : undefined), 75_000);
       await worker.unschedule("rate_limit.cleanup");
