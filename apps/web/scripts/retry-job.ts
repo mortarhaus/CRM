@@ -1,10 +1,10 @@
 import { runRetryCommand } from "../src/jobs/retry";
-import { getWorkerEnv } from "../src/lib/env";
+import { parseJobsAdminEnv } from "../src/lib/env";
 
 // pnpm --filter @crm/web jobs:retry -- --queue <original queue> --id <dead-letter job id>; see --help (src/jobs/retry.ts).
 // No top-level await: tsx runs this package's scripts as CommonJS.
 runRetryCommand(process.argv.slice(2), {
-  workerUrl: () => getWorkerEnv().DATABASE_WORKER_URL,
+  workerUrl: () => parseJobsAdminEnv(process.env).DATABASE_WORKER_URL,
   out: console.log,
   err: console.error,
 }).then(

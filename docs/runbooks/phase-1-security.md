@@ -156,6 +156,44 @@ Verified: `security-headers.test.ts` (the policy strings and the header table); 
 nonce differs per load and is on every `<script>`; no CSP violation through sign-in, 2FA enrolment and workspace
 switching; `/api/health`'s policy; the cookie flags).
 
+## Email (PR 8, Task 26)
+
+Only the worker sends email; the web app queues an `email.send` job. The four settings go to the **worker
+container only**. The web container must not get them, and `RESEND_API_KEY` above all: the worker schema
+(`parseWorkerEnv`, `apps/web/src/lib/env.ts`) requires them, while the web schema neither needs nor keeps them.
+
+| Variable | Value | When |
+|---|---|---|
+| `EMAIL_PROVIDER` | `smtp` or `resend` | always |
+| `EMAIL_FROM` | a display name and one address, `Name <address>` | always. Dev: `CRM Dev <dev@localhost>`. Production (SaaS): to be set by Charlie (ASK 7) |
+| `SMTP_URL` | `smtp://` or `smtps://` URL, credentials in the URL if the server needs them | `EMAIL_PROVIDER=smtp` |
+| `RESEND_API_KEY` | the Resend API key | `EMAIL_PROVIDER=resend` |
+
+A missing or invalid setting stops the worker container at start (the entrypoint's environment check) with the
+variable's name, never its value. A failed send throws `EmailSendError`, whose message is the provider and its
+status only (SMTP reply code, HTTP status or a short code such as `network`), never the address or the key; the
+job is retried and then dead-lettered like any job (`jobs:retry`, `phase-1-database-roles.md`). `jobs:retry`
+reads only `DATABASE_WORKER_URL`, so it needs no email setting.
+
+- **Dev:** `docker/compose.dev.yml` sets the three SMTP settings on the `worker` service and runs Mailpit
+  (`axllent/mailpit`, pinned by tag and digest). Every message the worker sends is caught there: UI and API on
+  http://localhost:8025, SMTP on `127.0.0.1:1025`. For `pnpm worker:dev` on the host, uncomment the email lines in
+  `.env` (`SMTP_URL=smtp://localhost:1025`). The root `.env` is the `env_file` of every app container, web
+  included, so under compose it holds no email setting, and it never holds `RESEND_API_KEY`.
+- **Switching provider:** set `EMAIL_PROVIDER` and the matching `SMTP_URL` or `RESEND_API_KEY` in the worker's
+  environment, then restart `worker`. Jobs still queued are sent by the new provider.
+- **Rotating `RESEND_API_KEY`:** create a new key in Resend, put it in the host's secret store for the worker
+  (UNI-08; never in `.env` or the repository), restart `worker`, send a test email, then revoke the old key in
+  Resend.
+- **Sending domain (production):** the domain of `EMAIL_FROM` needs SPF, DKIM and DMARC records for the chosen
+  provider. The address and the owner of those DNS records: to be set by Charlie (ASK 7).
+- **Test email wording** (Charlie, ASK 8 = A, 2026-11-01): subject "Test email from CRM", body "This is a test
+  email sent from your CRM workspace settings. If you received it, email delivery works."
+  (`apps/web/src/emails/test-email.tsx`).
+
+Verified: `apps/web/src/adapters/email/contract.test.ts` runs the same cases against both adapters: SMTP against a
+Mailpit Testcontainer, Resend against a local stand-in server (no test calls the real Resend API, UNI-11).
+
 ## Commands
 
 | What | Command | Result |
@@ -164,3 +202,4 @@ switching; `/api/health`'s policy; the cookie flags).
 | Cleanup jobs | `pnpm vitest run apps/web/src/jobs/cleanup.test.ts` | Verified 2026-11-01 |
 | Header unit test | `pnpm vitest run apps/web/src/lib/security-headers.test.ts` | Verified 2026-11-01 |
 | Header E2E | `pnpm test:e2e e2e/security-headers.spec.ts` (from `apps/web`) | Verified 2026-11-01 against `next start` and `next dev` on a Testcontainers database (9 passed each) |
+| Email adapter contract | `pnpm vitest run apps/web/src/adapters` (Docker running: Mailpit Testcontainer) | Verified 2026-11-01 (5 passed) |
