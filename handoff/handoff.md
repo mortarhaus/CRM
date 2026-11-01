@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-events (worktree) · HEAD 64299e9
+# Handoff — 2026-11-01 · branch feat/p1-events (worktree) · HEAD 4ae6060
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -10,9 +10,9 @@
 - Working folder: `.agent/worktrees/build-feat-p1-events`. The main checkout is on `main`, but at `c599bd8`: it has not been fast-forwarded to `751ba3b`. It has untracked `.playwright-mcp/`, `docker/sync-export.sh` and `docker/sync-import.sh`, which are not mine.
 
 ## 1. Current PR / branch
-- PR #46 https://github.com/mortarhaus/CRM/pull/46 · branch `feat/p1-events` · base `main` (`751ba3bd`) · head **`64299e9`** (4 commits: `93fe31f` Task 19, `0088f8c` Task 20, `34a489d` merge of main/PR 47 (the only conflict was `docs/DECISIONS.md`, and both entries are kept), `64299e9` fix(jobs): `jobs:retry` redrives dead-letter jobs (closes PR 45 deferred P2-1))
+- PR #46 https://github.com/mortarhaus/CRM/pull/46 · branch `feat/p1-events` · base `main` (`751ba3bd`) · head **`4ae6060`** (5 commits: `93fe31f` Task 19, `0088f8c` Task 20, `34a489d` merge of main/PR 47 (the only conflict was `docs/DECISIONS.md`, and both entries are kept), `64299e9` fix(jobs): `jobs:retry` redrives dead-letter jobs (closes PR 45 deferred P2-1), `4ae6060` docs(jobs): retry comments and the 14-day redrive window)
 - Purpose: Phase 1 PR 6 (plan Tasks 19-20): `domain_event` with transactional pg-boss enqueue, `notification`, the PgBouncer pooler gate, and the `/api/health` queue check.
-- Status: `64299e9` pushed 2026-11-01; CI run 41277018455 on it was queued at push (not yet green). The previous head `34a489df` was green (run 41212515170). Bob's Round 1 (Blocked) findings are fixed in the PR body and this handoff. Charlie chose option A for EVT-05, and it is done in `64299e9`. The PR body is updated for the new head.
+- Status: `4ae6060` pushed 2026-11-01. Its CI started at push and was not finished at hand-back (not yet green). The previous head `34a489df` was green (run 41212515170). Bob's Round 1 (Blocked) findings are fixed in the PR body and this handoff. Charlie chose option A for EVT-05, and it is done in `64299e9` + `4ae6060`. The PR body is updated for `4ae6060`.
 - PR #47 (better-auth 1.7.14) merged 2026-10-31 as `751ba3b`. Its review, receipt and log are on `agent-logs`.
 
 ## 2. Milestones
@@ -23,6 +23,7 @@
 ## 3. Git state
 ```
 worktree build-feat-p1-events: ## feat/p1-events...origin/feat/p1-events (clean)
+4ae6060 docs(jobs): retry comments and the 14-day redrive window
 64299e9 fix(jobs): jobs:retry redrives dead-letter jobs (closes PR 45 deferred P2-1)
 34a489d merge: bring main (PR 47 better-auth 1.7.14) into feat/p1-events
 751ba3b Merge pull request #47 from mortarhaus/fix/audit-better-auth
@@ -36,13 +37,13 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 | (none) | | |
 
 ## 4. Just finished
-2026-11-01 `fix` for PR 46, after Charlie chose option A (close PR 45 deferred P2-1 in this PR). Commit `64299e9`, pushed normally. `jobs:retry` (`apps/web/src/jobs/retry.ts`) now calls pg-boss `redrive(<queue's deadLetter>, { ids: [id], sourceName: <queue>, limit: 1 })` instead of `retry()`. The flags are unchanged (`--queue <original queue> --id <id>`), but `--id` is now the dead-letter copy's id. The output is `job redriven`. The redrive creates a new `created` job in the source queue and deletes the copy. It works after the failed original is deleted. Tests: `retry.test.ts` 8 tests, written red first (6 of 7 failed against `retry()`). Two mutation checks both kill their mutant: without `sourceName`, and with a fixed `email.send.dead`. `worker-grants.test.ts` and `pooler.gate.test.ts` now redrive instead of calling `retry()`. They show zero `crm_worker` permission errors, and all 31 ablations still deny, so there is **no grant change and no migration**. I updated the runbook retry section and grant rows (`docs/runbooks/phase-1-database-roles.md`) and added a DECISIONS 2026-11-01 entry. PR body: new head, 4 commits, EVT-05 now pass, difference 8, size 38 files +4,297/-114. Checks on `64299e9`: typecheck 0, lint 0, `pnpm test` 793 passed (37 files), `test:gates` 1 passed, build 0 (bundle checks pass), audit (high) 0 with 5 moderate, `git diff --check` clean. Not run locally: the bundled `dist/retry-job.mjs` in the image, and `jobs:retry` against a dev DB (CI image E2E is the evidence). Skipped: Bob's optional P3 (event name/version check).
+2026-11-01 `fix` for PR 46, after Charlie chose option A (close PR 45 deferred P2-1 in this PR). Commit `64299e9`, pushed normally. `jobs:retry` (`apps/web/src/jobs/retry.ts`) now calls pg-boss `redrive(<queue's deadLetter>, { ids: [id], sourceName: <queue>, limit: 1 })` instead of `retry()`. The flags are unchanged (`--queue <original queue> --id <id>`), but `--id` is now the dead-letter copy's id. The output is `job redriven`. The redrive creates a new `created` job in the source queue and deletes the copy. It works after the failed original is deleted. Tests: `retry.test.ts` 8 tests, written red first (6 of 7 failed against `retry()`). Two mutation checks both kill their mutant: without `sourceName`, and with a fixed `email.send.dead`. `worker-grants.test.ts` and `pooler.gate.test.ts` now redrive instead of calling `retry()`. They show zero `crm_worker` permission errors, and all 31 ablations still deny, so there is **no grant change and no migration**. I updated the runbook retry section and grant rows (`docs/runbooks/phase-1-database-roles.md`) and added a DECISIONS 2026-11-01 entry. PR body: new head, 4 commits, EVT-05 now pass, difference 8, size 38 files +4,297/-114. Checks on `64299e9`: typecheck 0, lint 0, `pnpm test` 793 passed (37 files), `test:gates` 1 passed, build 0 (bundle checks pass), audit (high) 0 with 5 moderate, `git diff --check` clean. Not run locally: the bundled `dist/retry-job.mjs` in the image, and `jobs:retry` against a dev DB (CI image E2E is the evidence). Then a follow-up commit `4ae6060` fixed two stale comments (`scripts/retry-job.ts`, `handlers.ts`). It also made the runbook say to redrive within 14 days, because pg-boss's default `retentionSeconds` deletes the unfetched copy after that. At `4ae6060` I re-ran typecheck 0, lint 0, `retry.test.ts` 8 passed, build 0 and diff-check clean. The PR body is updated (5 commits, 39 files +4,300/-116). Skipped: Bob's optional P3 (event name/version check).
 
 ## 5. Next step (file-level)
-Wait for CI on `64299e9` to be green (run 41277018455). Then Charlie runs **`review 46`** (Bob, on Opus 5.5, as Round 1 asked). Then `approved 46` before the merge, and `merged 46` after it.
+Wait for CI on `4ae6060` to be green. Then Charlie runs **`review 46`** (Bob, on Opus 5.5, as Round 1 asked). Then `approved 46` before the merge, and `merged 46` after it.
 
 ## 6. Open ASK items, blockers, and owner answers
-- **Answered (2026-11-01):** PR 45's deferred P2-1 (EVT-05). Charlie chose **A**, to fix it in PR 46. It is done in `64299e9` (§4), and EVT-05 is now pass in the PR body.
+- **Answered (2026-11-01):** PR 45's deferred P2-1 (EVT-05). Charlie chose **A**, to fix it in PR 46. It is done in `64299e9` and `4ae6060` (§4), and EVT-05 is now pass in the PR body.
 - Note for the Phase 7 plan: `notification.target_type`/`target_id` has no same-workspace trigger (Bob Round 1 note).
 - Carried from 2026-10-28: ASK 5, the `.env` refresh, repo visibility, and the untracked files in the main checkout.
 - Owner answer this session: option A above.
@@ -54,7 +55,7 @@ Wait for CI on `64299e9` to be green (run 41277018455). Then Charlie runs **`rev
   - [P2] Handoff does not describe PR 46 -> fixed (this file and the `agent-logs` copy).
   - [P3] `emitEvent` does not check the event name or version -> optional, not done.
   - [P3] Size over 400 LOC -> accepted by the plan, disclosed in the body.
-- EVT-05 fixed in `64299e9` (PR 45 deferred P2-1 closed). Awaiting green CI, then Bob's Round 2 on `64299e9`.
+- EVT-05 fixed in `64299e9` (PR 45 deferred P2-1 closed). Awaiting green CI, then Bob's Round 2 on `4ae6060`.
 
 ## 8. Decisions made this session, not yet in the decisions log
 - None. The redrive switch is in `docs/DECISIONS.md` 2026-11-01 (committed in `64299e9`).
