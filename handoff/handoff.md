@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-rate-limits (worktree) · HEAD 5d76e37 · PR #48
+# Handoff — 2026-11-01 · branch feat/p1-rate-limits (worktree) · HEAD e5d2036 · PR #48
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -10,9 +10,9 @@
 - Working folder: `.agent/worktrees/build-feat-p1-rate-limits`. Main checkout untouched (untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine).
 
 ## 1. Current PR / branch
-- PR #48 https://github.com/mortarhaus/CRM/pull/48 · branch `feat/p1-rate-limits` (base origin/main `fe8664e`) · pushed normally, head **`5d76e37`**.
+- PR #48 https://github.com/mortarhaus/CRM/pull/48 · branch `feat/p1-rate-limits` (base origin/main `fe8664e`) · pushed normally, head **`e5d2036`**.
 - Purpose: Phase 1 PR 7 (plan Tasks 21-24): database rate limits, one client-IP derivation, Better Auth on the database limiter, per-account sign-in cap, uniform 429, Phase 1 enabled-path allow-list, AUTH-07, revoke-session-by-id, cleanup schedules.
-- Commits: `8e730a6` Task 21; `5efa3b0` Task 22; `0c23559` Task 23 (limiter on its own `crm_app` pool, Charlie 1A); `967c395` Task 24 (enabled paths + 404 layer, AUTH-07 hook + migration 0023, revokeOwnSession/revokeMySession, cleanups, origin pin, security-scan fix, Playwright per-test IP, runbook `phase-1-security.md`, DECISIONS); `5d76e37` docs (fourth PR #44 test named).
+- Commits: `8e730a6` Task 21; `5efa3b0` Task 22; `0c23559` Task 23 (limiter on its own `crm_app` pool, Charlie 1A); `967c395` Task 24 (enabled paths + 404 layer, AUTH-07 hook + migration 0023, revokeOwnSession/revokeMySession, cleanups, origin pin, security-scan fix, Playwright per-test IP, runbook `phase-1-security.md`, DECISIONS); `5d76e37` docs (fourth PR #44 test named); `e5d2036` docs (Task 22 details, 404/415 before counters, revoke-by-id shape in DECISIONS).
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1 PRs 1-6 (#39, #41, #43, #44, #45, #46) and #47.
@@ -22,6 +22,7 @@
 ## 3. Git state
 ```
 worktree build-feat-p1-rate-limits: ## feat/p1-rate-limits...origin/feat/p1-rate-limits (clean)
+e5d2036 docs: record the Task 22 details and the revoke-by-id shape in the PR 7 decision
 5d76e37 docs: name the fourth PR #44 test in the PR 7 decision
 967c395 feat(auth): only Phase 1 Better Auth paths reachable; worker-owned cleanup schedules
 0c23559 feat(auth): database-backed Better Auth limits, per-account sign-in failures, uniform 429
@@ -38,19 +39,19 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 2026-11-01 PR #48 opened by the Opus 5.5 helper. Checks at `967c395`: typecheck 0, lint 0, `pnpm test` 45 files 921 passed 1 skipped (runIf), `test:gates` 1 passed, build 0, audit 0 (5 moderate), auth E2E 84 passed (throwaway Postgres, `next dev` 3100, no `E2E_RATE_LIMITED`), `git diff --check` clean. Security scan finding (HIGH, parser differential in `request-handler.ts`) fixed fail-closed: 415 for non-JSON sign-in, shared `acct:signin:unreadable` key; in DECISIONS and PR body. `pnpm smoke:auth-route` FAILED locally only because the worktree root `.env` is stale (Phase 0 user `crm`); CI image job runs it. CI on `5d76e37` pending at PR open.
 
 ## 5. Next step (file-level)
-`review 48` (Bob), on head `5d76e37`, once CI is green.
+`review 48` (Bob), on head `e5d2036`, once CI is green.
 
 ## 6. Open ASK items, blockers, and owner answers
 1. Decided (Charlie 1A, 2026-11-01): limiter on its own autocommit `crm_app` pool (`LIMITER_POOL_MAX` 2; R4 14 per web process). In DECISIONS and PR #48.
 2. Decided (Charlie 2A, 2026-11-01): `/change-password` refused without `revokeOtherSessions: true`. In DECISIONS and PR #48.
-3. Recorded for Bob: per-row keys `ba:<row>:<ip>` (DECISIONS + PR "Differences" item 3).
-4. Carried: ASK 5, the `.env` refresh (now also blocks local `pnpm smoke:auth-route`: `/api/auth/ok` needs the database since PR 7), repo visibility, untracked files in the main checkout. Dev volume `crm-dev_pgdata` not migrated to 0021-0023.
+3. For Bob (in PR #48): revoke-by-id is a server function, not an `action()` (workspace-scoped); is a user-scoped wrapper wanted? Also recorded: per-row keys `ba:<row>:<ip>` (DECISIONS + PR "Differences" item 3).
+4. Carried: ASK 5, the `.env` refresh (now also blocks local `pnpm smoke:auth-route`: `/api/auth/ok` needs the database since PR 7), repo visibility, untracked files in the main checkout. Dev volume `crm-dev_pgdata` not migrated to 0021-0023; the helper started dev compose `postgres`+`bootstrap` once for the smoke attempt (bootstrap re-applied role passwords from the worktree `.env`), then stopped and removed them.
 
 ## 7. Open review findings (P0/P1) and verdict
 - No review yet for PR #48. PR 46: merged; review, receipt and log on agent-logs.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- None: all in `docs/DECISIONS.md` 2026-11-01 PR 7 entry.
+- None open: Step 3a IP, IPv6 /64, `session.ts` header strip, migrations 0021-0023, revoke-by-id shape are all in `docs/DECISIONS.md` 2026-11-01 PR 7 entry (commit `e5d2036`).
 
 ## 9. Files touched but not committed
 - None in the worktree. Scratch files only in the helper's scratchpad.
@@ -409,4 +410,4 @@ Opus 5.5 (auth, rate limits and review fixes are the deep tier). Sonnet 5 only f
 ## 2026-11-01 build PR 7 (feat/p1-rate-limits) partial
 - Tasks 21-22 committed and pushed (8e730a6, 5efa3b0). Task 23 uncommitted (4 files, §3). No PR. Blocked on two decisions for Charlie: limiter consume inside the request transaction (lock scope, 500s under contention) and AUTH-07 password change. Next: those answers, then finish Tasks 23-24.
 
-- 2026-11-01 Phase 1 PR 7 opened: PR #48 (feat/p1-rate-limits, head 5d76e37). Charlie 1A/2A built; security-scan HIGH fixed. Next: review 48.
+- 2026-11-01 Phase 1 PR 7 opened: PR #48 (feat/p1-rate-limits, head e5d2036). Charlie 1A/2A built; security-scan HIGH fixed. Next: review 48.
