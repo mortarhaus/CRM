@@ -1,5 +1,5 @@
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
-import { mkdirSync, rmdirSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, rmdirSync, statSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { createServer } from "node:net";
 import path from "node:path";
@@ -10,10 +10,14 @@ import { fileURLToPath } from "node:url";
 const WEB_ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const NEXT_BIN = path.join(WEB_ROOT, "node_modules/next/dist/bin/next");
 const BUILD_LOCK = path.join(WEB_ROOT, ".next-test-build.lock");
+// The run id (run-id.global.ts) of the last test build, inside .next.
+const BUILD_STAMP = path.join(WEB_ROOT, ".next", "test-run-id");
 const LOCK_STALE_MS = 10 * 60_000;
 const READY_TIMEOUT_MS = 60_000;
 // The app's variables; a child gets only the ones a test sets (the root .env fills nothing a test sets).
 const APP_VARS = ["DATABASE_URL", "AUTH_SECRET", "APP_URL", "DATABASE_MIGRATOR_URL", "DEPLOYMENT_MODE", "TRUSTED_CLIENT_IP_HEADER"];
+// The test runner's own markers: a child must run as production does (Better Auth reads TEST, see config.ts).
+const RUNNER_VARS = /^(TEST|VITEST.*|NODE_ENV)$/;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -21,7 +25,8 @@ function sleep(ms: number): Promise<void> {
 
 let built = false;
 
-// `pnpm --filter @crm/web build`, once per test process; test files in parallel workers take turns (one .next).
+// `pnpm --filter @crm/web build`, once per `vitest run` (run-id.global.ts): test files in parallel workers take turns
+// at the lock, and a later one reuses the build instead of rewriting .next under the servers of an earlier one.
 export async function buildWeb(): Promise<void> {
   if (built) return;
   for (;;) {
@@ -35,7 +40,17 @@ export async function buildWeb(): Promise<void> {
     }
   }
   try {
-    execFileSync("pnpm", ["--filter", "@crm/web", "build"], { cwd: WEB_ROOT, stdio: "ignore" });
+    const runId = process.env.CRM_TEST_RUN_ID;
+    let stamp: string | undefined;
+    try {
+      stamp = readFileSync(BUILD_STAMP, "utf8");
+    } catch {
+      stamp = undefined;
+    }
+    if (runId === undefined || stamp !== runId) {
+      execFileSync("pnpm", ["--filter", "@crm/web", "build"], { cwd: WEB_ROOT, stdio: "ignore" });
+      if (runId !== undefined) writeFileSync(BUILD_STAMP, runId);
+    }
     built = true;
   } finally {
     rmdirSync(BUILD_LOCK);
@@ -63,7 +78,9 @@ export interface NextServer {
 
 export async function startNext(env: Record<string, string>): Promise<NextServer> {
   const port = await freePort();
-  const base = Object.fromEntries(Object.entries(process.env).filter(([name]) => !APP_VARS.includes(name)));
+  const base = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !APP_VARS.includes(name) && !RUNNER_VARS.test(name)),
+  );
   const child: ChildProcess = spawn(process.execPath, [NEXT_BIN, "start", "--port", String(port), "--hostname", "127.0.0.1"], {
     cwd: WEB_ROOT,
     env: { ...base, ...env, NODE_ENV: "production" } as NodeJS.ProcessEnv,

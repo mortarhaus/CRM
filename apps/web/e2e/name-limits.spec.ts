@@ -1,5 +1,5 @@
 import { NAME_MAX_LENGTH, WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { PASSWORD, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
 
 // UNI-02: the server counts characters (code points); an emoji is two UTF-16 units, so a native

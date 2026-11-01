@@ -24,6 +24,7 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...table("session", "SELECT", "INSERT", "DELETE"),
     ...columns("session", "UPDATE", "active_organization_id", "expires_at", "updated_at"),
     ...table("account", "SELECT", "INSERT"),
+    ...columns("account", "UPDATE", "password", "updated_at"), // the password change (migration 0023)
     ...table("verification", "SELECT", "INSERT", "DELETE"),
     ...table("two_factor", "SELECT", "INSERT", "DELETE"),
     ...columns("two_factor", "UPDATE", "backup_codes", "failed_verification_count", "locked_until", "secret", "verified"),

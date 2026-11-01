@@ -8,23 +8,12 @@ import * as schema from "../../db/schema";
 import { createAuthTransactions, ensureBillingAccount, ensureWorkspaceSettings, lockAuthUsers } from "../../db/system";
 import { isHttpsUrl, isLoopbackUrl } from "../origin";
 import { CLIENT_IP_HEADER } from "./client-ip";
+import { disabledPathsOf, endpointPathsOf } from "./enabled-paths";
 import { enforceInputLimits } from "./input-limits";
 import { logAuth } from "./log";
 import { rateLimitOptions } from "./rate-limit-rules";
 import { withRequestTransactions } from "./request-transaction";
 import { crmSessionAudit, labelSessionIssue } from "./session-audit";
-
-// Invitations are a Phase 3 feature (plan Task 10; Task 24 replaces this with the full Phase 1 allow-list).
-// disabledPaths applies to HTTP requests: Better Auth answers 404 before any handler runs.
-export const INVITATION_PATHS = [
-  "/organization/invite-member",
-  "/organization/accept-invitation",
-  "/organization/reject-invitation",
-  "/organization/cancel-invitation",
-  "/organization/get-invitation",
-  "/organization/list-invitations",
-  "/organization/list-user-invitations",
-] as const;
 
 export interface AuthDeps {
   db: Database;
@@ -43,7 +32,7 @@ export function authOptions({
   adapterDb = db,
   limiterDb = db,
 }: Omit<AuthDeps, "limiterDb"> & { adapterDb?: Database; limiterDb?: Database }) {
-  return {
+  const options = {
     appName: "CRM",
     secret,
     baseURL,
@@ -55,6 +44,10 @@ export function authOptions({
       database: { generateId: "uuid" },
       // Only the address prepareAuthRequest derived (plan Task 22): it strips any caller copy first.
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
+      // Origin and CSRF checks on everywhere. Better Auth 1.7.14 turns both off when it thinks it runs under test
+      // (context/create-context.mjs:211: NODE_ENV=test or a truthy TEST variable, core env/env-impl.mjs:36), so a
+      // stray TEST in a deployment would disable them; stating it pins them on (plan Task 24, enabled-paths.test.ts).
+      disableOriginCheck: false,
     },
     // Info-level lines include user emails (e.g. duplicate sign-up attempts); logs must carry no PII. logAuth
     // also drops a failed query's SQL and parameters.
@@ -75,7 +68,6 @@ export function authOptions({
         },
       },
     },
-    disabledPaths: [...INVITATION_PATHS],
     // Database-backed limits (spec "Rate limits"; plan Task 23), consumed on the limiter's own pool.
     rateLimit: rateLimitOptions(limiterDb),
     emailAndPassword: {
@@ -113,6 +105,8 @@ export function authOptions({
       crmSessionAudit({ lockUsers: (keys) => lockAuthUsers(adapterDb, keys) }),
     ],
   } satisfies BetterAuthOptions;
+  // Only the Phase 1 paths are reachable over HTTP (plan Task 24; enabled-paths.ts); invitations among the rest.
+  return { ...options, disabledPaths: disabledPathsOf(endpointPathsOf(options)) } satisfies BetterAuthOptions;
 }
 
 export class SharedLimiterPoolError extends Error {

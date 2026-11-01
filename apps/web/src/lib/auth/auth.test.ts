@@ -314,6 +314,59 @@ describe("input limits enforced on the server (owner decision 2026-10-14)", () =
   });
 });
 
+// AUTH-07 (Charlie 2026-11-01, decision 2 A): a password change ends every other session. Better Auth 1.7.14 does
+// that only when the body says `revokeOtherSessions: true` (api/routes/update-user.mjs:174), so a request without it
+// is refused before the endpoint runs.
+describe("AUTH-07: a password change signs out every other session", () => {
+  const NEW_PASSWORD = `${PASSWORD} changed`;
+
+  it.each([
+    ["without the flag", {}],
+    ["with the flag false", { revokeOtherSessions: false }],
+  ])("refuses a change %s and keeps the password", async (_label, flag) => {
+    const email = uniqueEmail();
+    const headers = await signUpAndSignIn(email);
+    expect(await viaHttp("/change-password", { currentPassword: PASSWORD, newPassword: NEW_PASSWORD, ...flag }, headers)).toEqual({
+      status: 400,
+      code: "REVOKE_OTHER_SESSIONS_REQUIRED",
+    });
+    const signIn = await auth.api.signInEmail({ body: { email, password: PASSWORD }, asResponse: true });
+    expect(signIn.status).toBe(200);
+  });
+
+  it("refuses it through auth.api too", async () => {
+    const headers = await signUpAndSignIn(uniqueEmail());
+    expect(
+      await viaApi(() => auth.api.changePassword({ body: { currentPassword: PASSWORD, newPassword: NEW_PASSWORD }, headers })),
+    ).toEqual({ status: 400, code: "REVOKE_OTHER_SESSIONS_REQUIRED" });
+  });
+
+  it("with the flag, the other session is gone and the caller gets a new one", async () => {
+    const email = uniqueEmail();
+    const first = await signUpAndSignIn(email);
+    const signIn = await auth.api.signInEmail({ body: { email, password: PASSWORD }, asResponse: true });
+    const second = cookieHeaders(signIn);
+    expect(await auth.api.getSession({ headers: second })).not.toBeNull();
+
+    const requestHeaders = new Headers(first);
+    requestHeaders.set("content-type", "application/json");
+    requestHeaders.set("origin", "http://localhost:3000");
+    const response = await auth.handler(
+      new Request("http://localhost:3000/api/auth/change-password", {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify({ currentPassword: PASSWORD, newPassword: NEW_PASSWORD, revokeOtherSessions: true }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await auth.api.getSession({ headers: second })).toBeNull();
+    expect(await auth.api.getSession({ headers: first })).toBeNull();
+    expect(await auth.api.getSession({ headers: cookieHeaders(response) })).not.toBeNull();
+    const { id } = await findUser(email);
+    expect(await handle.db.select().from(session).where(eq(session.userId, id))).toHaveLength(1);
+  });
+});
+
 describe("Unicode passwords (NFC, owner decision 2026-10-14)", () => {
   const COMPOSED = "café crème brûlée";
   const DECOMPOSED = COMPOSED.normalize("NFD");

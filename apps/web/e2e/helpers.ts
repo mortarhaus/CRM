@@ -8,8 +8,9 @@ export function uniqueEmail(): string {
   return `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
 }
 
-// Better Auth's built-in limiter (NODE_ENV=production only) allows 3 requests per 10 s per path
-// on /sign-in*, /sign-up* and /two-factor/*. Set E2E_RATE_LIMITED=1 when testing the production image.
+// Phase 0 waited out Better Auth's built-in 3 per 10 s. Phase 1 limits are on everywhere (10 per 60 s for sign-in,
+// 10 per hour for sign-up, per client IP; docs/runbooks/phase-1-security.md) and every test has its own client IP
+// (fixtures.ts), so no test comes near them; the wait stays behind E2E_RATE_LIMITED=1 as a margin for the image run.
 export async function respectRateLimit(page: Page): Promise<void> {
   if (process.env.E2E_RATE_LIMITED === "1") await page.waitForTimeout(11_000);
 }

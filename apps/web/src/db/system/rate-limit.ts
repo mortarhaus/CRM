@@ -1,6 +1,7 @@
 import { RATE_LIMIT_ROW_RETENTION_SECONDS } from "@crm/core/security";
 import { sql } from "drizzle-orm";
 import type { Database } from "../client";
+import { getDb } from "../index";
 
 // The database rate-limit counters (spec "Authentication and sessions" → "Rate limits"; AUTH-06; plan Task 21).
 // `rate_limit` is a system table without RLS: only this module reads or writes it (TEN-10). Keys are prefixed
@@ -58,4 +59,9 @@ export async function cleanupExpired(db: Database, now: Date | null): Promise<nu
     delete from rate_limit
     where window_start + make_interval(secs => window_seconds + ${RATE_LIMIT_ROW_RETENTION_SECONDS}) < ${at}`);
   return deleted.count;
+}
+
+// The worker's job (jobs/cleanup.ts): the same delete on the process's crm_app pool, at the database clock.
+export function cleanupExpiredCounters(): Promise<number> {
+  return cleanupExpired(getDb().db, null);
 }

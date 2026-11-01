@@ -503,16 +503,10 @@ describe("Step 3a (plan Task 22): the audit IP is the derived client IP, never a
   });
 });
 
-// crm_app holds no UPDATE on account until plan Task 24 enables the password change; a test database of its own
-// gets the two columns Better Auth writes, so /change-password reaches its rotation.
-async function grantPasswordChange(admin: postgres.Sql): Promise<void> {
-  await admin.unsafe("GRANT UPDATE (password, updated_at) ON public.account TO crm_app");
-}
-
 describe("T2 (R2): no session exists without its audit row", () => {
-  it("the password-change path reaches its rotation (with the test-only grant): one rotation row, A′ only", async () => {
+  // crm_app holds UPDATE (password, updated_at) on account since migration 0023 (plan Task 24).
+  it("the password-change path reaches its rotation: one rotation row, A′ only", async () => {
     const { stack, auth: instance } = await isolated();
-    await grantPasswordChange(stack.admin);
     const person = await signUp(instance, stack.admin);
     const jar = await signIn(instance, person.email);
     const other = await signIn(instance, person.email);
@@ -615,7 +609,6 @@ describe("T2 (R2): no session exists without its audit row", () => {
       "rotation on password change",
       {
         async setup(instance, admin) {
-          await grantPasswordChange(admin);
           const person = await signUp(instance, admin);
           const jar = await signIn(instance, person.email);
           const act = () =>
@@ -1366,7 +1359,7 @@ describe("T8 (R8): a trusted-device cookie cannot skip the 2FA challenge", () =>
 });
 
 describe("T9 (R9): trusted devices are refused", () => {
-  it("trusted devices refused: 400 on both verify paths with trustDevice: true", async () => {
+  it("trusted devices refused: 400 on both Phase 1 verify paths with trustDevice: true", async () => {
     const person = await withTwoFactor(auth, main.admin);
     const jar = await challenge(auth, person.email);
     const totp = await http(auth, "POST", "/two-factor/verify-totp", { body: { code: code(person.totp), trustDevice: true }, jar });
@@ -1374,8 +1367,11 @@ describe("T9 (R9): trusted devices are refused", () => {
       body: { code: person.backupCodes[0], trustDevice: true },
       jar,
     });
+    // verify-otp is not a Phase 1 path (plan Task 24): 404 before the refusal could run.
     const otp = await http(auth, "POST", "/two-factor/verify-otp", { body: { code: "123456", trustDevice: true }, jar });
-    for (const reply of [totp, recovery, otp]) {
+    expect(otp.status).toBe(404);
+    expect(setsSession(otp)).toBe(false);
+    for (const reply of [totp, recovery]) {
       expect(reply.status).toBe(400);
       expect(bodyField(reply, "code")).toBe("TRUST_DEVICE_DISABLED");
       expect(setsSession(reply)).toBe(false);

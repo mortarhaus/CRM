@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createAuth, INVITATION_PATHS, type Auth } from "../../lib/auth/config";
+import { createAuth, type Auth } from "../../lib/auth/config";
 import { startDatabase, type TestDatabase } from "../../test/postgres";
 import { createDb, type DbHandle } from "../client";
 import { billingAccount, member, organization, session, twoFactor, user, workspaceSettings } from "../schema";
@@ -182,9 +182,10 @@ describe("Better Auth endpoints: U1 cannot read or change W2", () => {
 
   it("/organization/get-full-organization refuses W2 by id and with a stale active workspace", async () => {
     const byId = await http("GET", `/organization/get-full-organization?organizationId=${u2.workspaceId}`, undefined, u1.headers);
-    expect(byId.status).toBe(403);
+    // Not enabled in Phase 1 (enabled-paths.ts): 404 since Task 24, 403 from Better Auth's own check before.
+    expect(byId.status).toBe(404);
     await makeStale(u1, u2.workspaceId);
-    expect((await http("GET", "/organization/get-full-organization", undefined, u1.headers)).status).toBe(403);
+    expect((await http("GET", "/organization/get-full-organization", undefined, u1.headers)).status).toBe(404);
   });
 
   it("/organization/list lists W1 only", async () => {
@@ -255,7 +256,8 @@ describe("Better Auth endpoints: U1 cannot read or change W2", () => {
   });
 });
 
-// Reachable in this PR and disabled by Task 24's Phase 1 allow-list; until then Better Auth's own checks hold.
+// Disabled by Task 24's Phase 1 allow-list (404); the refusals below hold either way, and would again if one of
+// these paths is enabled later.
 describe("Better Auth member endpoints: U1 cannot read or change W2's members", () => {
   async function u2MemberId(): Promise<string> {
     const [row] = await handle.db.select().from(member).where(eq(member.userId, u2.userId));
@@ -342,6 +344,7 @@ describe("invitation endpoints are disabled in Phase 1 (plan Tasks 10 and 24)", 
       .map((endpoint) => (endpoint as { path?: string }).path)
       .filter((path): path is string => typeof path === "string" && /invit/i.test(path));
     expect(exposed.length).toBeGreaterThan(0);
-    expect([...exposed].sort()).toEqual([...INVITATION_PATHS].sort());
+    // Since Task 24 every path outside the Phase 1 allow-list is disabled (enabled-paths.ts), these among them.
+    expect(auth.options.disabledPaths).toEqual(expect.arrayContaining(exposed));
   });
 });

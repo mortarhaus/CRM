@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../client";
 import { getDb } from "../index";
-import { member, workspaceSettings } from "../schema";
+import { member, organization, workspaceSettings } from "../schema";
 import { runInWorkspace } from "../workspace";
 
 export const WORKSPACE_ROLES = ["owner", "admin", "staff"] as const;
@@ -54,4 +54,10 @@ export async function healWorkspaceSettings(workspaceId: string): Promise<void> 
     tx.select({ workspaceId: workspaceSettings.workspaceId }).from(workspaceSettings).limit(1),
   );
   if (present.length === 0) await ensureWorkspaceSettings(db, workspaceId);
+}
+
+// Every workspace id, for the worker's per-workspace jobs (idempotency.cleanup): each then runs in withWorkspace.
+export async function listWorkspaceIds(db: Database = getDb().db): Promise<string[]> {
+  const rows = await db.select({ id: organization.id }).from(organization).orderBy(organization.id);
+  return rows.map((row) => row.id);
 }

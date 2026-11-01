@@ -79,13 +79,15 @@ describe("startWorker", () => {
     const worker = await startWorker({ appDb, workerUrl: database.workerUrl, log: () => {} });
     const sender = new PgBoss({ ...SEND_BOSS_OPTIONS, connectionString: database.appUrl });
     await sender.start();
-    // idempotency.cleanup has no handler until plan Task 24 (domain_event has one since Task 19).
-    const id = await sender.send("idempotency.cleanup", { workspaceId: crypto.randomUUID() });
+    // email.send has no handler until plan Task 27 (domain_event since Task 19, the two cleanups since Task 24).
+    const id = await sender.send("email.send", { workspaceId: crypto.randomUUID(), userId: crypto.randomUUID() });
     await sender.stop();
     await new Promise((resolve) => setTimeout(resolve, 3_000));
     const [row] = await admin<{ state: string }[]>`select state from pgboss.job_common where id = ${id ?? ""}`;
     expect(row?.state).toBe("created");
     await worker.stop();
+    // The waiting job would be the next test's first email.send job.
+    await admin`delete from pgboss.job_common where id = ${id ?? ""}`;
   });
 
   it("stops within Docker's 10 s while a handler never finishes and holds a crm_app query, and fails the job", async () => {

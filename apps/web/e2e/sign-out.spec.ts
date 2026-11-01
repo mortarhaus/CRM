@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 import { failServerActions, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
 
 const SIGN_OUT_FAILED = "We couldn't sign you out. Try again.";

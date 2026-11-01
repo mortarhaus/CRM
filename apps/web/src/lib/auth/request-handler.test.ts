@@ -6,7 +6,13 @@ import { BASE_URL, CookieJar, PASSWORD, SECRET } from "../../test/auth-harness";
 import { startDatabase, type TestDatabase } from "../../test/postgres";
 import { totpFromUri, wrongTotpCode } from "../../test/totp";
 import { createAuth } from "./config";
-import { accountKeyHmacKey, accountKeyOf, authRequestHandler, TOO_MANY_REQUESTS_BODY } from "./request-handler";
+import {
+  accountKeyHmacKey,
+  accountKeyOf,
+  authRequestHandler,
+  TOO_MANY_REQUESTS_BODY,
+  UNREADABLE_SIGN_IN_KEY,
+} from "./request-handler";
 
 // Plan Task 23 Steps 2 and 3, in process against a real Better Auth 1.7.14 and the limiter pool. The same rows across
 // two `next start` processes, the form path and the edge are in rate-limit.test.ts.
@@ -16,6 +22,8 @@ let admin: postgres.Sql;
 let app: DbHandle;
 let limiter: DbHandle;
 let handle: (request: Request) => Promise<Response>;
+// Requests that reached Better Auth's handler.
+let reachedBetterAuth = 0;
 
 beforeAll(async () => {
   database = await startDatabase();
@@ -23,7 +31,14 @@ beforeAll(async () => {
   app = createDb(database.appUrl);
   limiter = createDb(database.appUrl, { max: 2 });
   const auth = createAuth({ db: app.db, limiterDb: limiter.db, secret: SECRET, baseURL: BASE_URL });
-  handle = authRequestHandler({ handler: (request) => auth.handler(request), limiterDb: limiter.db, secret: SECRET });
+  handle = authRequestHandler({
+    handler: (request) => {
+      reachedBetterAuth += 1;
+      return auth.handler(request);
+    },
+    limiterDb: limiter.db,
+    secret: SECRET,
+  });
 });
 
 afterAll(async () => {
@@ -150,10 +165,67 @@ describe("sign-in failures per account (5 per 15 minutes)", () => {
     ]);
   });
 
-  it("skips a body without a string email: Better Auth answers it as before, and no account row is written", async () => {
-    expect((await post("/sign-in/email", "not json")).status).toBe(400);
-    expect((await post("/sign-in/email", { email: 42, password: PASSWORD })).status).toBe(400);
-    expect(await admin`select key from rate_limit where key like 'acct:%'`).toEqual([]);
+});
+
+// Security scan finding (2026-11-01, HIGH, parser differential): a sign-in whose email this layer could not read
+// skipped the account count while Better Auth might still read it. Now the layer refuses every media type Better Auth
+// would refuse (415, before Better Auth runs), and counts a JSON body it cannot read on one shared key.
+describe("sign-in bodies the account key cannot read: fail closed", () => {
+  function raw(body: BodyInit, contentType: string | null, ip = nextIp()): Promise<Response> {
+    const headers = new Headers({ origin: BASE_URL, "x-crm-client-ip": ip });
+    if (contentType !== null) headers.set("content-type", contentType);
+    return handle(new Request(`${BASE_URL}/api/auth/sign-in/email`, { method: "POST", headers, body }));
+  }
+
+  async function accountCount(key: string): Promise<number | undefined> {
+    const [row] = await admin<{ count: number }[]>`select count from rate_limit where key = ${key}`;
+    return row?.count;
+  }
+
+  it.each([
+    ["urlencoded", () => new URLSearchParams({ email: "x@example.test", password: PASSWORD }), "application/x-www-form-urlencoded"],
+    ["multipart", () => Object.assign(new FormData(), {}), "multipart/form-data; boundary=----x"],
+    ["text/plain", () => JSON.stringify({ email: "x@example.test", password: PASSWORD }), "text/plain"],
+    ["no Content-Type", () => JSON.stringify({ email: "x@example.test", password: PASSWORD }), null],
+    ["a JSON suffix type", () => JSON.stringify({ email: "x@example.test", password: PASSWORD }), "application/vnd.api+json"],
+  ] as const)("refuses %s with 415 before Better Auth runs", async (_label, body, contentType) => {
+    const before = reachedBetterAuth;
+    const response = await raw(body() as BodyInit, contentType);
+    expect(response.status).toBe(415);
+    expect(await response.json()).toMatchObject({ code: "UNSUPPORTED_MEDIA_TYPE" });
+    expect(reachedBetterAuth).toBe(before);
+  });
+
+  it("refuses a multipart body that carries the fields too", async () => {
+    const form = new FormData();
+    form.set("email", "x@example.test");
+    form.set("password", PASSWORD);
+    const before = reachedBetterAuth;
+    expect((await handle(new Request(`${BASE_URL}/api/auth/sign-in/email`, { method: "POST", headers: { origin: BASE_URL }, body: form }))).status).toBe(415);
+    expect(reachedBetterAuth).toBe(before);
+  });
+
+  it.each([
+    ["malformed JSON", "{\"email\": "],
+    ["a JSON string", JSON.stringify("x@example.test")],
+    ["a non-string email", JSON.stringify({ email: 42, password: PASSWORD })],
+    ["no email", JSON.stringify({ password: PASSWORD })],
+  ])("counts %s on the shared unreadable-body key, and Better Auth answers 400", async (_label, body) => {
+    const before = (await accountCount(UNREADABLE_SIGN_IN_KEY)) ?? 0;
+    expect((await raw(body, "application/json")).status).toBe(400);
+    expect(await accountCount(UNREADABLE_SIGN_IN_KEY)).toBe(before + 1);
+  });
+
+  it("counts JSON with charset, upper-case type, and a cased or padded email on the same account key as plain JSON", async () => {
+    const email = uniqueEmail();
+    const key = accountKeyOf(accountKeyHmacKey(SECRET), email);
+    const body = (value: string) => JSON.stringify({ email: value, password: `${PASSWORD} wrong` });
+    await raw(body(email), "application/json");
+    await raw(body(email.toUpperCase()), "application/json; charset=utf-8");
+    await raw(body(`  ${email}  `), "Application/JSON");
+    await raw(body(email.replace("limit", "LiMiT")), "application/json;charset=UTF-8");
+    expect(await accountCount(key)).toBe(4);
+    expect(await accountCount(UNREADABLE_SIGN_IN_KEY)).toBeUndefined();
   });
 });
 

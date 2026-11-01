@@ -12,6 +12,7 @@ export default defineConfig({
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
     // The gates run with `pnpm test:gates` (vitest.gates.config.mts).
     exclude: [...configDefaults.exclude, "**/*.gate.test.ts"],
+    globalSetup: ["src/test/run-id.global.ts"],
     testTimeout: 30_000,
     hookTimeout: 180_000,
   },

@@ -162,6 +162,13 @@
       "when": 1793516088044,
       "tag": "0022_rate_limit_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793519691505,
+      "tag": "0023_password_change_grant",
+      "breakpoints": true
     }
   ]
 }
