@@ -381,8 +381,9 @@ queue options, `notify` included, and the schema version change only in migratio
 
 A job whose retries are exhausted is `failed` in its own queue, and a copy lands in the queue's dead-letter queue
 (`email.send.dead`, `domain_event.dead`) in state `created`. No worker works the dead-letter queues. pg-boss deletes
-the failed original after the queue's `deleteAfterSeconds` (7 days by default); the copy stays until its own
-retention ends. To run the job again once the cause is fixed, **redrive the copy**: pass the **original queue** and
+the failed original after the queue's `deleteAfterSeconds` (7 days by default). The copy is never fetched, so
+maintenance deletes it when its `retentionSeconds` ends (14 days by default; migration 0016 sets no retention on the
+`.dead` queues): **redrive within 14 days of the failure**, or the job is gone. To run the job again once the cause is fixed, **redrive the copy**: pass the **original queue** and
 the **copy's id**, as `crm_worker`:
 
 ```sql

@@ -3,7 +3,7 @@ import { domainEventHandler } from "./domain-event";
 import type { Log } from "./log";
 
 // The application queues the worker works (migrations 0016 and 0017 create them). The dead-letter queues have no
-// handler: a job there waits for the admin command (scripts/retry-job.ts retries the failed original).
+// handler: a job there waits for the admin command (scripts/retry-job.ts redrives the copy back to its queue).
 export const QUEUE_NAMES = ["domain_event", "email.send", "rate_limit.cleanup", "idempotency.cleanup"] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];
 
