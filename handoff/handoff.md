@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-rate-limits (worktree) · HEAD e5d2036 · PR #48
+# Handoff — 2026-11-01 · branch feat/p1-rate-limits (worktree) · HEAD 69b738f · PR #48
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -10,9 +10,9 @@
 - Working folder: `.agent/worktrees/build-feat-p1-rate-limits`. Main checkout untouched (untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine).
 
 ## 1. Current PR / branch
-- PR #48 https://github.com/mortarhaus/CRM/pull/48 · branch `feat/p1-rate-limits` (base origin/main `fe8664e`) · pushed normally, head **`e5d2036`**.
+- PR #48 https://github.com/mortarhaus/CRM/pull/48 · branch `feat/p1-rate-limits` (base origin/main `fe8664e`) · pushed normally, head **`69b738f`**.
 - Purpose: Phase 1 PR 7 (plan Tasks 21-24): database rate limits, one client-IP derivation, Better Auth on the database limiter, per-account sign-in cap, uniform 429, Phase 1 enabled-path allow-list, AUTH-07, revoke-session-by-id, cleanup schedules.
-- Commits: `8e730a6` Task 21; `5efa3b0` Task 22; `0c23559` Task 23 (limiter on its own `crm_app` pool, Charlie 1A); `967c395` Task 24 (enabled paths + 404 layer, AUTH-07 hook + migration 0023, revokeOwnSession/revokeMySession, cleanups, origin pin, security-scan fix, Playwright per-test IP, runbook `phase-1-security.md`, DECISIONS); `5d76e37` docs (fourth PR #44 test named); `e5d2036` docs (Task 22 details, 404/415 before counters, revoke-by-id shape in DECISIONS).
+- Commits: `8e730a6` Task 21; `5efa3b0` Task 22; `0c23559` Task 23 (limiter on its own `crm_app` pool, Charlie 1A); `967c395` Task 24 (enabled paths + 404 layer, AUTH-07 hook + migration 0023, revokeOwnSession/revokeMySession, cleanups, origin pin, security-scan fix, Playwright per-test IP, runbook `phase-1-security.md`, DECISIONS); `5d76e37` docs (fourth PR #44 test named); `e5d2036` docs (Task 22 details, 404/415 before counters, revoke-by-id shape in DECISIONS); `69b738f` fix(image): CI image job failed on `e5d2036` (worker exited 1: `migrate.mjs` parsed the web schema, which needs the web-only `TRUSTED_CLIENT_IP_HEADER` in production); entrypoint now passes the role, `migrateEnvFor` checks each container's own schema; CI prints service logs on a failed stack start.
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1 PRs 1-6 (#39, #41, #43, #44, #45, #46) and #47.
@@ -22,6 +22,7 @@
 ## 3. Git state
 ```
 worktree build-feat-p1-rate-limits: ## feat/p1-rate-limits...origin/feat/p1-rate-limits (clean)
+69b738f fix(image): each container checks only its own environment before migrating
 e5d2036 docs: record the Task 22 details and the revoke-by-id shape in the PR 7 decision
 5d76e37 docs: name the fourth PR #44 test in the PR 7 decision
 967c395 feat(auth): only Phase 1 Better Auth paths reachable; worker-owned cleanup schedules
@@ -38,8 +39,10 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 ## 4. Just finished
 2026-11-01 PR #48 opened by the Opus 5.5 helper. Checks at `967c395`: typecheck 0, lint 0, `pnpm test` 45 files 921 passed 1 skipped (runIf), `test:gates` 1 passed, build 0, audit 0 (5 moderate), auth E2E 84 passed (throwaway Postgres, `next dev` 3100, no `E2E_RATE_LIMITED`), `git diff --check` clean. Security scan finding (HIGH, parser differential in `request-handler.ts`) fixed fail-closed: 415 for non-JSON sign-in, shared `acct:signin:unreadable` key; in DECISIONS and PR body. `pnpm smoke:auth-route` FAILED locally only because the worktree root `.env` is stale (Phase 0 user `crm`); CI image job runs it. CI on `5d76e37` pending at PR open.
 
+Update: CI image job failed on `e5d2036` (worker exit 1); fixed in `69b738f`; CI run 41292891545 on `69b738f` all green (checks 8m18s, audit, secret scan, image+smoke+E2E 25m46s).
+
 ## 5. Next step (file-level)
-`review 48` (Bob), on head `e5d2036`, once CI is green.
+`review 48` (Bob), on head `69b738f`, CI is green on it (run 41292891545: all 4 jobs pass, image job incl. smoke and E2E).
 
 ## 6. Open ASK items, blockers, and owner answers
 1. Decided (Charlie 1A, 2026-11-01): limiter on its own autocommit `crm_app` pool (`LIMITER_POOL_MAX` 2; R4 14 per web process). In DECISIONS and PR #48.
@@ -411,3 +414,4 @@ Opus 5.5 (auth, rate limits and review fixes are the deep tier). Sonnet 5 only f
 - Tasks 21-22 committed and pushed (8e730a6, 5efa3b0). Task 23 uncommitted (4 files, §3). No PR. Blocked on two decisions for Charlie: limiter consume inside the request transaction (lock scope, 500s under contention) and AUTH-07 password change. Next: those answers, then finish Tasks 23-24.
 
 - 2026-11-01 Phase 1 PR 7 opened: PR #48 (feat/p1-rate-limits, head e5d2036). Charlie 1A/2A built; security-scan HIGH fixed. Next: review 48.
+- 2026-11-01 CI image job failed on e5d2036 (worker exit 1, TRUSTED_CLIENT_IP_HEADER required by migrate in the worker container). Fixed in 69b738f (test first); CI-like local stack up OK; CI all green on 69b738f. Next: review 48.
