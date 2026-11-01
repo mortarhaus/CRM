@@ -18,9 +18,11 @@ All values live in one `.env` at the repo root (git-ignored). Copy `.env.example
 variable already set in the shell wins over the file. A change to `.env` needs a dev server restart.
 `apps/web/src/lib/env.ts` validates the values on first use. Under `pnpm dev` and `next start` that is the first
 request to `/api/auth/*`, `/`, `/workspaces` or `/settings/security`, or the first form submit; it is not checked at
-process start or during `next build`. In the Docker image the entrypoint runs `dist/migrate.mjs` first, and
-`migrate.ts` calls `getEnv()` before anything else, so `web` and `worker` validate every value at container start
-and exit 1 before they listen. Either way the error names the variables only, never the values.
+process start or during `next build`. In the Docker image the entrypoint runs `dist/migrate.mjs web` or `dist/migrate.mjs worker` first, and
+`migrate.ts` checks that container's own schema before anything else (`migrateEnvFor` in `env.ts`; since Phase 1
+PR 7, so the worker is not refused for the web-only `TRUSTED_CLIENT_IP_HEADER`), so `web` and `worker` validate every
+value at container start and exit 1 before they listen. The image's `migrate` command and `pnpm db:migrate`
+need only `DATABASE_MIGRATOR_URL`. Either way the error names the variables only, never the values.
 
 `pnpm build` needs no runtime values: CI builds without a `.env`. Pages that read the session call
 `headers()` before auth starts (`apps/web/src/lib/auth/session.ts`), so `next build` renders them at

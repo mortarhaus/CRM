@@ -1,5 +1,14 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { EnvError, parseBootstrapEnv, parseEnv, parseWorkerEnv, trustedClientIpHeader } from "./env";
+import {
+  EnvError,
+  migrateEnvFor,
+  parseBootstrapEnv,
+  parseEnv,
+  parseMigrateEnv,
+  parseWorkerEnv,
+  trustedClientIpHeader,
+} from "./env";
 
 const valid = {
   DEPLOYMENT_MODE: "selfhost",
@@ -132,6 +141,64 @@ describe("parseWorkerEnv", () => {
     expect(
       messageOf(() => parseWorkerEnv({ ...worker, NODE_ENV: "production", APP_URL: "http://crm.example.test" })),
     ).toContain("APP_URL: must be an https:// URL in production");
+  });
+});
+
+// The image runs `migrate.mjs` before the web server and before the worker (docker/entrypoint.sh), so the migration
+// step gets each container's environment. CI run 41289663599 (PR #48): the worker container has no
+// TRUSTED_CLIENT_IP_HEADER (a web-only setting), and migrate parsed the web schema, so the worker exited 1.
+describe("parseMigrateEnv", () => {
+  const workerContainer = {
+    ...valid,
+    NODE_ENV: "production",
+    DATABASE_WORKER_URL: "postgres://crm_worker:worker-password@localhost:5433/crm",
+  };
+
+  it("accepts the worker container's environment in production (no web-only setting)", () => {
+    expect(parseMigrateEnv(workerContainer)).toEqual({ DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL });
+  });
+
+  it("needs only DATABASE_MIGRATOR_URL", () => {
+    expect(parseMigrateEnv({ DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL })).toEqual({
+      DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL,
+    });
+    expect(messageOf(() => parseMigrateEnv({}))).toContain("DATABASE_MIGRATOR_URL");
+  });
+
+  it("rejects a non-Postgres DATABASE_MIGRATOR_URL without echoing the URL", () => {
+    const message = messageOf(() => parseMigrateEnv({ DATABASE_MIGRATOR_URL: "mysql://m:hunter2@db/crm" }));
+    expect(message).toContain("DATABASE_MIGRATOR_URL: must be a postgres:// URL");
+    expect(message).not.toContain("hunter2");
+  });
+
+  // The entrypoint passes the container's role, so each container is still checked in full at start and exits 1
+  // before it listens or works (docs/runbooks/phase-0-auth-database.md), against its own variables only.
+  it("checks the container's own schema: the worker container passes without the web-only setting", () => {
+    expect(migrateEnvFor("worker", workerContainer)).toEqual({ DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL });
+    expect(messageOf(() => migrateEnvFor("worker", { ...workerContainer, DATABASE_WORKER_URL: undefined }))).toContain(
+      "DATABASE_WORKER_URL",
+    );
+  });
+
+  it("checks the container's own schema: the web container still needs TRUSTED_CLIENT_IP_HEADER in production", () => {
+    expect(messageOf(() => migrateEnvFor("web", workerContainer))).toContain("TRUSTED_CLIENT_IP_HEADER");
+    expect(migrateEnvFor("web", production)).toEqual({ DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL });
+  });
+
+  it("a standalone migration (no role) needs only its own connection", () => {
+    expect(migrateEnvFor(undefined, { DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL })).toEqual({
+      DATABASE_MIGRATOR_URL: valid.DATABASE_MIGRATOR_URL,
+    });
+  });
+
+  it("the migrate and worker entry points never parse the web schema", () => {
+    for (const entry of ["../../migrate.ts", "../../worker.ts"]) {
+      const source = readFileSync(new URL(entry, import.meta.url), "utf8");
+      expect(source, entry).not.toMatch(/\bgetEnv\(|\bparseEnv\(/);
+    }
+    expect(readFileSync(new URL("../../../../docker/entrypoint.sh", import.meta.url), "utf8")).toMatch(
+      /web\)\n\s+node dist\/migrate\.mjs web\n[\s\S]*worker\)\n\s+node dist\/migrate\.mjs worker\n/,
+    );
   });
 });
 
