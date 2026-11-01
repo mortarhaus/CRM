@@ -266,18 +266,30 @@ describe("job data carries IDs only (PROJECT.md §9)", () => {
   });
 
   // Every enqueueJob/emitEvent call site of Phase 1, with the job data its queue gets. domain_event has no app call
-  // site in Phase 1 and is run directly; email.send through settings/email/actions.ts arrives with plan Task 27.
-  const PRODUCERS: { queue: string; callSite: string | null; run: (tx: Tx) => Promise<string | null> }[] = [
-    { queue: "domain_event", callSite: null, run: (tx) => emitEvent(tx, invoiceIssued({ invoiceId: crypto.randomUUID() })) },
+  // site in Phase 1 and is run directly. email.send has one producer, settings/email/actions.ts (plan Task 27), run
+  // here with the data it sends; email-send.test.ts reads the same key set from a job the action itself enqueued.
+  const PRODUCERS: { queue: string; callSite: string | null; keys: string[]; run: (tx: Tx) => Promise<string | null> }[] = [
+    {
+      queue: "domain_event",
+      callSite: null,
+      keys: ["eventId", "workspaceId"],
+      run: (tx) => emitEvent(tx, invoiceIssued({ invoiceId: crypto.randomUUID() })),
+    },
+    {
+      queue: "email.send",
+      callSite: "app/(app)/settings/email/actions.ts enqueueJob",
+      keys: ["userId", "workspaceId"],
+      run: (tx) => enqueueJob(tx, "email.send", { workspaceId: workspaceA, userId: crypto.randomUUID() }),
+    },
   ];
 
-  it.each(PRODUCERS)("$queue: the stored job data has only keys ending in Id, each a uuid", async ({ queue, run }) => {
+  it.each(PRODUCERS)("$queue: the stored job data is exactly its ID keys, each a uuid", async ({ queue, keys, run }) => {
     const id = await withWorkspace(workspaceA, run);
     const [job] = await admin<{ name: string; data: Record<string, unknown> }[]>`
       select name, data from pgboss.job_common where id = ${id ?? ""}`;
     expect(job?.name).toBe(queue);
     const entries = Object.entries(job?.data ?? {});
-    expect(entries.length).toBeGreaterThan(0);
+    expect(entries.map(([key]) => key).sort()).toEqual(keys);
     for (const [key, value] of entries) {
       expect(key).toMatch(/^[a-z][A-Za-z]*Id$/);
       expect(value).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);

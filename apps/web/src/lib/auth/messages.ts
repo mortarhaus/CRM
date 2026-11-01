@@ -18,6 +18,14 @@ export const WORKSPACE_SWITCH_FAILED = "Couldn't switch workspace. Try again.";
 export const SIGN_OUT_FAILED = "We couldn't sign you out. Try again.";
 export const TWO_FACTOR_PASSWORD_WRONG = "Your password didn't match. Try again.";
 
+// /settings/email (Charlie, ASK 8 = A, 2026-11-01; the intro sentence is the builder's).
+export const TEST_EMAIL_INTRO = "Send a test email to your own address to check that email delivery works.";
+export const SEND_TEST_EMAIL = "Send a test email";
+export const SENDING_TEST_EMAIL = "Sending…";
+export const TEST_EMAIL_QUEUED = "Test email queued.";
+export const TEST_EMAIL_FORBIDDEN = "Only an Admin or Owner can send a test email.";
+export const TEST_EMAIL_FAILED = "We couldn't send the test email. Try again.";
+
 // Keyed by the codes `input-limits.ts` refuses with; the text follows the shared limits.
 const LIMIT_MESSAGES: Record<LimitErrorCode, string> = {
   PASSWORD_TOO_SHORT: `Use at least ${PASSWORD_MIN_LENGTH} characters for your password.`,

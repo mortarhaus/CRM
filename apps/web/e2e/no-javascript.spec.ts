@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { NAME_MAX_LENGTH, PASSWORD_MIN_LENGTH, WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
 import { expect, test } from "./fixtures";
 import type { APIResponse, Locator, Page } from "@playwright/test";
+import { SEND_TEST_EMAIL, TEST_EMAIL_QUEUED } from "../src/lib/auth/messages";
+import { searchMessages } from "../src/test/mailpit";
 import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { tabTo } from "./a11y";
 import { PASSWORD, respectRateLimit, signIn, signOut, signUp, uniqueEmail } from "./helpers";
@@ -406,4 +408,19 @@ test("names of emoji at the limit arrive whole and one over is refused visibly, 
   );
   await expect(page.getByLabel("Workspace name")).toHaveValue(tooLongWorkspace);
   await expect(workspaces.getByRole("listitem")).toHaveCount(1);
+});
+
+test("the test email form posts without JavaScript, and the worker sends the email it enqueued", async ({ page }) => {
+  const email = uniqueEmail();
+  await signUp(page, email);
+  await signIn(page, email);
+  await expect(page).toHaveURL(/\/workspaces$/);
+  await createWorkspace(page, "Mail Studio");
+  await page.getByRole("link", { name: "Email", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/email$/);
+
+  await page.getByRole("button", { name: SEND_TEST_EMAIL }).click();
+  await expect(page.getByRole("main").getByRole("status")).toHaveText(TEST_EMAIL_QUEUED);
+  // Mailpit receives it only if the job was enqueued and worked.
+  await expect.poll(async () => (await searchMessages(email)).length, { timeout: 30_000 }).toBe(1);
 });

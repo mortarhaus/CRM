@@ -2,6 +2,9 @@ import { expect, type Page, type Route } from "@playwright/test";
 import type { TOTP } from "otpauth";
 import { totpFromUri } from "../src/test/totp";
 
+// Opens its own database connection, so it lives under src/test (TEN-10 lint).
+export { setMemberRole } from "../src/test/member-role";
+
 export const PASSWORD = "correct horse battery staple 42";
 
 export function uniqueEmail(): string {
@@ -74,3 +77,4 @@ export async function completeTotpSignIn(page: Page, totp: TOTP): Promise<void> 
   await page.getByRole("button", { name: "Verify", exact: true }).click();
   await expect(page).toHaveURL(/\/workspaces$/);
 }
+

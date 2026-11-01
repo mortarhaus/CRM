@@ -3,11 +3,9 @@ import type { AddressInfo } from "node:net";
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { renderTestEmail, TEST_EMAIL_BODY, TEST_EMAIL_SUBJECT } from "../../emails/test-email";
+import { MAILPIT_IMAGE } from "../../test/mailpit";
 import { createEmailAdapter, type EmailAdapter, type EmailMessage, EmailSendError } from "./index";
 
-// Mailpit 1.33.0, pinned by tag and index digest like docker/compose.dev.yml (docs/DECISIONS.md 2026-11-01).
-const MAILPIT_IMAGE =
-  "axllent/mailpit:v1.33.0@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231";
 const FROM = "CRM Test <crm@mail.example.test>";
 const TO = "member@client.example.test";
 const API_KEY = "re_contract_test_key";

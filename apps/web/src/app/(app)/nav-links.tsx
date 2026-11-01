@@ -9,12 +9,16 @@ const LINKS = [
   { href: "/settings/security", label: "Security" },
 ] as const;
 
-export function NavLinks() {
+// Email settings are Admin and Owner only (AUTH-03); the page and its action check the role themselves.
+const EMAIL_SETTINGS_LINK = { href: "/settings/email", label: "Email" } as const;
+
+export function NavLinks({ showEmailSettings }: { showEmailSettings: boolean }) {
   const pathname = usePathname();
+  const links = showEmailSettings ? [...LINKS, EMAIL_SETTINGS_LINK] : LINKS;
   return (
     <nav aria-label="Main">
       <ul className="flex items-center gap-4 text-sm">
-        {LINKS.map(({ href, label }) => {
+        {links.map(({ href, label }) => {
           const current = pathname === href;
           return (
             <li key={href}>
