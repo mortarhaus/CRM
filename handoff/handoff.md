@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-events (worktree) · HEAD 34a489d
+# Handoff — 2026-11-01 · branch feat/p1-events (worktree) · HEAD 64299e9
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -10,9 +10,9 @@
 - Working folder: `.agent/worktrees/build-feat-p1-events`. The main checkout is on `main`, but at `c599bd8`: it has not been fast-forwarded to `751ba3b`. It has untracked `.playwright-mcp/`, `docker/sync-export.sh` and `docker/sync-import.sh`, which are not mine.
 
 ## 1. Current PR / branch
-- PR #46 https://github.com/mortarhaus/CRM/pull/46 · branch `feat/p1-events` · base `main` (`751ba3bd`) · head **`34a489df`** (3 commits: `93fe31f` Task 19, `0088f8c` Task 20, `34a489d` merge of main/PR 47; the only conflict was `docs/DECISIONS.md`, and both entries are kept)
+- PR #46 https://github.com/mortarhaus/CRM/pull/46 · branch `feat/p1-events` · base `main` (`751ba3bd`) · head **`64299e9`** (4 commits: `93fe31f` Task 19, `0088f8c` Task 20, `34a489d` merge of main/PR 47 (the only conflict was `docs/DECISIONS.md`, and both entries are kept), `64299e9` fix(jobs): `jobs:retry` redrives dead-letter jobs (closes PR 45 deferred P2-1))
 - Purpose: Phase 1 PR 6 (plan Tasks 19-20): `domain_event` with transactional pg-boss enqueue, `notification`, the PgBouncer pooler gate, and the `/api/health` queue check.
-- Status: CI run 41212515170 on `34a489df` is green (4/4 jobs). Bob's Round 1 (Blocked) findings are fixed in the PR body and this handoff, with no new commit, so the head is unchanged. One new open item needs Charlie (§6).
+- Status: `64299e9` pushed 2026-11-01; CI run 41277018455 on it was queued at push (not yet green). The previous head `34a489df` was green (run 41212515170). Bob's Round 1 (Blocked) findings are fixed in the PR body and this handoff. Charlie chose option A for EVT-05, and it is done in `64299e9`. The PR body is updated for the new head.
 - PR #47 (better-auth 1.7.14) merged 2026-10-31 as `751ba3b`. Its review, receipt and log are on `agent-logs`.
 
 ## 2. Milestones
@@ -23,6 +23,7 @@
 ## 3. Git state
 ```
 worktree build-feat-p1-events: ## feat/p1-events...origin/feat/p1-events (clean)
+64299e9 fix(jobs): jobs:retry redrives dead-letter jobs (closes PR 45 deferred P2-1)
 34a489d merge: bring main (PR 47 better-auth 1.7.14) into feat/p1-events
 751ba3b Merge pull request #47 from mortarhaus/fix/audit-better-auth
 0088f8c test(jobs): pg-boss maintenance through PgBouncer as crm_worker; health reports the queue
@@ -35,28 +36,28 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 | (none) | | |
 
 ## 4. Just finished
-2026-11-01 `fix` for PR 46 (Bob Round 1: 1 P1 + 2 P2). The review was archived to `agent-logs` first. The PR body was rewritten for the current head `34a489df`: the three commits, base `751ba3bd`, the merge resolution, and the drafting model. It also has a full rule-by-rule self-check (universal, tenancy-rls, events-jobs, money, PROJECT.md §9, and the packs judged not relevant), plus updated differences, size and not-verified sections. I re-ran the checks on `34a489df`, in order and after the frozen install: frozen install 0, typecheck 0, lint 0, `pnpm test` 790 passed, `pnpm test:gates` 1 passed (79.59 s), build 0, audit (high) 0 with 5 moderate, worktree clean. Not re-run at this head: `stack:up` with the health curl, local E2E and the mutation checks (all done at `0088f8c`; CI's image E2E passed on `34a489df`).
+2026-11-01 `fix` for PR 46, after Charlie chose option A (close PR 45 deferred P2-1 in this PR). Commit `64299e9`, pushed normally. `jobs:retry` (`apps/web/src/jobs/retry.ts`) now calls pg-boss `redrive(<queue's deadLetter>, { ids: [id], sourceName: <queue>, limit: 1 })` instead of `retry()`. The flags are unchanged (`--queue <original queue> --id <id>`), but `--id` is now the dead-letter copy's id. The output is `job redriven`. The redrive creates a new `created` job in the source queue and deletes the copy. It works after the failed original is deleted. Tests: `retry.test.ts` 8 tests, written red first (6 of 7 failed against `retry()`). Two mutation checks both kill their mutant: without `sourceName`, and with a fixed `email.send.dead`. `worker-grants.test.ts` and `pooler.gate.test.ts` now redrive instead of calling `retry()`. They show zero `crm_worker` permission errors, and all 31 ablations still deny, so there is **no grant change and no migration**. I updated the runbook retry section and grant rows (`docs/runbooks/phase-1-database-roles.md`) and added a DECISIONS 2026-11-01 entry. PR body: new head, 4 commits, EVT-05 now pass, difference 8, size 38 files +4,297/-114. Checks on `64299e9`: typecheck 0, lint 0, `pnpm test` 793 passed (37 files), `test:gates` 1 passed, build 0 (bundle checks pass), audit (high) 0 with 5 moderate, `git diff --check` clean. Not run locally: the bundled `dist/retry-job.mjs` in the image, and `jobs:retry` against a dev DB (CI image E2E is the evidence). Skipped: Bob's optional P3 (event name/version check).
 
 ## 5. Next step (file-level)
-Charlie decides the EVT-05 item in §6. Then Charlie runs **`review 46`** (Bob, on Opus 5.5, as Round 1 asked). If Charlie wants the `redrive()` fix in this PR, the builder runs `fix` first: `apps/web/src/jobs/retry.ts`, its test and the runbook retry section; that gives a new head. Then `approved 46` before the merge, and `merged 46` after it.
+Wait for CI on `64299e9` to be green (run 41277018455). Then Charlie runs **`review 46`** (Bob, on Opus 5.5, as Round 1 asked). Then `approved 46` before the merge, and `merged 46` after it.
 
 ## 6. Open ASK items, blockers, and owner answers
-- **Open, needs Charlie:** PR 45's deferred P2-1 is due in this PR but not done. The condition is "switch `jobs:retry` to `redrive()` on the dead-letter queue … in PR 6 (plan Task 19), before the first handler can dead-letter a job" (PR 45 log on `agent-logs`, line 20). PR 46 registers the first handler (`domain_event`), but `apps/web/src/jobs/retry.ts:67` still calls `boss.retry`. Bob's Round 1 did not raise it. The self-check marks EVT-05 "partial: not pass". Charlie's choices: (A) fix it in PR 46, or (B) defer it again explicitly to a named PR.
+- **Answered (2026-11-01):** PR 45's deferred P2-1 (EVT-05). Charlie chose **A**, to fix it in PR 46. It is done in `64299e9` (§4), and EVT-05 is now pass in the PR body.
 - Note for the Phase 7 plan: `notification.target_type`/`target_id` has no same-workspace trigger (Bob Round 1 note).
 - Carried from 2026-10-28: ASK 5, the `.env` refresh, repo visibility, and the untracked files in the main checkout.
-- No owner answer this session.
+- Owner answer this session: option A above.
 
 ## 7. Open review findings (P0/P1) and verdict
 - Review file `.agent/reviews/PR-46.md`, newest Round 1 (head `34a489df`): **Blocked**. Status of each finding:
-  - [P1] No guardrail self-check table -> fixed (PR body "Self-check": 39 rows: 32 pass, 2 pass with a stated gap or note (UNI-16, §9 payload), 1 partial (EVT-05), 4 n-a with reasons, plus n-a lines for the other rules and the 6 packs judged not relevant).
+  - [P1] No guardrail self-check table -> fixed (PR body "Self-check": 39 rows: 33 pass (EVT-05 now pass, `64299e9`), 2 pass with a stated gap or note (UNI-16, §9 payload), 4 n-a with reasons, plus n-a lines for the other rules and the 6 packs judged not relevant).
   - [P2] PR body stale after the merge from `main` -> fixed (PR body updated to `34a489df`, base `751ba3bd`, merge `34a489d`; checks re-run).
   - [P2] Handoff does not describe PR 46 -> fixed (this file and the `agent-logs` copy).
   - [P3] `emitEvent` does not check the event name or version -> optional, not done.
   - [P3] Size over 400 LOC -> accepted by the plan, disclosed in the body.
-- Awaiting Charlie's EVT-05 decision, then Bob's Round 2.
+- EVT-05 fixed in `64299e9` (PR 45 deferred P2-1 closed). Awaiting green CI, then Bob's Round 2 on `64299e9`.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- None.
+- None. The redrive switch is in `docs/DECISIONS.md` 2026-11-01 (committed in `64299e9`).
 
 ## 9. Files touched but not committed
 - None in the repo. Scratch files only: the PR body and check logs in the session scratchpad.
