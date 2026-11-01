@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-headers-email (worktree) · HEAD 6550472 · PR #49
+# Handoff — 2026-11-02 · main checkout · HEAD 516c6ec · no PR in flight
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,46 +6,43 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: none yet (Phase 1 PR 8, plan Tasks 25-29)
-- Working folder: `.agent/worktrees/build-feat-p1-headers-email`. Main checkout untouched (untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine).
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: none (PR #49 merged)
+- Working folder: main checkout. Untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine.
 
 ## 1. Current PR / branch
-- Branch `feat/p1-headers-email` created from origin/main `f1d2e01` (PR #48 merge). Not pushed. No PR.
-- Purpose: Phase 1 PR 8: nonce CSP and static security headers (Task 25), email adapter SMTP/Resend + React Email + Mailpit (Task 26), test email web -> job -> Mailpit with `/settings/email` (Task 27), CI/compose wiring (Task 28), Phase 1 close: runbooks, CLAUDE.md commands (Task 29).
+- None. PR #49 (Phase 1 PR 8) merged 2026-11-01T16:18:49Z, merge commit `516c6ecdbca1584b47d91464e051a516388a6e2f`. Branch and worktree removed. Log, review and receipt are on agent-logs (`log/2026-11-02_PR49_headers-email-phase-1-close.md`).
 
 ## 2. Milestones
-- Done: Phase 0; Phase 1 PRs 1-7 (#39, #41, #43, #44, #45, #46, #48) and side fixes #35, #37, #40, #47. All logged on agent-logs.
-- In progress: PR 8. Task 25 done (commit `bdc72d9`, verified: unit 14 pass, typecheck, lint). Task 26 done (commit `3fdbb7b`, verified: adapters+env 56 pass, typecheck, lint; compose/CI image not run). Task 27 done (`d776980`), review by independent Opus: no P0/P1, P2-1 fixed in `253a406` (5/user/h, 20/ws/h, RATE_LIMITED), P3-2 guard. Task 29 docs done (`1396475`). Pushed and PR #49 opened 2026-11-01 (https://github.com/mortarhaus/CRM/pull/49). Task 28 = read the CI run; done-when run is CI's job.
-- Pending: PR #49 CI result (Task 28), `review 49` by Bob, then Task 30 (separate spec revision 8 PR).
+- Done: Phase 0; Phase 1 plan PRs 1-8 (#39, #41, #43, #44, #45, #46, #48, #49) and side fixes #35, #37, #40, #47. All logged.
+- Pending: Task 30 (separate spec revision 8 PR, E1-E12); then `setup` reconcile of PROJECT.md §7 and §9; then Phase 1 close sign-off; then Phase 2 (needs Charlie's design direction and the VPS spec-text revision first).
 
 ## 3. Git state
 ```
-worktree build-feat-p1-headers-email: feat/p1-headers-email = origin/main f1d2e01 (clean)
+main = origin/main 516c6ec (fast-forwarded)
 ```
 Uncommitted files — fingerprint every staged, modified or untracked path when writing this handoff:
 | Path | Status | Content hash (`git hash-object <path>`, or `deleted`) |
 |---|---|---|
-| (none) | clean | - |
+| (none of mine) | clean | - |
 
 ## 4. Just finished
-2026-11-01 `merged 48` done earlier. Status page made for Charlie (artifact 6de91JGVRQedUZ9YB3z3UQ). Gates checked: spec gate (Round 27 Approved for 733cc0e9), reconcile gate, log gate clear. Local main fast-forwarded to f1d2e01.
+2026-11-02 `merged 49` done. Log 2617536 on agent-logs. No gate breach (receipt 69 s before merge). Bob's review ran on Sonnet 5.5, below the Opus tier for security review; Charlie merged without a second pass.
 
 ## 5. Next step (file-level)
-Read CI on PR #49; if green tell Charlie to run `review 49` in Bob's window; add the Done-when and Verification map to the PR body from CI results. Task 26 notes for Bob: trailer says Opus 5.5 (Opus did the work); Mailpit SMTP also on 127.0.0.1:1025 (dev); jobs:retry reads only DATABASE_WORKER_URL; low advisory deepmerge via @react-email/render (2.2.0 fixes, 4 days old, separate PR); Resend fetch has no timeout; compose test keeps email vars worker-only. Task 25 deviations for Bob (in DECISIONS 2026-11-01): proxy at `src/proxy.ts`; `API_CSP` separate; matcher excludes `api`.
+Task 30: read the plan's Task 30 (line ~1500) and check it against the already-approved spec text (v4.7 rev 8, hash 733cc0e9…). It may be obsolete because the spec already holds revision 8. Tell Charlie what is left before doing anything.
 
 ## 6. Open ASK items, blockers, and owner answers
-1. ASK 6 answered by Charlie 2026-11-01: "A" = HSTS `max-age=31536000`, no `includeSubDomains`, no `preload`. Record in DECISIONS (Task 25 Step 4).
-2. ASK 7 (production `EMAIL_FROM`, SPF/DKIM/DMARC owner) open; blocks only the production runbook line (Task 26).
-3. ASK 8 answered by Charlie 2026-11-01: "a" = ship the plan's draft wording (test email subject and body; `/settings/email` copy). Record in DECISIONS.
-4. ASK 9 (`require_2fa` in Phase 2) open; confirm with Charlie.
-5. Task 27 .env decision (builder, 2026-11-01): Playwright webServer for `pnpm worker:dev` gets the email vars in its own `env:`, not in `.env`, so web never sees them.
-6. Carried: stale health body in `phase-0-auth-database.md` (Task 29), "3 moderate" count fix, `migrateEnvFor` DECISIONS entry, optional P3s, rotate dev AUTH_SECRET, refresh local `.env`, repo visibility, untracked files in main checkout.
+1. ASK 7 (production `EMAIL_FROM`, SPF/DKIM/DMARC owner) open for Charlie.
+2. ASK 9 (`require_2fa` timing; builder proposal Phase 2) open.
+3. Charlie to confirm the `RATE_LIMITED` wording and numbers (5 per user, 20 per workspace per hour).
+4. Spec text still names Singapore/DigitalOcean; Charlie chose Hostinger KVM 2 (2026-10-15): spec revision needed.
+5. Carried: rotate dev AUTH_SECRET, refresh local `.env`, repo visibility, untracked files in main checkout, optional P3s from the PR 49 log, old worktrees `build-feat-p1-events`, `build-feat-p1-rate-limits`, `build-fix-audit-better-auth` (merged; remove when Charlie agrees).
 
 ## 7. Open review findings (P0/P1) and verdict
-- None. No PR yet.
+- None. PR 49 Approved, merged.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- ASK 6 = A is in DECISIONS (Task 25). ASK 8 = A (draft wording) not yet in DECISIONS; goes in with Task 26/27.
+- None.
 
 ## 9. Files touched but not committed
 - None.
