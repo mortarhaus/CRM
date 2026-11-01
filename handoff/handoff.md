@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-headers-email (worktree) · HEAD 3fdbb7b · no PR yet
+# Handoff — 2026-11-01 · branch feat/p1-headers-email (worktree) · HEAD 1396475 · no PR yet (push waits for Charlie's yes)
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -15,8 +15,8 @@
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1 PRs 1-7 (#39, #41, #43, #44, #45, #46, #48) and side fixes #35, #37, #40, #47. All logged on agent-logs.
-- In progress: PR 8. Task 25 done (commit `bdc72d9`, verified: unit 14 pass, typecheck, lint). Task 26 done (commit `3fdbb7b`, verified: adapters+env 56 pass, typecheck, lint; compose/CI image not run). Task 27 started.
-- Pending: Tasks 28-29 (27 in progress); then Task 30 (separate spec revision 8 PR).
+- In progress: PR 8. Task 25 done (commit `bdc72d9`, verified: unit 14 pass, typecheck, lint). Task 26 done (commit `3fdbb7b`, verified: adapters+env 56 pass, typecheck, lint; compose/CI image not run). Task 27 done (`d776980`), review by independent Opus: no P0/P1, P2-1 fixed in `253a406` (5/user/h, 20/ws/h, RATE_LIMITED), P3-2 guard. Task 29 docs done (`1396475`). Task 28 (push + read CI) waits for Charlie's yes; done-when run is CI's job.
+- Pending: Task 28 push + CI; then Task 30 (separate spec revision 8 PR).
 
 ## 3. Git state
 ```
