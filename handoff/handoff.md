@@ -1,4 +1,4 @@
-# Handoff — 2026-10-31 · branch fix/audit-better-auth (worktree) · HEAD c70f3d7
+# Handoff — 2026-11-01 · branch feat/p1-events (worktree) · HEAD 34a489d
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,28 +6,28 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: **47**
-- Working folder: `.agent/worktrees/build-fix-audit-better-auth`. Do not touch `.agent/worktrees/build-feat-p1-events` (PR 46). Main checkout is on `main` at `c599bd8`; untracked `.playwright-mcp/` and `docker/sync-export.sh` are not mine.
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: **46**
+- Working folder: `.agent/worktrees/build-feat-p1-events`. The main checkout is on `main`, but at `c599bd8`: it has not been fast-forwarded to `751ba3b`. It has untracked `.playwright-mcp/`, `docker/sync-export.sh` and `docker/sync-import.sh`, which are not mine.
 
 ## 1. Current PR / branch
-- PR #47 https://github.com/mortarhaus/CRM/pull/47 · branch `fix/audit-better-auth` · base `main` (`c599bd8`) · head **`c70f3d7`** (pushed 2026-10-31; previous head `d8ad272`)
-- Purpose: `better-auth` 1.7.6 -> 1.7.14 (GHSA-965c-763c-88jm, GHSA-r4xp-prcw-77qf, GHSA-44jh-23m7-hpcf) so `pnpm audit --audit-level high` passes on `main`.
-- Status: Bob's Round 6 (Blocked) findings fixed at `c70f3d7`; awaiting `review 47`. CI on `c70f3d7`: Dependency audit and Secret scan pass; Typecheck/lint/test and image jobs were still running at 21:30.
-- Follow-on: PR #46 https://github.com/mortarhaus/CRM/pull/46 (`feat/p1-events`, Phase 1 PR 6, head `0088f8c`) is blocked only by its failing Dependency audit job, which PR 47 fixes. After PR 47 merges, update PR 46 from `main` and rerun its CI.
+- PR #46 https://github.com/mortarhaus/CRM/pull/46 · branch `feat/p1-events` · base `main` (`751ba3bd`) · head **`34a489df`** (3 commits: `93fe31f` Task 19, `0088f8c` Task 20, `34a489d` merge of main/PR 47; the only conflict was `docs/DECISIONS.md`, and both entries are kept)
+- Purpose: Phase 1 PR 6 (plan Tasks 19-20): `domain_event` with transactional pg-boss enqueue, `notification`, the PgBouncer pooler gate, and the `/api/health` queue check.
+- Status: CI run 41212515170 on `34a489df` is green (4/4 jobs). Bob's Round 1 (Blocked) findings are fixed in the PR body and this handoff, with no new commit, so the head is unchanged. One new open item needs Charlie (§6).
+- PR #47 (better-auth 1.7.14) merged 2026-10-31 as `751ba3b`. Its review, receipt and log are on `agent-logs`.
 
 ## 2. Milestones
-- Done: Phase 0; Phase 1 PRs 1-5 (#39, #41, #43, #44, #45; last merge #45 `c599bd8` 2026-10-28). Log gate clear through PR 45 (no merge since).
-- In progress: PR 47 (dependency fix), then PR 46 (Phase 1 PR 6, events).
-- Pending: rest of Phase 1.
+- Done: Phase 0; Phase 1 PRs 1-5 (#39, #41, #43, #44, #45); PR #47 (dependency fix, merged 2026-10-31 `751ba3b`). Log gate clear through PR 47.
+- In progress: PR 46 (Phase 1 PR 6, events).
+- Pending: rest of Phase 1 (PR 7 Tasks 21-24, PR 8 Tasks 25-29).
 
 ## 3. Git state
 ```
-worktree build-fix-audit-better-auth: ## fix/audit-better-auth...origin/fix/audit-better-auth (clean)
-c70f3d7 fix(deps): reverify better-auth 1.7.14 sources and update runbooks
-d8ad272 docs: record the kysely-adapter range of GHSA-44jh-23m7-hpcf
-f72b6b3 fix(deps): upgrade better-auth to 1.7.14 (GHSA-965c-763c-88jm, GHSA-r4xp-prcw-77qf)
-c599bd8 Merge pull request #45 from mortarhaus/feat/p1-pgboss
-agent-logs: reviews/PR-47.md (Rounds 1-6) archived 2026-10-31; remote blob equals local file
+worktree build-feat-p1-events: ## feat/p1-events...origin/feat/p1-events (clean)
+34a489d merge: bring main (PR 47 better-auth 1.7.14) into feat/p1-events
+751ba3b Merge pull request #47 from mortarhaus/fix/audit-better-auth
+0088f8c test(jobs): pg-boss maintenance through PgBouncer as crm_worker; health reports the queue
+93fe31f feat(events): domain_event with transactional pg-boss enqueue; notification table
+agent-logs: reviews/PR-46.md (Round 1) archived 2026-11-01 (b2536bd); remote blob 2eb5447f equals local file
 ```
 Uncommitted files — fingerprint every staged, modified or untracked path when writing this handoff:
 | Path | Status | Content hash (`git hash-object <path>`, or `deleted`) |
@@ -35,31 +35,34 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 | (none) | | |
 
 ## 4. Just finished
-2026-10-31 `fix` for PR 47 (Bob Round 6: 2 P1 + 1 P2). Review archived to `agent-logs`; commit `c70f3d7` pushed; PR body updated with a rule-by-rule self-check table, the source-audit table and the classification of all 59 `1.7.6` hits (11 code, 5 runbooks, 43 plan). Source audit: the ten Task 31 facts and the plan's limiter/path/hook assumptions re-read in installed better-auth 1.7.14; no fact the code relies on changed; compatible changes recorded in DECISIONS 2026-10-30 (change-password order inside `runWithTransaction`, which runs inline because the Drizzle adapter has `transaction: false`; stronger `incrementOne` re-check; async `onError`, awaited by the router). Local checks on `c70f3d7`: frozen install pass, focused auth tests 221 pass, typecheck 0, lint 0, `pnpm test` 736 pass, build 0, audit (high) 0 with 5 moderate (new: minimatch GHSA-g3hv-75wg-m249, glob GHSA-3g3m-2fjr-6pw4), auth schema byte-identical, smoke:auth-route PASS, E2E 84 pass (dev server :3100, throwaway postgres :5442, both removed). Not run locally: production-image E2E (port 3000 busy; CI covers), grant remeasurement on 1.7.14.
+2026-11-01 `fix` for PR 46 (Bob Round 1: 1 P1 + 2 P2). The review was archived to `agent-logs` first. The PR body was rewritten for the current head `34a489df`: the three commits, base `751ba3bd`, the merge resolution, and the drafting model. It also has a full rule-by-rule self-check (universal, tenancy-rls, events-jobs, money, PROJECT.md §9, and the packs judged not relevant), plus updated differences, size and not-verified sections. I re-ran the checks on `34a489df`: frozen install 0, typecheck 0, lint 0, `pnpm test` 790 passed, `pnpm test:gates` 1 passed (79.62 s), build 0, audit (high) 0 with 5 moderate, worktree clean. Not re-run at this head: `stack:up` with the health curl, local E2E and the mutation checks (all done at `0088f8c`; CI's image E2E passed on `34a489df`).
 
 ## 5. Next step (file-level)
-Charlie runs **`review 47`** (Bob). Then `fix` or `approved 47` -> Charlie merges -> `merged 47`. Then update PR 46 (`feat/p1-events`) from `main` so its Dependency audit job passes, and continue its review.
+Charlie decides the EVT-05 item in §6. Then Charlie runs **`review 46`** (Bob, on Opus 5.5, as Round 1 asked). If Charlie wants the `redrive()` fix in this PR, the builder runs `fix` first: `apps/web/src/jobs/retry.ts`, its test and the runbook retry section; that gives a new head. Then `approved 46` before the merge, and `merged 46` after it.
 
 ## 6. Open ASK items, blockers, and owner answers
-- Open: unchanged from 2026-10-28 (see history below), incl. untracked `docker/sync-export.sh` and `.playwright-mcp/` in the main checkout.
-- New moderate advisories (minimatch, glob) are below the high gate; no action taken.
+- **Open, needs Charlie:** PR 45's deferred P2-1 is due in this PR but not done. The condition is "switch `jobs:retry` to `redrive()` on the dead-letter queue … in PR 6 (plan Task 19), before the first handler can dead-letter a job" (PR 45 log on `agent-logs`, line 20). PR 46 registers the first handler (`domain_event`), but `apps/web/src/jobs/retry.ts:67` still calls `boss.retry`. Bob's Round 1 did not raise it. The self-check marks EVT-05 "partial: not pass". Charlie's choices: (A) fix it in PR 46, or (B) defer it again explicitly to a named PR.
+- Note for the Phase 7 plan: `notification.target_type`/`target_id` has no same-workspace trigger (Bob Round 1 note).
+- Carried from 2026-10-28: ASK 5, the `.env` refresh, repo visibility, and the untracked files in the main checkout.
 - No owner answer this session.
 
 ## 7. Open review findings (P0/P1) and verdict
-- Review file `.agent/reviews/PR-47.md`, newest Round 6 (head `d8ad272`): **Blocked**. Findings and fix status at `c70f3d7`:
-  - [P1] Required guardrail self-check still absent -> fixed (PR body "Self-check").
-  - [P1] Better Auth 1.7.14 compatibility and runbook gate incomplete -> fixed (DECISIONS 2026-10-30 "Source audit on 1.7.14"; comments, runbooks and plan version wording updated; checks rerun).
-  - [P2] Handoff points away from PR 47 -> fixed (this file and the `agent-logs` copy).
-- Awaiting Bob's Round 7.
+- Review file `.agent/reviews/PR-46.md`, newest Round 1 (head `34a489df`): **Blocked**. Status of each finding:
+  - [P1] No guardrail self-check table -> fixed (PR body "Self-check": 40 rows: 32 pass, 2 pass with a stated gap or note (UNI-16, §9 payload), 1 partial (EVT-05), 4 n-a with reasons, plus n-a lines for the other rules and the 6 packs judged not relevant).
+  - [P2] PR body stale after the merge from `main` -> fixed (PR body updated to `34a489df`, base `751ba3bd`, merge `34a489d`; checks re-run).
+  - [P2] Handoff does not describe PR 46 -> fixed (this file and the `agent-logs` copy).
+  - [P3] `emitEvent` does not check the event name or version -> optional, not done.
+  - [P3] Size over 400 LOC -> accepted by the plan, disclosed in the body.
+- Awaiting Charlie's EVT-05 decision, then Bob's Round 2.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- None (the source audit is in the PR's DECISIONS 2026-10-30 entry).
-
-## 9. Files touched but not committed
 - None.
 
+## 9. Files touched but not committed
+- None in the repo. Scratch files only: the PR body and check logs in the session scratchpad.
+
 ## 10. Model for the next session
-Opus 5.5 (auth/security review and any follow-up on PR 47); Sonnet 5 only for mechanical edits.
+Opus 5.5 (events, RLS and tenancy work is the deep tier; Bob's Round 2 should run on Opus 5.5). Sonnet 5 only for mechanical edits.
 
 - 2026-10-15 (fix, Bob PR #27 R1): review archived (ae70237). Runbook P2 + PR body P3 fixed in 088d013, pushed; CI re-running. Next: Charlie runs `review 27` when CI is green.
 
@@ -404,3 +407,6 @@ Opus 5.5 (auth/security review and any follow-up on PR 47); Sonnet 5 only for me
 - PR #45 merged 2026-10-28 (c599bd8). Log on agent-logs (log/2026-10-28_PR45_...). Receipt before merge (31 s), no gate breaches. Worktree/branch feat/p1-pgboss removed without --force; local main at c599bd8.
 - Next: Phase 1 PR 6 (events, Tasks 19-20) via "build" (ask Charlie first); carries P2-1 (jobs:retry -> redrive()) before the first handler can dead-letter. Docs debt: PROJECT.md UNI-04 + §11, CLAUDE.md Status, DECISIONS "option (c)" label, RETRY_HELP image form, PR 44 pointers.
 - Open: ASK 5, .env refresh, repo visibility, untracked docker/sync-*.sh and .playwright-mcp/.
+
+## 2026-11-01 fix 46 (Bob Round 1)
+- Review PR-46.md archived to agent-logs (b2536bd). PR body rewritten for head 34a489df with the full self-check; checks rerun on the head, all exit 0. No commit to the branch. New: PR 45 deferred P2-1 (redrive) is due in PR 46 and not done; EVT-05 marked partial; Charlie decides. Next: Charlie decision, then review 46.
