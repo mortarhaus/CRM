@@ -77,4 +77,3 @@ export async function completeTotpSignIn(page: Page, totp: TOTP): Promise<void> 
   await page.getByRole("button", { name: "Verify", exact: true }).click();
   await expect(page).toHaveURL(/\/workspaces$/);
 }
-
