@@ -33,18 +33,22 @@ function adapterFromEnv(): EmailAdapter {
 // send time. A missing or non-uuid ID, or a user who is no longer a member, fails the job, so it retries and then
 // dead-letters (EVT-05). The email is sent before the audit transaction opens, so no transaction waits on SMTP; a
 // failed audit write retries the job and may send the test email twice.
+//
+// One job per call: pg-boss 12.35.0 fetches `batchSize` jobs and its default is 1 (dist/manager.js:911), and
+// startWorker passes no options. In a batch, a later job's failure would fail the whole batch and retry an email
+// already sent, so a batch is refused before anything is sent (review P3-2).
 export function emailSendHandler(adapter: () => EmailAdapter = adapterFromEnv): Handler {
   return async (jobs) => {
-    for (const job of jobs) {
-      const parsed = jobData.safeParse(job.data);
-      if (!parsed.success) throw new Error("job data is not { workspaceId, userId }");
-      const { workspaceId, userId } = parsed.data;
-      const [membership, to] = await Promise.all([findMembership(userId, workspaceId), getUserEmail(userId)]);
-      if (!membership || to === null) throw new RecipientNotMemberError();
-      await adapter().send({ to, ...(await renderTestEmail()) });
-      await withWorkspace(workspaceId, (tx) =>
-        recordAudit(tx, { actorUserId: null, action: "email.test_sent", targetType: "user", targetId: userId }),
-      );
-    }
+    const [job] = jobs;
+    if (jobs.length !== 1 || !job) throw new Error("email.send handles one job per call");
+    const parsed = jobData.safeParse(job.data);
+    if (!parsed.success) throw new Error("job data is not { workspaceId, userId }");
+    const { workspaceId, userId } = parsed.data;
+    const [membership, to] = await Promise.all([findMembership(userId, workspaceId), getUserEmail(userId)]);
+    if (!membership || to === null) throw new RecipientNotMemberError();
+    await adapter().send({ to, ...(await renderTestEmail()) });
+    await withWorkspace(workspaceId, (tx) =>
+      recordAudit(tx, { actorUserId: null, action: "email.test_sent", targetType: "user", targetId: userId }),
+    );
   };
 }

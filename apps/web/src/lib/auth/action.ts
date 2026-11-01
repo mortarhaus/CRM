@@ -10,7 +10,8 @@ export type Role = WorkspaceRole;
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
-type Refusal = "UNAUTHENTICATED" | "NO_WORKSPACE" | "FORBIDDEN";
+// RATE_LIMITED is thrown by a handler (an action's own limit, e.g. the test email); the others by the checks below.
+type Refusal = "UNAUTHENTICATED" | "NO_WORKSPACE" | "FORBIDDEN" | "RATE_LIMITED";
 
 export type ActionResult<O> =
   | { ok: true; status: "DONE" | "REPLAYED"; data: O }
@@ -105,7 +106,8 @@ async function claimKey(tx: Tx, name: string, key: string, hash: string): Promis
 
 // The one wrapper for every mutating server action (spec "Validation"; AUTH-01). The order is fixed: (1) session,
 // (2) the session's active workspace, (3) role, (4) Zod, (5) idempotency, (6) the handler, in the same transaction
-// as the claimed key, then its response is stored. No input value is read before step 4.
+// as the claimed key, then its response is stored. No input value is read before step 4. A handler that throws
+// ActionRefusedError rolls the transaction back, claimed key included, and the refusal is the result.
 export function action<I, O extends Json>(spec: {
   name: string;
   minRole: Role;
@@ -137,6 +139,9 @@ export function action<I, O extends Json>(spec: {
         update idempotency_key set response = ${JSON.stringify(data)}::jsonb
         where workspace_id = ${CURRENT_WORKSPACE} and key = ${idempotencyKey}`);
       return { ok: true, status: "DONE", data };
+    }).catch((error: unknown): ActionResult<O> => {
+      if (error instanceof ActionRefusedError) return { ok: false, status: error.status };
+      throw error;
     });
   };
 }

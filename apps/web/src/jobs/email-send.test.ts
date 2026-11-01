@@ -1,5 +1,6 @@
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import postgres from "postgres";
+import { TEST_EMAIL_USER_LIMIT, TEST_EMAIL_WORKSPACE_LIMIT } from "@crm/core/security";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createEmailAdapter } from "../adapters/email";
 import { openDatabase } from "../db/system";
@@ -59,10 +60,17 @@ async function newUser(): Promise<{ id: string; email: string }> {
   return { id: row.id, email };
 }
 
-async function newMember(role: string): Promise<{ id: string; email: string }> {
+async function newWorkspace(name: string): Promise<string> {
+  const [org] = await admin<{ id: string }[]>`
+    insert into organization (name, slug, created_at) values (${name}, ${`${name}-${crypto.randomUUID()}`}, now()) returning id`;
+  if (!org) throw new Error("workspace not created");
+  return org.id;
+}
+
+async function newMember(role: string, inWorkspace = workspaceId): Promise<{ id: string; email: string }> {
   const created = await newUser();
   await admin`
-    insert into member (organization_id, user_id, role, created_at) values (${workspaceId}, ${created.id}, ${role}, now())`;
+    insert into member (organization_id, user_id, role, created_at) values (${inWorkspace}, ${created.id}, ${role}, now())`;
   return created;
 }
 
@@ -76,11 +84,25 @@ async function messageCount(): Promise<number> {
   return ((await response.json()) as { messages_count: number }).messages_count;
 }
 
-async function auditRows(userId: string) {
+async function auditRows(userId: string, inWorkspace = workspaceId) {
   return admin<{ action: string; actor_user_id: string | null; target_type: string; target_id: string }[]>`
     select action, actor_user_id, target_type, target_id, before, after, ip from audit_log
-     where workspace_id = ${workspaceId} and target_id = ${userId} order by created_at, action`;
+     where workspace_id = ${inWorkspace} and target_id = ${userId} order by created_at, action`;
 }
+
+// The test email's counters (review P2-1): keyed by IDs, read with the admin connection.
+const userKey = (userId: string) => `email-test:user:${userId}`;
+const workspaceKey = (id: string) => `email-test:ws:${id}`;
+
+async function unitsSpent(key: string): Promise<number> {
+  const [row] = await admin<{ count: number }[]>`select count from rate_limit where key = ${key}`;
+  return row?.count ?? 0;
+}
+
+async function jobsFor(userId: string): Promise<number> {
+  return (await admin`select id from pgboss.job_common where name = 'email.send' and data->>'userId' = ${userId}`).length;
+}
+
 
 // A refused job is retried (email.send: retryLimit 5, then email.send.dead), so it is seen in `retry` first.
 async function waitForFailure(id: string): Promise<void> {
@@ -95,10 +117,7 @@ beforeAll(async () => {
   databaseUrl = database.appUrl;
   mailpitUrl = `http://${mailpit.getHost()}:${mailpit.getMappedPort(8025)}`;
   admin = postgres(database.adminUrl, { max: 1, onnotice: () => {} });
-  const [org] = await admin<{ id: string }[]>`
-    insert into organization (name, slug, created_at) values ('email', ${`email-${crypto.randomUUID()}`}, now()) returning id`;
-  if (!org) throw new Error("workspace not created");
-  workspaceId = org.id;
+  workspaceId = await newWorkspace("email");
   const adapter = createEmailAdapter({
     EMAIL_PROVIDER: "smtp",
     EMAIL_FROM: FROM,
@@ -117,6 +136,9 @@ afterAll(async () => {
   const cache = globalThis as typeof globalThis & { crmSendBoss?: Promise<{ stop(): Promise<void> }> };
   await (await cache.crmSendBoss?.catch(() => undefined))?.stop();
   cache.crmSendBoss = undefined;
+  const limiter = globalThis as typeof globalThis & { crmLimiterDb?: { sql: { end(): Promise<void> } } };
+  await limiter.crmLimiterDb?.sql.end();
+  limiter.crmLimiterDb = undefined;
   await worker?.stop();
   await admin?.end();
   await Promise.all([database?.stop(), mailpit?.stop()]);
@@ -169,10 +191,23 @@ describe("sendTestEmail: Admin and Owner only, job data IDs only (AUTH-03, PROJE
     expect(await sendTestEmail({}, key)).toEqual({ ok: true, status: "DONE", data: { queued: true } });
     expect(await sendTestEmail({}, key)).toEqual({ ok: true, status: "REPLAYED", data: { queued: true } });
     expect(await admin`select id from pgboss.job_common where data->>'userId' = ${member.id}`).toHaveLength(1);
+    expect(await unitsSpent(userKey(member.id))).toBe(1);
   });
 });
 
 describe("the email.send handler (worker)", () => {
+  // Review P3-2: one job per call, so a failed send never retries an email already sent in the same batch.
+  it("refuses a batch of more than one job and sends nothing", async () => {
+    const send = vi.fn();
+    const handler = emailSendHandler(() => ({ send }) as unknown as ReturnType<typeof createEmailAdapter>);
+    const member = await newMember("owner");
+    const job = { id: crypto.randomUUID(), name: "email.send", data: { workspaceId, userId: member.id } };
+    await expect(handler([job, { ...job, id: crypto.randomUUID() }] as never, { log: () => {} })).rejects.toThrow(
+      "email.send handles one job per call",
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("ignores unknown job data fields (EVT-03)", async () => {
     const member = await newMember("owner");
     const boss = await getSendBoss();
@@ -199,5 +234,57 @@ describe("the email.send handler (worker)", () => {
     const [row] = await admin<{ output: { message?: string } | null }[]>`select output from pgboss.job_common where id = ${id ?? ""}`;
     expect(JSON.stringify(row?.output)).not.toContain("member@client.example.test");
     expect(await messageCount()).toBe(before);
+  });
+});
+
+// Review P2-1 (2026-11-01): sign-up does not verify the address, so the test email is limited per user and per
+// workspace on the database counters (src/db/system/rate-limit.ts). Each case has its own workspace.
+
+describe("sendTestEmail: rate limits (review P2-1)", () => {
+  it(`answers RATE_LIMITED to post ${TEST_EMAIL_USER_LIMIT.max + 1} in the hour and enqueues no job for it`, async () => {
+    const own = await newWorkspace("limit-user");
+    const member = await newMember("owner", own);
+    signedIn = { userId: member.id, workspaceId: own };
+    for (let i = 0; i < TEST_EMAIL_USER_LIMIT.max; i += 1) {
+      expect(await sendTestEmail({}, crypto.randomUUID())).toEqual({ ok: true, status: "DONE", data: { queued: true } });
+    }
+    expect(await sendTestEmail({}, crypto.randomUUID())).toEqual({ ok: false, status: "RATE_LIMITED" });
+    expect(await jobsFor(member.id)).toBe(TEST_EMAIL_USER_LIMIT.max);
+    expect(await auditRows(member.id, own).then((rows) => rows.filter((row) => row.action === "email.test_requested"))).toHaveLength(
+      TEST_EMAIL_USER_LIMIT.max,
+    );
+    // The keys hold IDs only, never the address (UNI-09).
+    expect(await admin`select key from rate_limit where key like ${"%@%"}`).toEqual([]);
+    // Wait for the sends, so no message of this case lands while a later case counts messages.
+    await waitFor("messages in Mailpit", async () =>
+      (await searchMessages(member.email, mailpitUrl)).length === TEST_EMAIL_USER_LIMIT.max ? true : undefined,
+    );
+  });
+
+  it("does not count a FORBIDDEN or unauthenticated post", async () => {
+    const own = await newWorkspace("limit-staff");
+    const member = await newMember("staff", own);
+    signedIn = { userId: member.id, workspaceId: own };
+    for (let i = 0; i <= TEST_EMAIL_USER_LIMIT.max; i += 1) {
+      expect(await sendTestEmail({}, crypto.randomUUID())).toEqual({ ok: false, status: "FORBIDDEN" });
+    }
+    signedIn = null;
+    expect(await sendTestEmail({}, crypto.randomUUID())).toEqual({ ok: false, status: "UNAUTHENTICATED" });
+    expect(await unitsSpent(userKey(member.id))).toBe(0);
+    expect(await unitsSpent(workspaceKey(own))).toBe(0);
+  });
+
+  it(`answers RATE_LIMITED once the workspace has sent ${TEST_EMAIL_WORKSPACE_LIMIT.max} in the hour, and gives the user's unit back`, async () => {
+    const own = await newWorkspace("limit-workspace");
+    const member = await newMember("admin", own);
+    // The workspace's window already holds its maximum (as if other members had sent them).
+    await admin`
+      insert into rate_limit (key, count, window_start, window_seconds)
+      values (${workspaceKey(own)}, ${TEST_EMAIL_WORKSPACE_LIMIT.max}, now(), ${TEST_EMAIL_WORKSPACE_LIMIT.windowSeconds})`;
+    signedIn = { userId: member.id, workspaceId: own };
+    expect(await sendTestEmail({}, crypto.randomUUID())).toEqual({ ok: false, status: "RATE_LIMITED" });
+    expect(await jobsFor(member.id)).toBe(0);
+    expect(await auditRows(member.id, own)).toEqual([]);
+    expect(await unitsSpent(userKey(member.id))).toBe(0);
   });
 });

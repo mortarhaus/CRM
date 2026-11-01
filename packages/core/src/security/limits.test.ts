@@ -13,6 +13,8 @@ import {
   SIGN_IN_ACCOUNT_FAILURE_LIMIT,
   SIGN_IN_IP_LIMIT,
   SIGN_UP_IP_LIMIT,
+  TEST_EMAIL_USER_LIMIT,
+  TEST_EMAIL_WORKSPACE_LIMIT,
   TWO_FACTOR_VERIFY_IP_LIMIT,
   WORKSPACE_NAME_MAX_LENGTH,
 } from "./limits";
@@ -62,6 +64,11 @@ describe("rate limits (spec Authentication and sessions, Rate limits, Numbers)",
 
   it("spec Rate limits, Storage and keys: cleanup removes rows whose window ended more than 24 hours ago", () => {
     expect(RATE_LIMIT_ROW_RETENTION_SECONDS).toBe(86_400);
+  });
+
+  it("not a spec row (review P2-1): the test email, 5 per hour per user and 20 per hour per workspace", () => {
+    expect(TEST_EMAIL_USER_LIMIT).toEqual({ windowSeconds: 3600, max: 5 });
+    expect(TEST_EMAIL_WORKSPACE_LIMIT).toEqual({ windowSeconds: 3600, max: 20 });
   });
 });
 

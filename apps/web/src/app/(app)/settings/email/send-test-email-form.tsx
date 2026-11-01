@@ -11,6 +11,7 @@ import {
   TEST_EMAIL_FAILED,
   TEST_EMAIL_FORBIDDEN,
   TEST_EMAIL_QUEUED,
+  TEST_EMAIL_RATE_LIMITED,
 } from "@/lib/auth/messages";
 
 type SendResult = ActionResult<{ queued: boolean }>;
@@ -20,10 +21,12 @@ interface FormProps {
   action: () => Promise<SendResult>;
 }
 
-// Every refusal but Staff's is one the user can only retry (a stale workspace, a reused key, a malformed post).
+// Every refusal but Staff's and the limit's is one the user can only retry (a stale workspace, a reused key, a
+// malformed post).
 function errorFor(result: SendResult): string | null {
   if (result.ok) return null;
-  return result.status === "FORBIDDEN" ? TEST_EMAIL_FORBIDDEN : TEST_EMAIL_FAILED;
+  if (result.status === "FORBIDDEN") return TEST_EMAIL_FORBIDDEN;
+  return result.status === "RATE_LIMITED" ? TEST_EMAIL_RATE_LIMITED : TEST_EMAIL_FAILED;
 }
 
 function SendTestEmailButton({ action, unreachable }: FormProps & { unreachable: boolean }) {

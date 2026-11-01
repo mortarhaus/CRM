@@ -25,6 +25,7 @@ export const SENDING_TEST_EMAIL = "Sending…";
 export const TEST_EMAIL_QUEUED = "Test email queued.";
 export const TEST_EMAIL_FORBIDDEN = "Only an Admin or Owner can send a test email.";
 export const TEST_EMAIL_FAILED = "We couldn't send the test email. Try again.";
+export const TEST_EMAIL_RATE_LIMITED = "You sent several test emails already. Try again in an hour.";
 
 // Keyed by the codes `input-limits.ts` refuses with; the text follows the shared limits.
 const LIMIT_MESSAGES: Record<LimitErrorCode, string> = {

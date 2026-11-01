@@ -190,6 +190,9 @@ reads only `DATABASE_WORKER_URL`, so it needs no email setting.
 - **Test email wording** (Charlie, ASK 8 = A, 2026-11-01): subject "Test email from CRM", body "This is a test
   email sent from your CRM workspace settings. If you received it, email delivery works."
   (`apps/web/src/emails/test-email.tsx`).
+- **Test email limit** (review P2-1, 2026-11-01): 5 per user and 20 per workspace per hour (`TEST_EMAIL_USER_LIMIT`,
+  `TEST_EMAIL_WORKSPACE_LIMIT`), counted in `rate_limit` under `email-test:user:<user id>` and
+  `email-test:ws:<workspace id>`; to let a user send again before the hour ends, delete that user's row.
 
 Verified: `apps/web/src/adapters/email/contract.test.ts` runs the same cases against both adapters: SMTP against a
 Mailpit Testcontainer, Resend against a local stand-in server (no test calls the real Resend API, UNI-11).

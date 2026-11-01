@@ -39,7 +39,7 @@ vi.mock("./session", async (importOriginal) => {
   };
 });
 
-const { action, requireWorkspaceMember } = await import("./action");
+const { ActionRefusedError, action, requireWorkspaceMember } = await import("./action");
 
 let database: TestDatabase;
 let admin: postgres.Sql;
@@ -351,6 +351,20 @@ describe("action(): idempotency", () => {
     const key = randomUUID();
     expect((await run({ field: Object.assign(Object.create(null), { a: 1 }) }, key)).status).toBe("DONE");
     expect((await run({ field: { a: 1 } }, key)).status).toBe("REPLAYED");
+  });
+
+  it("returns a refusal the handler throws, rolls back its key, and runs the same key again later", async () => {
+    let refuse = true;
+    const run = noteAction("test.refused", "staff", async ({ tx }) => {
+      await tx.execute(sql`select 1`);
+      if (refuse) throw new ActionRefusedError("RATE_LIMITED");
+      return { done: true };
+    }, true);
+    const key = randomUUID();
+    expect(await run({ note: "x" }, key)).toEqual({ ok: false, status: "RATE_LIMITED" });
+    expect(await keyRows(owner.workspaceId, key)).toEqual([]);
+    refuse = false;
+    expect(await run({ note: "x" }, key)).toEqual({ ok: true, status: "DONE", data: { done: true } });
   });
 
   it("returns IDEMPOTENCY_KEY_REUSED for the same key with other input, or for another action", async () => {
