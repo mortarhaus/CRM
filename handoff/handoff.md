@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-rate-limits (worktree) · HEAD 69b738f · PR #48
+# Handoff — 2026-11-01 · branch feat/p1-headers-email (worktree) · HEAD f1d2e01 · no PR yet
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,30 +6,21 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: **48** (Phase 1 PR 7)
-- Working folder: `.agent/worktrees/build-feat-p1-rate-limits`. Main checkout untouched (untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine).
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: none yet (Phase 1 PR 8, plan Tasks 25-29)
+- Working folder: `.agent/worktrees/build-feat-p1-headers-email`. Main checkout untouched (untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine).
 
 ## 1. Current PR / branch
-- PR #48 https://github.com/mortarhaus/CRM/pull/48 · branch `feat/p1-rate-limits` (base origin/main `fe8664e`) · pushed normally, head **`69b738f`**.
-- Purpose: Phase 1 PR 7 (plan Tasks 21-24): database rate limits, one client-IP derivation, Better Auth on the database limiter, per-account sign-in cap, uniform 429, Phase 1 enabled-path allow-list, AUTH-07, revoke-session-by-id, cleanup schedules.
-- Commits: `8e730a6` Task 21; `5efa3b0` Task 22; `0c23559` Task 23 (limiter on its own `crm_app` pool, Charlie 1A); `967c395` Task 24 (enabled paths + 404 layer, AUTH-07 hook + migration 0023, revokeOwnSession/revokeMySession, cleanups, origin pin, security-scan fix, Playwright per-test IP, runbook `phase-1-security.md`, DECISIONS); `5d76e37` docs (fourth PR #44 test named); `e5d2036` docs (Task 22 details, 404/415 before counters, revoke-by-id shape in DECISIONS); `69b738f` fix(image): CI image job failed on `e5d2036` (worker exited 1: `migrate.mjs` parsed the web schema, which needs the web-only `TRUSTED_CLIENT_IP_HEADER` in production); entrypoint now passes the role, `migrateEnvFor` checks each container's own schema; CI prints service logs on a failed stack start.
+- Branch `feat/p1-headers-email` created from origin/main `f1d2e01` (PR #48 merge). Not pushed. No PR.
+- Purpose: Phase 1 PR 8: nonce CSP and static security headers (Task 25), email adapter SMTP/Resend + React Email + Mailpit (Task 26), test email web -> job -> Mailpit with `/settings/email` (Task 27), CI/compose wiring (Task 28), Phase 1 close: runbooks, CLAUDE.md commands (Task 29).
 
 ## 2. Milestones
-- Done: Phase 0; Phase 1 PRs 1-6 (#39, #41, #43, #44, #45, #46) and #47.
-- In progress: Phase 1 PR 7 = PR #48, awaiting review.
-- Pending: PR 8 (Tasks 25-29).
+- Done: Phase 0; Phase 1 PRs 1-7 (#39, #41, #43, #44, #45, #46, #48) and side fixes #35, #37, #40, #47. All logged on agent-logs.
+- In progress: PR 8, Task 25 not started.
+- Pending: Tasks 26-29; then Task 30 (separate spec revision 8 PR).
 
 ## 3. Git state
 ```
-worktree build-feat-p1-rate-limits: ## feat/p1-rate-limits...origin/feat/p1-rate-limits (clean)
-69b738f fix(image): each container checks only its own environment before migrating
-e5d2036 docs: record the Task 22 details and the revoke-by-id shape in the PR 7 decision
-5d76e37 docs: name the fourth PR #44 test in the PR 7 decision
-967c395 feat(auth): only Phase 1 Better Auth paths reachable; worker-owned cleanup schedules
-0c23559 feat(auth): database-backed Better Auth limits, per-account sign-in failures, uniform 429
-5efa3b0 feat(auth): one trusted client-IP derivation for /api/auth and form submits
-8e730a6 feat(auth): database rate-limit counters with one atomic consume statement
-fe8664e Merge pull request #46 from mortarhaus/feat/p1-events
+worktree build-feat-p1-headers-email: feat/p1-headers-email = origin/main f1d2e01 (clean)
 ```
 Uncommitted files — fingerprint every staged, modified or untracked path when writing this handoff:
 | Path | Status | Content hash (`git hash-object <path>`, or `deleted`) |
@@ -37,27 +28,26 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 | (none) | clean | - |
 
 ## 4. Just finished
-2026-11-01 PR #48 opened by the Opus 5.5 helper. Checks at `967c395`: typecheck 0, lint 0, `pnpm test` 45 files 921 passed 1 skipped (runIf), `test:gates` 1 passed, build 0, audit 0 (5 moderate), auth E2E 84 passed (throwaway Postgres, `next dev` 3100, no `E2E_RATE_LIMITED`), `git diff --check` clean. Security scan finding (HIGH, parser differential in `request-handler.ts`) fixed fail-closed: 415 for non-JSON sign-in, shared `acct:signin:unreadable` key; in DECISIONS and PR body. `pnpm smoke:auth-route` FAILED locally only because the worktree root `.env` is stale (Phase 0 user `crm`); CI image job runs it. CI on `5d76e37` pending at PR open.
-
-Update: CI image job failed on `e5d2036` (worker exit 1); fixed in `69b738f`; CI run 41292891545 on `69b738f` all green (checks 8m18s, audit, secret scan, image+smoke+E2E 25m46s).
+2026-11-01 `merged 48` done earlier. Status page made for Charlie (artifact 6de91JGVRQedUZ9YB3z3UQ). Gates checked: spec gate (Round 27 Approved for 733cc0e9), reconcile gate, log gate clear. Local main fast-forwarded to f1d2e01.
 
 ## 5. Next step (file-level)
-`review 48` (Bob), on head `69b738f`, CI is green on it (run 41292891545: all 4 jobs pass, image job incl. smoke and E2E).
+Task 25 (`apps/web/proxy.ts`, `apps/web/src/lib/security-headers.ts` + test, `apps/web/e2e/security-headers.spec.ts`, `next.config.ts`, `layout.tsx`, runbook `phase-1-security.md`, DECISIONS), test first, on Opus 5.5.
 
 ## 6. Open ASK items, blockers, and owner answers
-1. Decided (Charlie 1A, 2026-11-01): limiter on its own autocommit `crm_app` pool (`LIMITER_POOL_MAX` 2; R4 14 per web process). In DECISIONS and PR #48.
-2. Decided (Charlie 2A, 2026-11-01): `/change-password` refused without `revokeOtherSessions: true`. In DECISIONS and PR #48.
-3. For Bob (in PR #48): revoke-by-id is a server function, not an `action()` (workspace-scoped); is a user-scoped wrapper wanted? Also recorded: per-row keys `ba:<row>:<ip>` (DECISIONS + PR "Differences" item 3).
-4. Carried: ASK 5, the `.env` refresh (now also blocks local `pnpm smoke:auth-route`: `/api/auth/ok` needs the database since PR 7), repo visibility, untracked files in the main checkout. Dev volume `crm-dev_pgdata` not migrated to 0021-0023; the helper started dev compose `postgres`+`bootstrap` once for the smoke attempt (bootstrap re-applied role passwords from the worktree `.env`), then stopped and removed them.
+1. ASK 6 answered by Charlie 2026-11-01: "A" = HSTS `max-age=31536000`, no `includeSubDomains`, no `preload`. Record in DECISIONS (Task 25 Step 4).
+2. ASK 7 (production `EMAIL_FROM`, SPF/DKIM/DMARC owner) open; blocks only the production runbook line (Task 26).
+3. ASK 8 (test-email and `/settings/email` wording) open; blocks Task 27's commit. Draft text is in the plan.
+4. ASK 9 (`require_2fa` in Phase 2) open; confirm with Charlie.
+5. Carried: stale health body in `phase-0-auth-database.md` (Task 29), "3 moderate" count fix, `migrateEnvFor` DECISIONS entry, optional P3s, rotate dev AUTH_SECRET, refresh local `.env`, repo visibility, untracked files in main checkout.
 
 ## 7. Open review findings (P0/P1) and verdict
-- No review yet for PR #48. PR 46: merged; review, receipt and log on agent-logs.
+- None. No PR yet.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- None open: Step 3a IP, IPv6 /64, `session.ts` header strip, migrations 0021-0023, revoke-by-id shape are all in `docs/DECISIONS.md` 2026-11-01 PR 7 entry (commit `e5d2036`).
+- ASK 6 = A (HSTS values above). Goes into DECISIONS in Task 25.
 
 ## 9. Files touched but not committed
-- None in the worktree. Scratch files only in the helper's scratchpad.
+- None.
 
 ## 10. Model for the next session
 Opus 5.5 (auth, rate limits and review fixes are the deep tier). Sonnet 5 only for mechanical edits.
