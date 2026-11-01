@@ -63,7 +63,7 @@ export class CookieJar {
 
   headers(extra: HeadersInit = {}): Headers {
     const headers = new Headers(extra);
-    headers.set("x-forwarded-for", CLIENT_IP);
+    headers.set("x-crm-client-ip", CLIENT_IP);
     headers.set("user-agent", USER_AGENT);
     if (this.values.size > 0) headers.set("cookie", this.header());
     return headers;
@@ -83,10 +83,12 @@ export async function call(
   auth: AuthLike,
   method: "GET" | "POST",
   path: string,
-  options: { body?: unknown; jar?: CookieJar; headers?: HeadersInit } = {},
+  options: { body?: unknown; jar?: CookieJar; headers?: HeadersInit; clientIp?: string } = {},
 ): Promise<Reply> {
   const jar = new CookieJar(options.jar);
   const headers = jar.headers(options.headers);
+  // A burst that is about locks, not limits, sends each request from its own address (rate limits are per IP).
+  if (options.clientIp !== undefined) headers.set("x-crm-client-ip", options.clientIp);
   headers.set("origin", BASE_URL);
   if (options.body !== undefined) headers.set("content-type", "application/json");
   let response: Response;
@@ -129,6 +131,8 @@ export interface Stack {
   name: string;
   admin: postgres.Sql;
   handle: DbHandle;
+  // The rate limiter's own pool (createAuth's limiterDb), as in the web process.
+  limiter: DbHandle;
   appUrl: string;
   close(): Promise<void>;
 }
@@ -137,13 +141,16 @@ export function openStack(database: TestDatabase, name: string): Stack {
   const admin = postgres(databaseUrl(database.adminUrl, name), { max: 4, onnotice: () => {} });
   const appUrl = databaseUrl(database.appUrl, name);
   const handle = createDb(appUrl);
+  const limiter = createDb(appUrl, { max: 2 });
   return {
     name,
     admin,
     handle,
+    limiter,
     appUrl,
     async close() {
       await handle.sql.end({ timeout: 1 });
+      await limiter.sql.end({ timeout: 1 });
       await admin.end({ timeout: 1 });
     },
   };

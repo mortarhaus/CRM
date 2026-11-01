@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 import { completeTotpSignIn, enrolTotp, respectRateLimit, signIn, signOut, signUp, uniqueEmail } from "./helpers";
 
 async function createWorkspace(page: Page, name: string): Promise<void> {

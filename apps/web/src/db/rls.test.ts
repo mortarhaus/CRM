@@ -115,8 +115,7 @@ async function policyRoleViolations(schema: string): Promise<string[]> {
 }
 
 // Spec Tenancy: the tables without RLS are exactly the system tables on the allow-list and every pgboss table.
-// Listed tables that a later Phase 1 PR creates (rate_limit, auth_audit_log) are skipped until they exist;
-// the Phase 1 done-when run checks that each one does (plan Task 8, Task 29).
+// Since rate_limit (plan Task 21) every listed table exists; the test below checks that each one does (Task 8, 29).
 async function noRlsViolations(schema: string, allowList: readonly string[] | "every table"): Promise<string[]> {
   const rows = await admin<{ name: string; rls: boolean }[]>`
     select c.relname as name, c.relrowsecurity as rls
@@ -139,6 +138,14 @@ async function noRlsPolicyViolations(schema: string, allowList: readonly string[
 }
 
 describe("no-RLS allow-list (spec Tenancy)", () => {
+  it("public: every table on the allow-list exists", async () => {
+    const rows = await admin<{ name: string }[]>`
+      select c.relname as name from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind in ('r', 'p')`;
+    const existing = new Set(rows.map((row) => row.name));
+    expect(NO_RLS_ALLOW_LIST.filter((name) => !existing.has(name))).toEqual([]);
+  });
+
   it("public: the tables without RLS are exactly the system tables on the allow-list", async () => {
     expect(await noRlsViolations("public", NO_RLS_ALLOW_LIST)).toEqual([]);
   });

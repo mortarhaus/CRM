@@ -24,6 +24,7 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...table("session", "SELECT", "INSERT", "DELETE"),
     ...columns("session", "UPDATE", "active_organization_id", "expires_at", "updated_at"),
     ...table("account", "SELECT", "INSERT"),
+    ...columns("account", "UPDATE", "password", "updated_at"), // the password change (migration 0023)
     ...table("verification", "SELECT", "INSERT", "DELETE"),
     ...table("two_factor", "SELECT", "INSERT", "DELETE"),
     ...columns("two_factor", "UPDATE", "backup_codes", "failed_verification_count", "locked_until", "secret", "verified"),
@@ -34,6 +35,7 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...columns("invitation", "UPDATE", "expires_at", "status"),
     ...table("billing_account", "SELECT", "INSERT"), // system table, no RLS (migration 0005)
     ...table("auth_audit_log", "INSERT"), // system table, no RLS, append-only, no reader (migration 0008)
+    ...table("rate_limit", "SELECT", "INSERT", "UPDATE", "DELETE"), // system table, no RLS (migration 0022)
     // Tenant tables, under RLS (migrations 0003, 0012, 0014 and 0020).
     ...table("workspace_settings", "SELECT", "INSERT", "UPDATE"),
     ...table("audit_log", "SELECT", "INSERT"), // append-only (TEN-03)

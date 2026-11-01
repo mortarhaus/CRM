@@ -1,5 +1,6 @@
 import type { AppDatabase } from "../db/system";
 import { createWorkerBoss } from "../jobs/boss";
+import { IDEMPOTENCY_CLEANUP_CRON, RATE_LIMIT_CLEANUP_CRON } from "../jobs/cleanup";
 import { HANDLERS, type Handlers, type QueueName } from "../jobs/handlers";
 import { type Log, logInfo } from "../jobs/log";
 
@@ -30,6 +31,10 @@ export async function startWorker({ appDb, workerUrl, log = console.log, handler
     for (const [queue, handler] of Object.entries(handlers) as [QueueName, NonNullable<Handlers[QueueName]>][]) {
       await boss.work<object>(queue, (jobs) => handler(jobs, { log }));
     }
+    // The daily cleanups (plan Task 24; EVT-06): scheduled here, by the worker, never from an HTTP route. schedule()
+    // upserts, so every start sets the same two rows.
+    await boss.schedule("rate_limit.cleanup", RATE_LIMIT_CLEANUP_CRON);
+    await boss.schedule("idempotency.cleanup", IDEMPOTENCY_CLEANUP_CRON);
   } catch (error) {
     await boss.stop({ graceful: false, timeout: 1_000 }).catch(() => {});
     await appDb.close();

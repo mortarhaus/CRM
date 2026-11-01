@@ -6,7 +6,7 @@ import {
 } from "@crm/core/security";
 import { and, eq } from "drizzle-orm";
 import postgres from "postgres";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createDb, type DbHandle } from "../../db/client";
 import {
   account,
@@ -30,12 +30,17 @@ const PASSWORD = "correct horse battery staple 42";
 let database: TestDatabase;
 let handle: DbHandle;
 let auth: Auth;
+let limiterAdmin: postgres.Sql;
+let limiter: DbHandle;
 
 beforeAll(async () => {
   database = await startDatabase();
+  limiterAdmin = postgres(database.adminUrl, { max: 1, onnotice: () => {} });
   handle = createDb(database.appUrl);
+  limiter = createDb(database.appUrl, { max: 2 });
   auth = createAuth({
     db: handle.db,
+    limiterDb: limiter.db,
     secret: "integration test secret, not a real key",
     baseURL: "http://localhost:3000",
   });
@@ -43,7 +48,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await handle?.sql.end();
+  await limiterAdmin?.end();
+  await limiter?.sql.end();
   await database?.stop();
+});
+
+// The limits are on (spec "Rate limits": tests run with them on) and every request here shares one IP; each test
+// starts with no counters, so a test only meets a limit it sets out to reach (rate-limit.test.ts).
+beforeEach(async () => {
+  await limiterAdmin`delete from rate_limit`;
 });
 
 let emailCounter = 0;
@@ -81,7 +94,7 @@ async function findUser(email: string) {
 
 describe("session cookie attributes", () => {
   function authAt(baseURL: string): Auth {
-    return createAuth({ db: handle.db, secret: "integration test secret, not a real key", baseURL });
+    return createAuth({ db: handle.db, limiterDb: limiter.db, secret: "integration test secret, not a real key", baseURL });
   }
 
   async function signInCookies(instance: Auth): Promise<string[]> {
@@ -264,7 +277,8 @@ describe("input limits enforced on the server (owner decision 2026-10-14)", () =
 
   it("applies the password limits to a password change", async () => {
     const headers = await signUpAndSignIn(uniqueEmail());
-    const change = (newPassword: string) => viaHttp("/change-password", { currentPassword: PASSWORD, newPassword }, headers);
+    const change = (newPassword: string) =>
+      viaHttp("/change-password", { currentPassword: PASSWORD, newPassword, revokeOtherSessions: true }, headers);
     expect(await change(ascii(PASSWORD_MIN_LENGTH - 1))).toEqual({ status: 400, code: "PASSWORD_TOO_SHORT" });
     expect(await change(astral(PASSWORD_MAX_LENGTH + 1))).toEqual({ status: 400, code: "PASSWORD_TOO_LONG" });
   });
@@ -297,6 +311,59 @@ describe("input limits enforced on the server (owner decision 2026-10-14)", () =
       });
       expect(await rename("w".repeat(WORKSPACE_NAME_MAX_LENGTH))).toEqual({ status: 200 });
     });
+  });
+});
+
+// AUTH-07 (Charlie 2026-11-01, decision 2 A): a password change ends every other session. Better Auth 1.7.14 does
+// that only when the body says `revokeOtherSessions: true` (api/routes/update-user.mjs:174), so a request without it
+// is refused before the endpoint runs.
+describe("AUTH-07: a password change signs out every other session", () => {
+  const NEW_PASSWORD = `${PASSWORD} changed`;
+
+  it.each([
+    ["without the flag", {}],
+    ["with the flag false", { revokeOtherSessions: false }],
+  ])("refuses a change %s and keeps the password", async (_label, flag) => {
+    const email = uniqueEmail();
+    const headers = await signUpAndSignIn(email);
+    expect(await viaHttp("/change-password", { currentPassword: PASSWORD, newPassword: NEW_PASSWORD, ...flag }, headers)).toEqual({
+      status: 400,
+      code: "REVOKE_OTHER_SESSIONS_REQUIRED",
+    });
+    const signIn = await auth.api.signInEmail({ body: { email, password: PASSWORD }, asResponse: true });
+    expect(signIn.status).toBe(200);
+  });
+
+  it("refuses it through auth.api too", async () => {
+    const headers = await signUpAndSignIn(uniqueEmail());
+    expect(
+      await viaApi(() => auth.api.changePassword({ body: { currentPassword: PASSWORD, newPassword: NEW_PASSWORD }, headers })),
+    ).toEqual({ status: 400, code: "REVOKE_OTHER_SESSIONS_REQUIRED" });
+  });
+
+  it("with the flag, the other session is gone and the caller gets a new one", async () => {
+    const email = uniqueEmail();
+    const first = await signUpAndSignIn(email);
+    const signIn = await auth.api.signInEmail({ body: { email, password: PASSWORD }, asResponse: true });
+    const second = cookieHeaders(signIn);
+    expect(await auth.api.getSession({ headers: second })).not.toBeNull();
+
+    const requestHeaders = new Headers(first);
+    requestHeaders.set("content-type", "application/json");
+    requestHeaders.set("origin", "http://localhost:3000");
+    const response = await auth.handler(
+      new Request("http://localhost:3000/api/auth/change-password", {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify({ currentPassword: PASSWORD, newPassword: NEW_PASSWORD, revokeOtherSessions: true }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await auth.api.getSession({ headers: second })).toBeNull();
+    expect(await auth.api.getSession({ headers: first })).toBeNull();
+    expect(await auth.api.getSession({ headers: cookieHeaders(response) })).not.toBeNull();
+    const { id } = await findUser(email);
+    expect(await handle.db.select().from(session).where(eq(session.userId, id))).toHaveLength(1);
   });
 });
 

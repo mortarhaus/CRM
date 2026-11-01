@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NAME_MAX_LENGTH, PASSWORD_MIN_LENGTH, WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
-import { expect, test, type APIResponse, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { APIResponse, Locator, Page } from "@playwright/test";
 import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { tabTo } from "./a11y";
 import { PASSWORD, respectRateLimit, signIn, signOut, signUp, uniqueEmail } from "./helpers";

@@ -96,7 +96,7 @@ these grants; the statement log was not re-collected.
 |---|---|---|---|---|---|
 | `user` | yes | yes | `name`, `two_factor_enabled`, `updated_at` | no | sign-up, session reads, rename, 2FA flag |
 | `session` | yes | yes | `active_organization_id`, `expires_at`, `updated_at` | yes | sign-in, workspace switch, refresh after a day, sign-out and 2FA session rotation |
-| `account` | yes | yes | none | no | credential row at sign-up, password check at sign-in |
+| `account` | yes | yes | `password`, `updated_at` (PR 7, migration 0023) | no | credential row at sign-up, password check at sign-in, `/change-password` |
 | `verification` | yes | yes | none | yes | the 2FA challenge row, consumed and expired-row cleanup |
 | `two_factor` | yes | yes | `backup_codes`, `failed_verification_count`, `locked_until`, `secret`, `verified` | yes | enrolment (restart replaces the secret), confirmation, recovery codes, failed-attempt lock, disable |
 | `organization` | yes | yes | `name` | no | workspace create, list, rename |
@@ -105,10 +105,12 @@ these grants; the statement log was not re-collected.
 
 INSERT is table-level because Drizzle names every column in an insert. Better Auth paths outside the
 operation set get no grant and fail with `permission denied` (HTTP 500) if called, for example a successful
-password change (`account.password`), email change, a workspace slug or logo change, and member role changes. The Phase 1 enabled-path list (plan Task 24) decides which of them stay
-reachable; enabling one adds its grant and a test here. Since PR 3 the seven invitation endpoints answer
-404 over HTTP (`disabledPaths` in `apps/web/src/lib/auth/config.ts`; invitations are Phase 3), so the
-`invitation` grants are used only by the server-side tests until then.
+email change, a workspace slug or logo change, and member role changes. Since PR 7 the Phase 1 enabled-path
+list (`apps/web/src/lib/auth/enabled-paths.ts`, plan Task 24) decides which paths are reachable: every other
+Better Auth path answers 404 over HTTP (`disabledPaths`, computed from the built options, and the request
+handler). `/change-password` is enabled, with its grant (migration 0023) and a refusal unless the body sends
+`revokeOtherSessions: true` (AUTH-07; `docs/runbooks/phase-1-security.md`). The seven invitation endpoints
+answer 404 (invitations are Phase 3), so the `invitation` grants are used only by the server-side tests until then.
 
 The manifest `apps/web/src/db/privileges.ts` holds the same set, together with every grant below
 (system tables, tenant tables, `crm_purge`); `privileges.test.ts` fails on any privilege

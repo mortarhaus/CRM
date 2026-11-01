@@ -7,7 +7,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import type { TOTP } from "otpauth";
 import postgres from "postgres";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Database } from "../../db/client";
 import * as schema from "../../db/schema";
 import {
@@ -65,6 +65,10 @@ const next = vi.hoisted(() => ({
   headers: new Headers(),
   auth: undefined as unknown,
   setCookie: () => {},
+  env: { APP_URL: "http://localhost:3000", TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for" },
+  // The limiter pool and secret behind getAuthHandler (server.ts), set in beforeAll.
+  limiter: undefined as unknown,
+  secret: "",
 }));
 vi.mock("next/headers", () => ({ headers: async () => next.headers, cookies: async () => ({ set: next.setCookie }) }));
 vi.mock("next/navigation", () => ({
@@ -72,8 +76,19 @@ vi.mock("next/navigation", () => ({
     throw Object.assign(new Error("NEXT_REDIRECT"), { url });
   },
 }));
-vi.mock("./server", () => ({ getAuth: () => next.auth }));
-vi.mock("../env", () => ({ getEnv: () => ({ APP_URL: "http://localhost:3000" }) }));
+vi.mock("./server", async () => {
+  const { authRequestHandler } = await import("./request-handler");
+  return {
+    getAuth: () => next.auth,
+    getAuthHandler: () =>
+      authRequestHandler({
+        handler: (request) => (next.auth as Auth).handler(request),
+        limiterDb: next.limiter as never,
+        secret: next.secret,
+      }),
+  };
+});
+vi.mock("../env", async (importOriginal) => ({ ...(await importOriginal<object>()), getEnv: () => next.env }));
 
 const TEMPLATE = "auth_audit_template";
 const NAME = "Audit Person";
@@ -116,7 +131,9 @@ beforeAll(async () => {
     await root.end();
   }
   main = openStack(database, database.container.getDatabase());
-  auth = createAuth({ db: main.handle.db, secret: SECRET, baseURL: BASE_URL });
+  auth = createAuth({ db: main.handle.db, limiterDb: main.limiter.db, secret: SECRET, baseURL: BASE_URL });
+  next.limiter = main.limiter.db;
+  next.secret = SECRET;
 }, 120_000);
 
 afterAll(async () => {
@@ -163,6 +180,13 @@ async function faultsNotFired(admin: postgres.Sql): Promise<string[]> {
   return rows.map((row) => row.name);
 }
 
+// The limits are on (spec "Rate limits": tests run with them on) and every request here comes from CLIENT_IP, which
+// the row-content check needs. Each test starts with no counters on the main database; a database of a test's own is
+// a fresh copy of the template, which has none.
+beforeEach(async () => {
+  await main.admin`delete from rate_limit`;
+});
+
 afterEach(async () => {
   try {
     for (const stack of [main, ...isolatedStacks]) {
@@ -175,12 +199,20 @@ afterEach(async () => {
   }
 });
 
+// A distinct documentation address (TEST-NET-2) per request of a burst.
+function burstIp(index: number): string {
+  return `198.51.100.${index + 1}`;
+}
+
 // A database of the test's own, with the configured instance on it.
 async function isolated(): Promise<{ stack: Stack; auth: Auth }> {
   clones += 1;
   const stack = await cloneStack(database, TEMPLATE, `auth_audit_${clones}`);
   isolatedStacks.push(stack);
-  return { stack, auth: createAuth({ db: stack.handle.db, secret: SECRET, baseURL: BASE_URL }) };
+  return {
+    stack,
+    auth: createAuth({ db: stack.handle.db, limiterDb: stack.limiter.db, secret: SECRET, baseURL: BASE_URL }),
+  };
 }
 
 // Control: the configured options (labels, triggers, plugins), but no request transaction: every statement
@@ -191,9 +223,12 @@ function unserialised(db: Database): AuthLike {
 
 // The configured instance with one part of its options changed (a protection removed, for a control or a
 // layer-alone test).
-function configuredWith(db: Database, change: (options: BetterAuthOptions) => BetterAuthOptions): AuthLike {
+function configuredWith(stack: Stack, change: (options: BetterAuthOptions) => BetterAuthOptions): AuthLike {
+  const { db } = stack.handle;
   const transactions = createAuthTransactions(db);
-  const options = change(authOptions({ db, secret: SECRET, baseURL: BASE_URL, adapterDb: transactions.db }));
+  const options = change(
+    authOptions({ db, secret: SECRET, baseURL: BASE_URL, adapterDb: transactions.db, limiterDb: stack.limiter.db }),
+  );
   return withRequestTransactions(betterAuth(options), transactions);
 }
 
@@ -204,7 +239,7 @@ async function http(
   instance: AuthLike,
   method: "GET" | "POST",
   path: string,
-  options: { body?: unknown; jar?: CookieJar; headers?: HeadersInit } = {},
+  options: { body?: unknown; jar?: CookieJar; headers?: HeadersInit; clientIp?: string } = {},
 ): Promise<Reply> {
   const reply = await call(instance, method, path, options);
   for (const line of reply.setCookies) {
@@ -430,16 +465,48 @@ describe("T1 (R1): one row per event, keyed by user, with no workspace", () => {
   });
 });
 
-// crm_app holds no UPDATE on account until plan Task 24 enables the password change; a test database of its own
-// gets the two columns Better Auth writes, so /change-password reaches its rotation.
-async function grantPasswordChange(admin: postgres.Sql): Promise<void> {
-  await admin.unsafe("GRANT UPDATE (password, updated_at) ON public.account TO crm_app");
-}
+describe("Step 3a (plan Task 22): the audit IP is the derived client IP, never a caller-supplied one", () => {
+  // The edge in front of handleAuthRequest (SaaS setting): it sets CF-Connecting-IP, and the caller forges the
+  // internal header. The edge IP is the harness CLIENT_IP so the every-test row-content check (T13 b) still holds.
+  function behindEdge(instance: Auth): AuthLike {
+    return {
+      $context: instance.$context,
+      async handler(request) {
+        next.auth = instance;
+        const headers = new Headers(request.headers);
+        headers.set("cf-connecting-ip", CLIENT_IP);
+        headers.set("x-crm-client-ip", "198.51.100.9");
+        const { handleAuthRequest } = await import("./handle");
+        return handleAuthRequest(new Request(request, { headers }));
+      },
+    };
+  }
+
+  // The plan's Step 3a expected the 2FA change rows to keep ip null (Task 31 open point 4). The merged mechanism
+  // (migration 0009) writes crm.auth_client_ip on every row of a request, so they carry the edge IP too.
+  it("session_issued, two_factor_verified and the 2FA change rows carry the edge IP, never the forged one", async () => {
+    next.env = { ...next.env, TRUSTED_CLIENT_IP_HEADER: "cf-connecting-ip" };
+    try {
+      const edge = behindEdge(auth);
+      const person = await withTwoFactor(edge, main.admin);
+      await signInWithTotp(edge, person);
+      const rows = await auditRows(main.admin, person.id);
+      const ips = new Map<string, Set<string | null>>();
+      for (const row of rows) ips.set(row.event, (ips.get(row.event) ?? new Set()).add(row.ip));
+      expect(ips.get("session_issued")).toEqual(new Set([CLIENT_IP]));
+      expect(ips.get("two_factor_verified")).toEqual(new Set([CLIENT_IP]));
+      expect(ips.get("two_factor_enabled")).toEqual(new Set([CLIENT_IP]));
+      for (const row of rows) expect(row.ip).not.toBe("198.51.100.9");
+    } finally {
+      next.env = { ...next.env, TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for" };
+    }
+  });
+});
 
 describe("T2 (R2): no session exists without its audit row", () => {
-  it("the password-change path reaches its rotation (with the test-only grant): one rotation row, A′ only", async () => {
+  // crm_app holds UPDATE (password, updated_at) on account since migration 0023 (plan Task 24).
+  it("the password-change path reaches its rotation: one rotation row, A′ only", async () => {
     const { stack, auth: instance } = await isolated();
-    await grantPasswordChange(stack.admin);
     const person = await signUp(instance, stack.admin);
     const jar = await signIn(instance, person.email);
     const other = await signIn(instance, person.email);
@@ -542,7 +609,6 @@ describe("T2 (R2): no session exists without its audit row", () => {
       "rotation on password change",
       {
         async setup(instance, admin) {
-          await grantPasswordChange(admin);
           const person = await signUp(instance, admin);
           const jar = await signIn(instance, person.email);
           const act = () =>
@@ -1260,7 +1326,7 @@ describe("T7 (R7): a concurrent 2FA change never gives a login row that disagree
 describe("T8 (R8): a trusted-device cookie cannot skip the 2FA challenge", () => {
   it("each trust layer alone: the database refuses the record when the input check is gone", async () => {
     const { stack } = await isolated();
-    const withoutInputCheck = configuredWith(stack.handle.db, (options) => ({ ...options, hooks: {} }));
+    const withoutInputCheck = configuredWith(stack, (options) => ({ ...options, hooks: {} }));
     const person = await withTwoFactor(withoutInputCheck, stack.admin);
     const jar = await challenge(withoutInputCheck, person.email);
     const reply = await http(withoutInputCheck, "POST", "/two-factor/verify-totp", {
@@ -1293,7 +1359,7 @@ describe("T8 (R8): a trusted-device cookie cannot skip the 2FA challenge", () =>
 });
 
 describe("T9 (R9): trusted devices are refused", () => {
-  it("trusted devices refused: 400 on both verify paths with trustDevice: true", async () => {
+  it("trusted devices refused: 400 on both Phase 1 verify paths with trustDevice: true", async () => {
     const person = await withTwoFactor(auth, main.admin);
     const jar = await challenge(auth, person.email);
     const totp = await http(auth, "POST", "/two-factor/verify-totp", { body: { code: code(person.totp), trustDevice: true }, jar });
@@ -1301,8 +1367,11 @@ describe("T9 (R9): trusted devices are refused", () => {
       body: { code: person.backupCodes[0], trustDevice: true },
       jar,
     });
+    // verify-otp is not a Phase 1 path (plan Task 24): 404 before the refusal could run.
     const otp = await http(auth, "POST", "/two-factor/verify-otp", { body: { code: "123456", trustDevice: true }, jar });
-    for (const reply of [totp, recovery, otp]) {
+    expect(otp.status).toBe(404);
+    expect(setsSession(otp)).toBe(false);
+    for (const reply of [totp, recovery]) {
       expect(reply.status).toBe(400);
       expect(bodyField(reply, "code")).toBe("TRUST_DEVICE_DISABLED");
       expect(setsSession(reply)).toBe(false);
@@ -1331,7 +1400,7 @@ describe("T10 (R10): /list-sessions never returns a session token", () => {
 
   it("`/list-sessions` gives no token: the stock endpoint does, the configured one on no entry path", async () => {
     const { stack } = await isolated();
-    const unprotected = configuredWith(stack.handle.db, (options) => ({
+    const unprotected = configuredWith(stack, (options) => ({
       ...options,
       plugins: (options.plugins ?? []).filter((plugin) => plugin.id !== "crm-session-audit"),
     }));
@@ -1342,7 +1411,7 @@ describe("T10 (R10): /list-sessions never returns a session token", () => {
     const stock = await http(unprotected, "GET", "/list-sessions", { jar });
     expect(tokensIn(stock.body, tokens)).toEqual(tokens);
 
-    const configured = createAuth({ db: stack.handle.db, secret: SECRET, baseURL: BASE_URL });
+    const configured = createAuth({ db: stack.handle.db, limiterDb: stack.limiter.db, secret: SECRET, baseURL: BASE_URL });
     const viaHandler = await http(configured, "GET", "/list-sessions", { jar });
     expect(viaHandler.status).toBe(200);
     expect(viaHandler.body).toHaveLength(2);
@@ -1750,9 +1819,11 @@ describe("T15 (R15): Phase 0 sessions are invalidated at cutover", () => {
       const journal = await admin<{ id: number }[]>`select id from drizzle.__drizzle_migrations order by created_at`;
       expect(journal.length).toBeGreaterThanOrEqual(11);
 
-      const handle = await import("../../db/client").then(({ createDb }) => createDb(phase0.appUrl));
+      const { createDb } = await import("../../db/client");
+      const handle = createDb(phase0.appUrl);
+      const limiter = createDb(phase0.appUrl, { max: 1 });
       try {
-        const phase1 = createAuth({ db: handle.db, secret: SECRET, baseURL: BASE_URL });
+        const phase1 = createAuth({ db: handle.db, limiterDb: limiter.db, secret: SECRET, baseURL: BASE_URL });
         for (const jar of [s1, s2, s3]) {
           const reply = await http(phase1, "GET", "/get-session", { jar });
           expect(reply.body).toBeNull();
@@ -1769,6 +1840,7 @@ describe("T15 (R15): Phase 0 sessions are invalidated at cutover", () => {
         expect(await sessionsWithoutRow(admin)).toEqual([]);
       } finally {
         await handle.sql.end({ timeout: 1 });
+        await limiter.sql.end({ timeout: 1 });
       }
     } finally {
       await old.end();
@@ -1900,12 +1972,14 @@ describe("T15 (R15): Phase 0 sessions are invalidated at cutover", () => {
 
         const { createDb } = await import("../../db/client");
         const handle = createDb(databaseUrl(upgrade.appUrl, name));
+        const limiter = createDb(databaseUrl(upgrade.appUrl, name), { max: 1 });
         try {
-          const phase1 = createAuth({ db: handle.db, secret: SECRET, baseURL: BASE_URL });
+          const phase1 = createAuth({ db: handle.db, limiterDb: limiter.db, secret: SECRET, baseURL: BASE_URL });
           expect(await sessionOf(phase1, s1)).not.toBeNull();
           expect(await sessionsWithoutRow(admin)).toHaveLength(1);
         } finally {
           await handle.sql.end({ timeout: 1 });
+          await limiter.sql.end({ timeout: 1 });
         }
       } finally {
         await old.end();
@@ -1939,9 +2013,15 @@ describe("PR #44 P2-1: a burst of sign-ins for one email leaves half of the pool
     return { release, held };
   }
 
+  // Each request from its own address: the burst (30) is over the sign-in limit per IP (10 per 60 s, plan Task 23),
+  // and this test is about the email lock and the pool, not the limit. Failed sign-ins write no audit row, so the
+  // row-content check (ip = CLIENT_IP) is unaffected.
   function wrongPasswords(instance: AuthLike, email: string): Promise<Reply>[] {
-    return Array.from({ length: BURST }, () =>
-      http(instance, "POST", "/sign-in/email", { body: { email, password: `${PASSWORD} wrong` } }),
+    return Array.from({ length: BURST }, (_, i) =>
+      http(instance, "POST", "/sign-in/email", {
+        body: { email, password: `${PASSWORD} wrong` },
+        clientIp: burstIp(i),
+      }),
     );
   }
 
@@ -1981,7 +2061,15 @@ describe("PR #44 P2-1: a burst of sign-ins for one email leaves half of the pool
     const { stack } = await isolated();
     const transactions = createAuthTransactions(stack.handle.db, { slots: 10 });
     const unbounded = withRequestTransactions(
-      betterAuth(authOptions({ db: stack.handle.db, secret: SECRET, baseURL: BASE_URL, adapterDb: transactions.db })),
+      betterAuth(
+        authOptions({
+          db: stack.handle.db,
+          secret: SECRET,
+          baseURL: BASE_URL,
+          adapterDb: transactions.db,
+          limiterDb: stack.limiter.db,
+        }),
+      ),
       transactions,
     );
     const person = await signUp(unbounded, stack.admin);
@@ -2037,8 +2125,12 @@ describe("PR #44 Round 2 P2-2 (AUTH-05): a sign-in burst runs one at a time whet
     try {
       const started = performance.now();
       const replies = await Promise.all(
-        Array.from({ length: BURST }, () =>
-          http(instance, "POST", "/sign-in/email", { body: { email, password: `${PASSWORD} wrong` } }),
+        // Each request from its own address: 20 is over the sign-in limit per IP (see wrongPasswords above).
+        Array.from({ length: BURST }, (_, i) =>
+          http(instance, "POST", "/sign-in/email", {
+            body: { email, password: `${PASSWORD} wrong` },
+            clientIp: burstIp(i),
+          }),
         ),
       );
       return { statuses: replies.map((reply) => reply.status), maxInFlight, totalMs: performance.now() - started };

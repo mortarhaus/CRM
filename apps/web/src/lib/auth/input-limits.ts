@@ -30,8 +30,8 @@ function asBody(value: unknown): Body | undefined {
   return typeof value === "object" && value !== null ? (value as Body) : undefined;
 }
 
-// No form sends trustDevice, so this refusal has no user-facing message.
-type RefusalCode = LimitErrorCode | "TRUST_DEVICE_DISABLED";
+// No form sends trustDevice or changes a password yet, so these refusals have no user-facing message.
+type RefusalCode = LimitErrorCode | "TRUST_DEVICE_DISABLED" | "REVOKE_OTHER_SESSIONS_REQUIRED";
 
 function refuse(code: RefusalCode): never {
   throw new APIError("BAD_REQUEST", { code, message: code });
@@ -56,6 +56,10 @@ export const enforceInputLimits = createAuthMiddleware(async (ctx) => {
   const body = asBody(ctx.body);
   if (!body) return;
   if (TRUST_DEVICE_PATHS.has(ctx.path) && body.trustDevice) refuse("TRUST_DEVICE_DISABLED");
+  // AUTH-07 (Charlie 2026-11-01, decision 2 A): a password change ends every other session. Better Auth 1.7.14 does
+  // that only when the body asks (api/routes/update-user.mjs:174, deleteUserSessions under `if (revokeOtherSessions)`),
+  // so a change that does not ask is refused before the endpoint runs.
+  if (ctx.path === "/change-password" && body.revokeOtherSessions !== true) refuse("REVOKE_OTHER_SESSIONS_REQUIRED");
   const passwordField = NEW_PASSWORD_FIELD[ctx.path];
   if (passwordField) checkPassword(body[passwordField]);
   if (USER_NAME_PATHS.has(ctx.path)) checkMax(body.name, NAME_MAX_LENGTH, "NAME_TOO_LONG");

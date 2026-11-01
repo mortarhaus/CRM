@@ -16,3 +16,5 @@ next-env.d.ts
 .agent/
 /apps/web/AGENTS.md
 /apps/web/CLAUDE.md
+# rate-limit.test.ts and enabled-paths.test.ts take turns building (src/test/next-server.ts)
+.next-test-build.lock

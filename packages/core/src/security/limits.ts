@@ -12,6 +12,22 @@ export const IDEMPOTENCY_KEY_EXPIRY_SECONDS = 24 * 60 * 60;
 // Plan Task 14 Step 1: a key is 1 to 128 characters (CHECK on idempotency_key.key).
 export const IDEMPOTENCY_KEY_MAX_LENGTH = 128;
 
+// Spec "Authentication and sessions" → "Rate limits" → "Numbers" (revision 7, owner-approved 2026-10-20). Each is a
+// fixed window. Only the Phase 1 rows are here; the reset, link and OTP rows land with their features (UNI-02).
+export interface RateLimit {
+  readonly windowSeconds: number;
+  readonly max: number;
+}
+
+export const AUTH_DEFAULT_LIMIT: RateLimit = { windowSeconds: 60, max: 100 };
+export const SIGN_IN_IP_LIMIT: RateLimit = { windowSeconds: 60, max: 10 };
+export const SIGN_IN_ACCOUNT_FAILURE_LIMIT: RateLimit = { windowSeconds: 15 * 60, max: 5 };
+export const SIGN_UP_IP_LIMIT: RateLimit = { windowSeconds: 60 * 60, max: 10 };
+export const TWO_FACTOR_VERIFY_IP_LIMIT: RateLimit = { windowSeconds: 60, max: 10 };
+export const PASSWORD_CHECK_IP_LIMIT: RateLimit = { windowSeconds: 15 * 60, max: 10 };
+// The daily cleanup removes counter rows whose window ended more than this long ago.
+export const RATE_LIMIT_ROW_RETENTION_SECONDS = 24 * 60 * 60;
+
 // A code point, not a UTF-16 unit: an emoji counts once, like NIST and unlike String#length.
 export function characterCount(value: string): number {
   return [...value].length;

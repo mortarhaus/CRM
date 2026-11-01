@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 // The billing owner of one or more workspaces (spec Data model, "Accounts and workspaces"). A system table:
@@ -52,5 +52,23 @@ export const authAuditLog = pgTable(
       sql`${table.event} in ('session_issued', 'two_factor_verified', 'two_factor_enabled', 'two_factor_disabled', 'two_factor_backup_codes_changed')`,
     ),
     check("auth_audit_log_detail_check", sql`${table.detail} is null or jsonb_typeof(${table.detail}) = 'object'`),
+  ],
+);
+
+// Fixed-window rate-limit counters (spec "Authentication and sessions" → "Rate limits"; plan Task 21). A system table:
+// no RLS, reached only through src/db/system/rate-limit.ts. Better Auth's own limiter writes here through its
+// customStorage (keys "ba:…"), the app limiter for the keys Better Auth does not offer ("acct:…"). A key never holds
+// a raw email or token.
+export const rateLimit = pgTable(
+  "rate_limit",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    windowSeconds: integer("window_seconds").notNull(),
+  },
+  (table) => [
+    check("rate_limit_count_check", sql`${table.count} >= 0`),
+    check("rate_limit_window_seconds_check", sql`${table.windowSeconds} > 0`),
   ],
 );

@@ -97,7 +97,13 @@ jobs:
           exit-code: "1"
           format: table
       - name: Start stack (role bootstrap, migrations, web, worker)
+        id: stack
         run: docker compose -f docker/compose.dev.yml up -d --wait
+      # PR #48: `up --wait` names only the container that exited. Print each service's own output right here. The
+      # app logs name invalid variables, never their values (apps/web/src/lib/env.ts); nothing here echoes `.env`.
+      - name: Service logs when the stack does not start
+        if: failure() && steps.stack.outcome == 'failure'
+        run: docker compose -f docker/compose.dev.yml logs --no-color --tail=200
       # Bob PR #26: `pnpm dev` with only the root .env must serve /api/auth/ok. It needs the .env
       # written above, which the checks job does not have.
       - name: Smoke check of the auth route under pnpm dev

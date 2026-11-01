@@ -7,33 +7,32 @@ import type { Database } from "../../db/client";
 import * as schema from "../../db/schema";
 import { createAuthTransactions, ensureBillingAccount, ensureWorkspaceSettings, lockAuthUsers } from "../../db/system";
 import { isHttpsUrl, isLoopbackUrl } from "../origin";
+import { CLIENT_IP_HEADER } from "./client-ip";
+import { disabledPathsOf, endpointPathsOf } from "./enabled-paths";
 import { enforceInputLimits } from "./input-limits";
 import { logAuth } from "./log";
+import { rateLimitOptions } from "./rate-limit-rules";
 import { withRequestTransactions } from "./request-transaction";
 import { crmSessionAudit, labelSessionIssue } from "./session-audit";
-
-// Invitations are a Phase 3 feature (plan Task 10; Task 24 replaces this with the full Phase 1 allow-list).
-// disabledPaths applies to HTTP requests: Better Auth answers 404 before any handler runs.
-export const INVITATION_PATHS = [
-  "/organization/invite-member",
-  "/organization/accept-invitation",
-  "/organization/reject-invitation",
-  "/organization/cancel-invitation",
-  "/organization/get-invitation",
-  "/organization/list-invitations",
-  "/organization/list-user-invitations",
-] as const;
 
 export interface AuthDeps {
   db: Database;
   secret: string;
   baseURL: string;
+  // The rate limiter's own pool (getLimiterDb): its consumes autocommit outside the request transaction.
+  limiterDb: Database;
 }
 
 // The Better Auth options. `adapterDb` is the database Better Auth's adapter uses: createAuth passes the one that
 // routes each request to its transaction. Tests build an instance without that wrapper only as a control.
-export function authOptions({ db, secret, baseURL, adapterDb = db }: AuthDeps & { adapterDb?: Database }) {
-  return {
+export function authOptions({
+  db,
+  secret,
+  baseURL,
+  adapterDb = db,
+  limiterDb = db,
+}: Omit<AuthDeps, "limiterDb"> & { adapterDb?: Database; limiterDb?: Database }) {
+  const options = {
     appName: "CRM",
     secret,
     baseURL,
@@ -43,6 +42,12 @@ export function authOptions({ db, secret, baseURL, adapterDb = db }: AuthDeps & 
       useSecureCookies: isHttpsUrl(baseURL) || !isLoopbackUrl(baseURL),
       // Postgres-generated uuids so Phase 1 RLS policies can compare against current_setting(...)::uuid.
       database: { generateId: "uuid" },
+      // Only the address prepareAuthRequest derived (plan Task 22): it strips any caller copy first.
+      ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
+      // Origin and CSRF checks on everywhere. Better Auth 1.7.14 turns both off when it thinks it runs under test
+      // (context/create-context.mjs:211: NODE_ENV=test or a truthy TEST variable, core env/env-impl.mjs:36), so a
+      // stray TEST in a deployment would disable them; stating it pins them on (plan Task 24, enabled-paths.test.ts).
+      disableOriginCheck: false,
     },
     // Info-level lines include user emails (e.g. duplicate sign-up attempts); logs must carry no PII. logAuth
     // also drops a failed query's SQL and parameters.
@@ -63,7 +68,8 @@ export function authOptions({ db, secret, baseURL, adapterDb = db }: AuthDeps & 
         },
       },
     },
-    disabledPaths: [...INVITATION_PATHS],
+    // Database-backed limits (spec "Rate limits"; plan Task 23), consumed on the limiter's own pool.
+    rateLimit: rateLimitOptions(limiterDb),
     emailAndPassword: {
       enabled: true,
       // Spec: uniform responses on sign-up. With auto sign-in off, a duplicate email gets the same
@@ -99,9 +105,22 @@ export function authOptions({ db, secret, baseURL, adapterDb = db }: AuthDeps & 
       crmSessionAudit({ lockUsers: (keys) => lockAuthUsers(adapterDb, keys) }),
     ],
   } satisfies BetterAuthOptions;
+  // Only the Phase 1 paths are reachable over HTTP (plan Task 24; enabled-paths.ts); invitations among the rest.
+  return { ...options, disabledPaths: disabledPathsOf(endpointPathsOf(options)) } satisfies BetterAuthOptions;
+}
+
+export class SharedLimiterPoolError extends Error {
+  override readonly name = "SharedLimiterPoolError";
+
+  constructor() {
+    super("the rate limiter needs a pool of its own, not the request transactions' pool");
+  }
 }
 
 export function createAuth(deps: AuthDeps) {
+  // On the request pool a consume inside a request transaction would fail (PoolBypassError) or, routed into the
+  // transaction, hold the counter row until commit.
+  if (deps.limiterDb.$client === deps.db.$client) throw new SharedLimiterPoolError();
   const transactions = createAuthTransactions(deps.db);
   return withRequestTransactions(betterAuth(authOptions({ ...deps, adapterDb: transactions.db })), transactions);
 }

@@ -1,4 +1,5 @@
 import type { Job } from "pg-boss";
+import { idempotencyCleanupHandler, rateLimitCleanupHandler } from "./cleanup";
 import { domainEventHandler } from "./domain-event";
 import type { Log } from "./log";
 
@@ -18,4 +19,8 @@ export type Handlers = { readonly [Queue in QueueName]?: Handler };
 
 // Each handler lands with its feature (domain_event in Task 19, the cleanups in Task 24, email.send in Task 27). A
 // queue without a handler is not worked, so its jobs wait in `created`; a placeholder would complete or fail real jobs.
-export const HANDLERS: Handlers = { domain_event: domainEventHandler() };
+export const HANDLERS: Handlers = {
+  domain_event: domainEventHandler(),
+  "rate_limit.cleanup": rateLimitCleanupHandler(),
+  "idempotency.cleanup": idempotencyCleanupHandler(),
+};

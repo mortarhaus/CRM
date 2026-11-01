@@ -3,11 +3,11 @@ set -eu
 
 case "${1:-web}" in
   web)
-    node dist/migrate.mjs
+    node dist/migrate.mjs web
     exec node server.js
     ;;
   worker)
-    node dist/migrate.mjs
+    node dist/migrate.mjs worker
     exec node dist/worker.mjs
     ;;
   migrate)

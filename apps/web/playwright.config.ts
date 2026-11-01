@@ -26,5 +26,8 @@ export default defineConfig({
         url: "http://localhost:3000/api/health",
         reuseExistingServer: true,
         timeout: 120_000,
+        // The app reads the client IP from X-Forwarded-For, which each test sets to its own address (e2e/fixtures.ts),
+        // so the per-IP limits of one test never spend another's. docker/compose.dev.yml sets the same for the image.
+        env: { TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for" },
       },
 });

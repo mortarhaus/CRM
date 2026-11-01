@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { expectAccessible, expectVisibleFocus, tabTo } from "./a11y";
 import {
