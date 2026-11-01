@@ -1,4 +1,4 @@
-# Handoff — 2026-11-01 · branch feat/p1-events (worktree) · HEAD 4ae6060
+# Handoff — 2026-11-01 · branch feat/p1-rate-limits (worktree) · HEAD 5efa3b0
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,65 +6,62 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: **46**
-- Working folder: `.agent/worktrees/build-feat-p1-events`. The main checkout is on `main`, but at `c599bd8`: it has not been fast-forwarded to `751ba3b`. It has untracked `.playwright-mcp/`, `docker/sync-export.sh` and `docker/sync-import.sh`, which are not mine.
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: **none yet** (Phase 1 PR 7 not opened: held, see §6)
+- Working folder: `.agent/worktrees/build-feat-p1-rate-limits`. Main checkout untouched (untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine).
 
 ## 1. Current PR / branch
-- PR #46 https://github.com/mortarhaus/CRM/pull/46 · branch `feat/p1-events` · base `main` (`751ba3bd`) · head **`4ae6060`** (5 commits: `93fe31f` Task 19, `0088f8c` Task 20, `34a489d` merge of main/PR 47 (the only conflict was `docs/DECISIONS.md`, and both entries are kept), `64299e9` fix(jobs): `jobs:retry` redrives dead-letter jobs (closes PR 45 deferred P2-1), `4ae6060` docs(jobs): retry comments and the 14-day redrive window)
-- Purpose: Phase 1 PR 6 (plan Tasks 19-20): `domain_event` with transactional pg-boss enqueue, `notification`, the PgBouncer pooler gate, and the `/api/health` queue check.
-- Status: `4ae6060` pushed 2026-11-01. Its CI started at push and was not finished at hand-back (not yet green). The previous head `34a489df` was green (run 41212515170). Bob's Round 1 (Blocked) findings are fixed in the PR body and this handoff. Charlie chose option A for EVT-05, and it is done in `64299e9` + `4ae6060`. The PR body is updated for `4ae6060`.
-- PR #47 (better-auth 1.7.14) merged 2026-10-31 as `751ba3b`. Its review, receipt and log are on `agent-logs`.
+- Branch `feat/p1-rate-limits` (base origin/main `fe8664e`, PR 46 merged) · pushed normally, head **`5efa3b0`** · no PR opened.
+- Purpose: Phase 1 PR 7 (plan Tasks 21-24): database rate limits, one client-IP derivation, Better Auth on the database limiter, enabled-path allow-list, cleanup schedules.
+- Commits: `8e730a6` Task 21 (limits in `limits.ts`, `rate_limit` table, migrations **0021** table + **0022** grants (the plan said 0014), `system/rate-limit.ts` consume/giveBack/cleanupExpired, manifest, lint list, allow-list-exists test); `5efa3b0` Task 22 (`client-ip.ts`, `handle.ts`, `TRUSTED_CLIENT_IP_HEADER` env (required in production), `forward.ts` and route through `handleAuthRequest`, `ipAddressHeaders: [x-crm-client-ip]`, harness header switch, Step 3a audit-IP test, `.env.example`, compose web env).
+- Task 23 started, NOT committed (see §3, §9). Task 24 not started.
 
 ## 2. Milestones
-- Done: Phase 0; Phase 1 PRs 1-5 (#39, #41, #43, #44, #45); PR #47 (dependency fix, merged 2026-10-31 `751ba3b`). Log gate clear through PR 47.
-- In progress: PR 46 (Phase 1 PR 6, events).
-- Pending: rest of Phase 1 (PR 7 Tasks 21-24, PR 8 Tasks 25-29).
+- Done: Phase 0; Phase 1 PRs 1-6 (#39, #41, #43, #44, #45, #46) and #47. Log gate clear through PR 46.
+- In progress: Phase 1 PR 7 (Tasks 21-22 committed; Task 23 blocked; Task 24 not started).
+- Pending: PR 8 (Tasks 25-29).
 
 ## 3. Git state
 ```
-worktree build-feat-p1-events: ## feat/p1-events...origin/feat/p1-events (clean)
-4ae6060 docs(jobs): retry comments and the 14-day redrive window
-64299e9 fix(jobs): jobs:retry redrives dead-letter jobs (closes PR 45 deferred P2-1)
-34a489d merge: bring main (PR 47 better-auth 1.7.14) into feat/p1-events
-751ba3b Merge pull request #47 from mortarhaus/fix/audit-better-auth
-0088f8c test(jobs): pg-boss maintenance through PgBouncer as crm_worker; health reports the queue
-93fe31f feat(events): domain_event with transactional pg-boss enqueue; notification table
-agent-logs: reviews/PR-46.md (Round 1) archived 2026-11-01 (b2536bd); remote blob 2eb5447f equals local file
+worktree build-feat-p1-rate-limits: ## feat/p1-rate-limits...origin/feat/p1-rate-limits (4 files changed, uncommitted Task 23 work)
+5efa3b0 feat(auth): one trusted client-IP derivation for /api/auth and form submits
+8e730a6 feat(auth): database rate-limit counters with one atomic consume statement
+fe8664e Merge pull request #46 from mortarhaus/feat/p1-events
 ```
 Uncommitted files — fingerprint every staged, modified or untracked path when writing this handoff:
 | Path | Status | Content hash (`git hash-object <path>`, or `deleted`) |
 |---|---|---|
-| (none) | | |
+| apps/web/src/lib/auth/rate-limit-rules.ts | untracked | f3e7ccc138116125d99ddeb0f2ffb093f211f41b |
+| apps/web/src/lib/auth/config.ts | modified | 3c49387fba606f359b2020bb573a901b39f8ac3e |
+| apps/web/src/lib/auth/auth.test.ts | modified | 8774cb71b0f0fc57bfd21ffbb402755306d36c54 |
+| apps/web/src/lib/auth/auth-audit.test.ts | modified | 166a70a3ff171458e27ae34460c980798753215f |
 
 ## 4. Just finished
-2026-11-01 `fix` for PR 46, after Charlie chose option A (close PR 45 deferred P2-1 in this PR). Commit `64299e9`, pushed normally. `jobs:retry` (`apps/web/src/jobs/retry.ts`) now calls pg-boss `redrive(<queue's deadLetter>, { ids: [id], sourceName: <queue>, limit: 1 })` instead of `retry()`. The flags are unchanged (`--queue <original queue> --id <id>`), but `--id` is now the dead-letter copy's id. The output is `job redriven`. The redrive creates a new `created` job in the source queue and deletes the copy. It works after the failed original is deleted. Tests: `retry.test.ts` 8 tests, written red first (6 of 7 failed against `retry()`). Two mutation checks both kill their mutant: without `sourceName`, and with a fixed `email.send.dead`. `worker-grants.test.ts` and `pooler.gate.test.ts` now redrive instead of calling `retry()`. They show zero `crm_worker` permission errors, and all 31 ablations still deny, so there is **no grant change and no migration**. I updated the runbook retry section and grant rows (`docs/runbooks/phase-1-database-roles.md`) and added a DECISIONS 2026-11-01 entry. PR body: new head, 4 commits, EVT-05 now pass, difference 8, size 38 files +4,297/-114. Checks on `64299e9`: typecheck 0, lint 0, `pnpm test` 793 passed (37 files), `test:gates` 1 passed, build 0 (bundle checks pass), audit (high) 0 with 5 moderate, `git diff --check` clean. Not run locally: the bundled `dist/retry-job.mjs` in the image, and `jobs:retry` against a dev DB (CI image E2E is the evidence). Then a follow-up commit `4ae6060` fixed two stale comments (`scripts/retry-job.ts`, `handlers.ts`). It also made the runbook say to redrive within 14 days, because pg-boss's default `retentionSeconds` deletes the unfetched copy after that. At `4ae6060` I re-ran typecheck 0, lint 0, `retry.test.ts` 8 passed, build 0 and diff-check clean. The PR body is updated (5 commits, 39 files +4,300/-116). Skipped: Bob's optional P3 (event name/version check).
+2026-11-01 build of PR 7 by an Opus 5.5 helper. Tasks 21 and 22 committed and pushed (checks at `5efa3b0`: typecheck 0, lint 0, `pnpm test` 840 passed in 39 files). Task 23 started: `rate-limit-rules.ts` (customStorage keyed `ba:<row>:<ip>` per spec row, customRules for every named path) wired in `config.ts`; counter resets before each test in `auth.test.ts` and `auth-audit.test.ts`. With the limiter on, 4 tests in `auth-audit.test.ts` fail (PR #44 P2-1 "as configured" and "control"; PR #44 Round 2 P2-2 "known and unknown email" and "the email lock is per email and case-blind"). Lock measurement: uncontended burst of 15 sign-ins from one IP, 150 ms total, 10 granted, 5 x 429, no 500. Contended probe: one sign-in held on its email lock keeps the `ba:sign-in:<ip>` counter row locked (the consume runs in the request transaction), so a sign-in for another email from the same IP waited 4,755 ms and the held one ended 500 at the 5 s lock timeout.
 
 ## 5. Next step (file-level)
-Wait for CI on `4ae6060` to be green. Then Charlie runs **`review 46`** (Bob, on Opus 5.5, as Round 1 asked). Then `approved 46` before the merge, and `merged 46` after it.
+Charlie decides the limiter connection (§6 item 1) and AUTH-07 (§6 item 2). Then the builder finishes Task 23 in `apps/web/src/lib/auth/rate-limit-rules.ts` / `handle.ts` (account key, uniform 429, `rate-limit.test.ts` with two `next start` processes and a test edge), fixes the burst tests' volume, then Task 24, full checks, PR. Not `review <n>` yet: no PR exists.
 
 ## 6. Open ASK items, blockers, and owner answers
-- **Answered (2026-11-01):** PR 45's deferred P2-1 (EVT-05). Charlie chose **A**, to fix it in PR 46. It is done in `64299e9` and `4ae6060` (§4), and EVT-05 is now pass in the PR body.
-- Note for the Phase 7 plan: `notification.target_type`/`target_id` has no same-workspace trigger (Bob Round 1 note).
-- Carried from 2026-10-28: ASK 5, the `.env` refresh, repo visibility, and the untracked files in the main checkout.
-- Owner answer this session: option A above.
+1. **Blocker, needs Charlie (with Bob): where Better Auth's limiter consume runs.** Plan Task 23 + Task 22 note put it on the routed db, inside the request transaction. Measured: the counter row lock is then held for the whole request, so one stalled sign-in serializes every sign-in from that IP (or the whole deployment under the placeholder IP) and others hit the 5 s lock timeout (500). Options: (A) `customStorage.consume` on its own small autocommit `crm_app` pool (Better Auth limiter stays as planned; more connections per web process, R4 budget); (B) consume the IP row in `handleAuthRequest` before `getAuth().handler`, on the pool before any transaction, with Better Auth's limiter off (no new connections; differs from Task 23 Step 1 and the spec wording "via Better Auth"; same coverage, since Better Auth's limiter only runs in the HTTP handler). Either way a granted unit is no longer undone when the request later fails with 500.
+2. **Blocker, needs Charlie (with Bob): AUTH-07 on password change.** Better Auth 1.7.14 `/change-password` revokes other sessions only when the body sends `revokeOtherSessions: true` (default false). The plan's AUTH-07 row says the builder stops and raises it before PR 7. Proposed fix: a before hook on `/change-password` that refuses (or forces) a body without `revokeOtherSessions: true`, like the trustDevice refusal.
+3. For Bob: per-row keying (`ba:<row>:<ip>`) instead of the plan's `"ba:" + key` (Better Auth keys per path, so 2FA verify would be 20 per 60 s and password check about 5 x 10 per 15 min).
+4. Carried: ASK 5, the `.env` refresh, repo visibility, untracked files in the main checkout. Bob PR 39 P2 (invitation grants) and PR 44 P2-3 (revoke-session-by-id) land in Task 24.
 
 ## 7. Open review findings (P0/P1) and verdict
-- Review file `.agent/reviews/PR-46.md`, newest Round 1 (head `34a489df`): **Blocked**. Status of each finding:
-  - [P1] No guardrail self-check table -> fixed (PR body "Self-check": 39 rows: 33 pass (EVT-05 now pass, `64299e9`), 2 pass with a stated gap or note (UNI-16, §9 payload), 4 n-a with reasons, plus n-a lines for the other rules and the 6 packs judged not relevant).
-  - [P2] PR body stale after the merge from `main` -> fixed (PR body updated to `34a489df`, base `751ba3bd`, merge `34a489d`; checks re-run).
-  - [P2] Handoff does not describe PR 46 -> fixed (this file and the `agent-logs` copy).
-  - [P3] `emitEvent` does not check the event name or version -> optional, not done.
-  - [P3] Size over 400 LOC -> accepted by the plan, disclosed in the body.
-- EVT-05 fixed in `64299e9` (PR 45 deferred P2-1 closed). Awaiting green CI, then Bob's Round 2 on `4ae6060`.
+- No review yet for PR 7 (no PR). PR 46: merged; review, receipt and log on agent-logs.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- None. The redrive switch is in `docs/DECISIONS.md` 2026-11-01 (committed in `64299e9`).
+- Migrations are 0021 (table) and 0022 (grants), not 0014. DECISIONS entry due in Task 24.
+- Step 3a: the 2FA change rows carry the edge IP, not null (migration 0009 writes `crm.auth_client_ip` on every row of a request). Recorded in the test comment; DECISIONS entry due.
+- `client-ip.ts` keys IPv6 by /64 in expanded form; IPv4-mapped IPv6 becomes the IPv4 address.
+- `session.ts` strips a caller's `x-crm-client-ip` before `auth.api.getSession`/`listOrganizations` (defence; neither writes an IP in 1.7.14).
 
 ## 9. Files touched but not committed
-- None in the repo. Scratch files only: the PR body and check logs in the session scratchpad.
+- The four paths in §3 (Task 23 work in progress). Nothing else; scratch files only in the helper's scratchpad.
 
 ## 10. Model for the next session
-Opus 5.5 (events, RLS and tenancy work is the deep tier; Bob's Round 2 should run on Opus 5.5). Sonnet 5 only for mechanical edits.
+Opus 5.5 (auth, rate limits and lock design are the deep tier). Sonnet 5 only for mechanical edits.
+
 
 - 2026-10-15 (fix, Bob PR #27 R1): review archived (ae70237). Runbook P2 + PR body P3 fixed in 088d013, pushed; CI re-running. Next: Charlie runs `review 27` when CI is green.
 
@@ -412,3 +409,6 @@ Opus 5.5 (events, RLS and tenancy work is the deep tier; Bob's Round 2 should ru
 
 ## 2026-11-01 fix 46 (Bob Round 1)
 - Review PR-46.md archived to agent-logs (b2536bd). PR body rewritten for head 34a489df with the full self-check; checks rerun on the head, all exit 0. No commit to the branch. New: PR 45 deferred P2-1 (redrive) is due in PR 46 and not done; EVT-05 marked partial; Charlie decides. Next: Charlie decision, then review 46.
+
+## 2026-11-01 build PR 7 (feat/p1-rate-limits) partial
+- Tasks 21-22 committed and pushed (8e730a6, 5efa3b0). Task 23 uncommitted (4 files, §3). No PR. Blocked on two decisions for Charlie: limiter consume inside the request transaction (lock scope, 500s under contention) and AUTH-07 password change. Next: those answers, then finish Tasks 23-24.
