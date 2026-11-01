@@ -14,7 +14,8 @@
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1 plan PRs 1-8 (#39, #41, #43, #44, #45, #46, #48, #49) and side fixes #35, #37, #40, #47. All logged.
-- Pending: Task 30 (separate spec revision 8 PR, E1-E12); then `setup` reconcile of PROJECT.md §7 and §9; then Phase 1 close sign-off; then Phase 2 (needs Charlie's design direction and the VPS spec-text revision first).
+- Done: Task 30 = PR #36 (merged 2026-10-22, approved by Charlie 2026-10-22, DECISIONS 2026-10-22). Spec text still labels revision 8 "draft; not approved" (stale label; fix at the next spec revision, since a spec edit needs a Bob spec review).
+- Pending: `setup` reconcile of PROJECT.md §7 and §9 and CLAUDE.md Status; then Phase 2 (needs Charlie's design direction and the VPS spec-text revision first).
 
 ## 3. Git state
 ```
@@ -29,7 +30,7 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 2026-11-02 `merged 49` done. Log 2617536 on agent-logs. No gate breach (receipt 69 s before merge). Bob's review ran on Sonnet 5.5, below the Opus tier for security review; Charlie merged without a second pass.
 
 ## 5. Next step (file-level)
-Task 30: read the plan's Task 30 (line ~1500) and check it against the already-approved spec text (v4.7 rev 8, hash 733cc0e9…). It may be obsolete because the spec already holds revision 8. Tell Charlie what is left before doing anything.
+Waiting for Charlie: option A = `setup` reconcile (PROJECT.md §7/§9, CLAUDE.md Status) to close Phase 1; then design direction + VPS spec-text revision before the Phase 2 plan.
 
 ## 6. Open ASK items, blockers, and owner answers
 1. ASK 7 (production `EMAIL_FROM`, SPF/DKIM/DMARC owner) open for Charlie.
