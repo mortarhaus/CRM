@@ -25,6 +25,12 @@ const ENTRY_POINTS: Record<string, { exports: string[]; coveredBy: string }> = {
     exports: ["GET"],
     coveredBy: "Read-only, unauthenticated by design (UNI-19); health.test.ts (plan Task 20). No mutating method.",
   },
+  "apps/web/src/app/(app)/theme/route.ts": {
+    exports: ["POST"],
+    coveredBy:
+      "Sets only the caller's own crm_theme cookie, reads no tenant data: same-origin Origin check, signed-in session, " +
+      "value allow-listed (lib/theme.test.ts, e2e/theme.spec.ts; Phase 2 plan Task 3).",
+  },
   "apps/web/src/proxy.ts": {
     exports: ["proxy"],
     coveredBy: "Sets headers only, reads no database (AUTH-11); security-headers.test.ts (plan Task 25). Not a mutation path.",

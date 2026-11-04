@@ -158,6 +158,17 @@ test.describe("axe scan, light and dark, no horizontal overflow", () => {
     await restore();
   });
 
+  test("app shell with a chosen theme, whatever the system setting", async ({ page }) => {
+    await openEmailSettingsAsOwner(page);
+    await page.goto("/workspaces");
+    await createWorkspace(page, "Theme Studio");
+    for (const theme of ["dark", "light"] as const) {
+      await page.getByRole("button", { name: `${theme === "dark" ? "Dark" : "Light"} theme` }).click();
+      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${theme}\\b`));
+      await expectAccessible(page, `/workspaces shell, ${theme} theme chosen`);
+    }
+  });
+
   test("email settings page in its initial, queued, failed and Staff states", async ({ page }) => {
     const email = await openEmailSettingsAsOwner(page);
     await expectAccessible(page, "/settings/email initial");

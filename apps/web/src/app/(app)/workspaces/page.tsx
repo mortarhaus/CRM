@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { cardEntrance } from "@/components/motion/card-entrance";
 import { getCurrentSession, listWorkspaces } from "@/lib/auth/session";
+import { cn } from "@/lib/utils";
 import { CreateWorkspaceForm } from "./create-workspace-form";
 
 export const metadata: Metadata = { title: "Workspaces · CRM" };
@@ -22,10 +24,10 @@ export default async function WorkspacesPage() {
           <p className="text-sm text-muted-foreground">You have no workspaces yet.</p>
         ) : (
           <ul aria-labelledby="your-workspaces-heading" className="flex flex-col gap-2">
-            {workspaces.map((workspace) => (
+            {workspaces.map((workspace, index) => (
               <li
                 key={workspace.id}
-                className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+                className={cn("flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3", cardEntrance(index))}
               >
                 <span className="min-w-0 break-words">{workspace.name}</span>
                 {workspace.id === activeId && <span className="text-xs text-muted-foreground">(active)</span>}
