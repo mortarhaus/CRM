@@ -28,7 +28,8 @@ const ENTRY_POINTS: Record<string, { exports: string[]; coveredBy: string }> = {
   "apps/web/src/app/(app)/theme/route.ts": {
     exports: ["POST"],
     coveredBy:
-      "AUTH-01 conforming interpretation (Bob, PR #53 R1, pending Charlie): sets only the caller's own crm_theme " +
+      "AUTH-01 conforming interpretation (Bob, PR #53 R1, confirmed by Charlie 2026-11-04 (Bob session: 1A)): sets " +
+      "only the caller's own crm_theme " +
       "cookie, and conforms only while (a) no database read or write beyond the session lookup; (b) same-origin " +
       "Origin required (403 otherwise); (c) signed-in session required; (d) the value allow-listed (parseTheme); " +
       "(e) the redirect target limited to a same-origin path (returnPath); (f) classified here with these conditions " +

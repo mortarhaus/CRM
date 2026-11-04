@@ -10,6 +10,8 @@ import {
   PASSWORD_CHECK_IP_LIMIT,
   PASSWORD_MIN_LENGTH,
   RATE_LIMIT_ROW_RETENTION_SECONDS,
+  SHORT_CODE_MAX_LENGTH,
+  SHORT_CODE_MIN_LENGTH,
   SIGN_IN_ACCOUNT_FAILURE_LIMIT,
   SIGN_IN_IP_LIMIT,
   SIGN_UP_IP_LIMIT,
@@ -34,6 +36,10 @@ describe("fixed security values", () => {
   it("keeps the idempotency key expiry at the decided 24 hours (ASK 4, Charlie 2026-10-26) and keys at 128", () => {
     expect(IDEMPOTENCY_KEY_EXPIRY_SECONDS).toBe(86_400);
     expect(IDEMPOTENCY_KEY_MAX_LENGTH).toBe(128);
+  });
+
+  it("keeps the short code at 2 to 6 characters (Phase 2 plan Q21, Charlie 2026-11-04)", () => {
+    expect([SHORT_CODE_MIN_LENGTH, SHORT_CODE_MAX_LENGTH]).toEqual([2, 6]);
   });
 });
 
