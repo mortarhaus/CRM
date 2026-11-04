@@ -46,6 +46,7 @@
 | `stepUp()` is not built in Phase 1; its first user is Phase 2 | Phase 1 plan line 133 (Settled item 5) |
 | ASK 9 (`require_2fa` timing) is open. The builder's proposal is Phase 2 | Phase 1 plan line 1562; `.agent/handoff.md` §6 item 2 |
 | The S3 vs MinIO contract test was n-a in Phase 1 and deferred to Phase 2 | Phase 1 plan line 1536 |
+| `notification` table, schema and RLS already exist | `apps/web/src/db/schema/events.ts:26`; migrations `0019`, `0020` (builder-checked after Bob PR #52 R1) |
 | `crm_purge` must not read `service`, `workspace_settings`, `email_template` or `doc_sequence` | spec line 897 |
 
 Builder spot-check (2026-11-04, `main` = `8a3c461`): migrations end at `0023_password_change_grant.sql`; no `stepUp`/`requireStepUp` and no `STEP_UP`/`BANK_NOTICE` in `packages/core/src/security/limits.ts`; `apps/web/src/adapters` holds only `email`; spec lines 460, 792, 847 and 1138, Phase 1 plan lines 1536 and 1562, and the FILE-03 exception at `docs/DECISIONS.md:770-776` match what is cited above. The other rows were not re-read by the builder.
@@ -80,12 +81,12 @@ Builder spot-check (2026-11-04, `main` = `8a3c461`): migrations end at `0023_pas
 | 2 | 4–6 | `workspace_settings` columns (all of spec line 460 except bank and QR), settings data layer, branding page (hex + drag picker + contrast), nonce'd brand token | 0024 | Q1–Q3 answered |
 | 3 | 7–9 | Country defaults module (core), onboarding step (country + SST/GST), tax/TIN/BRN, timezone/locale/currency settings page | 0025 (CHECKs if needed) | **Yes:** new core module `settings`; Q8–Q11 answered |
 | 4 | 10–12 | Storage adapter (S3/MinIO), MinIO in compose, upload validation, logo upload and serve route | none | **Yes:** new module `src/adapters/storage`, new dependency (UNI-06); Q12–Q14 answered |
-| 5 | 13–16 | `stepUp()`, bank details and DuitNow QR (owner, step-up, audit), `notification` table, owner email queue | 0026–0028 | Q15–Q19 answered |
+| 5 | 13–16 | `stepUp()`, bank details and DuitNow QR (owner, step-up, audit), first `notification` producer, owner email queue | 0026 `step_up`, 0027 bank columns, 0028 queue | Q15–Q19 answered |
 | 6 | 17–19 | Numbering core module, `doc_sequence` plus allocator, preview UI, concurrency test | 0029–0030 | **Yes:** new core module `numbering`; Q20–Q21 answered |
 | 7 | 20–22 | Money core (currency exponent, decimal → minor), `service` table and catalog CRUD | 0031–0032 | **Yes:** new core module `money`; Q22 answered |
 | 8 | 23–25 | `email_template` table, single-pass renderer, templates settings page | 0033–0034 | Q23–Q24 answered |
 
-The migration numbers are indicative; the builder takes the next free number when each PR is cut. Each PR's LOC is an estimate. If an estimate goes over 400, split at the task boundary shown, never mid-task.
+PR 2 is cut as 2a (Tasks 4–5) and 2b (Task 6); PR 5 is cut as 5a (Task 13), 5b (Tasks 14–15) and 5c (Task 16); the sections below keep one heading per numbered PR. The migration numbers are indicative; the builder takes the next free number when each PR is cut. Each PR's LOC is an estimate. If an estimate goes over 400, split at the task boundary shown, never mid-task.
 
 ---
 
@@ -108,14 +109,14 @@ The migration numbers are indicative; the builder takes the next free number whe
 - [ ] Font per Q4. The recommendation is a self-hosted woff2 under `font-src 'self'` via `next/font/local`, with its licence recorded in DECISIONS.
 - [ ] Icons per Q6. The recommendation is `lucide-react` pinned exactly, with the UNI-06 ladder in DECISIONS.
 - [ ] Sidebar as a `<nav aria-label="Main">` with icon links and visible names (`aria-label` plus tooltip). Count badges render only when a count exists; no feature has one yet, so the API is a prop only.
-- [ ] Top bar: search box (a placeholder with no backend; see Q7), the theme toggle, and a "New" menu with no entries yet (or hidden; see Q7).
+- [ ] Top bar: the theme toggle and a "New" menu that lists only what exists (Workspace). No search box until Phase 3 (Q7, UNI-05).
 - [ ] Greeting line uses the user's name; the "what needs you" line is empty until Phase 4 or 5.
 - [ ] Keep the existing NavLinks destinations (Workspaces, Security, Email) and the WorkspaceSwitcher and SignOutButton.
 - [ ] Mobile-320: sidebar collapses to a bottom bar or a disclosure (FE-70).
 
 **Task 3: dark-mode toggle and motion**
 - Files: new `apps/web/src/app/(app)/theme/actions.ts`; `apps/web/src/lib/theme.ts`; `apps/web/src/components/motion/*`; `globals.css`.
-- [ ] The theme toggle is a `<form>` posting to a server action that sets a cookie (`crm_theme=light|dark|system`, `SameSite=Lax`, `Secure` in production, `HttpOnly`). The root layout reads the cookie server-side and sets `class="dark"` on `<html>`, so there is no inline script and no FOUC. This is a **proposal**: Q3 decides between a cookie and a user column. Works without JS (FE-60, `no-javascript.spec.ts`).
+- [ ] The theme toggle is a `<form>` posting to a server action that sets a cookie (`crm_theme=light|dark|system`, `SameSite=Lax`, `Secure` in production, `HttpOnly`). The root layout reads the cookie server-side and sets `class="dark"` on `<html>`, so there is no inline script and no FOUC. Settled (Q3): a per-user cookie, not a user column. Works without JS (FE-60, `no-javascript.spec.ts`).
 - [ ] Motion: CSS-only staggered card entrance (`@keyframes` plus `animation-delay` from a class scale, not inline styles); `@media (prefers-reduced-motion: reduce)` disables it.
 - [ ] View transitions: verify current Next 16.4.2 / React 19.3 support first (unverified, see §10) and record the finding in DECISIONS. Use `@view-transition { navigation: auto; }` CSS if that is sufficient. No GSAP in this PR.
 - [ ] Tests: `e2e/theme.spec.ts` (toggle persists across reload; JS disabled works; reduced-motion emulation leaves no running animation); the existing `security-headers.spec.ts` stays green (no CSP violation).
@@ -145,9 +146,9 @@ The migration numbers are indicative; the builder takes the next free number whe
 **Task 6: branding page and brand token**
 - Files: new `apps/web/src/app/(app)/settings/branding/page.tsx`; `components/settings/colour-picker.tsx`; `packages/core/src/branding/contrast.ts` plus test; `apps/web/src/app/(app)/layout.tsx`.
 - [ ] Colour picker: a `<input type="text">` hex field (labelled), plus a drag picker (2D saturation/value area with a hue slider, keyboard-operable with arrow keys, `role="slider"` with `aria-valuetext`). Use a small custom picker or a pinned dependency per UNI-06 (Q6 covers the dependency question). It must work without JS through the hex field (FE-60).
-- [ ] `contrast.ts`: `relativeLuminance(hex)`, `contrastRatio(a,b)`, `pickForeground(hex)` (black or white, whichever is higher). **Proposal (Q1):** derive `--accent-foreground` automatically, and refuse a hex where neither black nor white reaches 4.5:1 (UI components 3:1).
+- [ ] `contrast.ts`: `relativeLuminance(hex)`, `contrastRatio(a,b)`, `pickForeground(hex)` (black or white, whichever is higher). **Builder proposal, replaces the earlier Q1 rule (Bob PR #52 R1 P1; Charlie re-confirms):** `--accent-foreground` is derived automatically (black or white). That alone can never fail, because the better of black and white always reaches at least 4.58:1. The rule that can fail is on the accent as a colour (buttons, badges, focus ring, links): `contrastRatio(accent, background)` and `contrastRatio(accent, card)` must each be ≥ 3:1 (A11Y-02, UI components), checked in both light and dark theme; if either theme fails, the hex is refused with a message that names the failing theme (a derived per-theme variant is a later option, not in Phase 2).
 - [ ] Brand token: the layout renders `<style nonce={nonce}>:root{--accent:#xxxxxx;--accent-foreground:#yyyyyy}</style>`, built only from the validated DB value, never from raw input. Each value is checked again against the regex at render (defence in depth).
-- [ ] Tests: `contrast.test.ts` (known WCAG pairs); `e2e/branding.spec.ts` (set a hex, reload, the accent applies, no CSP violation; a low-contrast hex is refused with a message linked through `aria-describedby`; picker keyboard operation); unit test that a malicious value (`#fff;}body{…`) is rejected by Zod and by the CHECK.
+- [ ] Tests: `contrast.test.ts` (known WCAG pairs; the pale and dark hexes above are refused, `#0e6c84` is accepted in both themes); `e2e/branding.spec.ts` (set a hex, reload, the accent applies, no CSP violation; a pale hex (for example `#ffe066`, fails on the light card) and a dark navy hex (fails on the dark background) are each refused with a message linked through `aria-describedby`; picker keyboard operation); unit test that a malicious value (`#fff;}body{…`) is rejected by Zod and by the CHECK.
 
 **Done when:** branding persists per workspace, applies as a token under CSP, and passes axe in both themes. (Spec line 1138: "Branding".)
 
@@ -166,9 +167,9 @@ The migration numbers are indicative; the builder takes the next free number whe
 
 **Task 8: the onboarding step**
 - Files: `apps/web/src/app/(app)/workspaces/actions.ts`; new `apps/web/src/app/(app)/onboarding/{page.tsx,actions.ts}`; `apps/web/src/db/system/workspaces.ts`.
-- [ ] **Proposal (Q9):** after `/organization/create` succeeds, redirect to `/onboarding`. There an owner picks a country (MY or SG) and answers "Are you registered for SST (MY) / GST (SG)?". A Yes requires the registration number and preselects the tax name and rate (editable). Optional TIN and BRN.
+- [ ] **Settled (Q9):** after `/organization/create` succeeds, redirect to `/onboarding`. There an owner picks a country (MY or SG) and answers "Are you registered for SST (MY) / GST (SG)?". A Yes requires the registration number and preselects the tax name and rate (editable). Optional TIN and BRN.
 - [ ] `applyCountryDefaults(tx, country, answer)` writes `workspace_settings` in `withWorkspace` via `action()` (owner), audited. It only fills fields that are null, so it never overwrites an existing setting.
-- [ ] The app layout redirects to `/onboarding` while `country IS NULL` (the healed row case).
+- [ ] The app layout redirects an owner to `/onboarding` while `country IS NULL` (the healed row case). An Admin or staff member of a not-yet-onboarded workspace sees a plain "The owner has not finished setting up this workspace" page with the workspace switcher and sign-out, and no settings.
 - [ ] Tests: `e2e/onboarding.spec.ts` (MY: MYR, Asia/Kuala_Lumpur, dd/mm/yyyy, invoice pattern seeded in PR 6; SG: SGD, Asia/Singapore; Yes without a number is refused; No leaves `tax_registered=false` and the tax fields null); unit test `apply-country-defaults.test.ts`.
 
 **Task 9: the settings page (tax, TIN/BRN, timezone, locale, currency)**
@@ -198,8 +199,9 @@ The migration numbers are indicative; the builder takes the next free number whe
 **Task 12: upload validation and logo**
 - Files: new `apps/web/src/lib/uploads/validate.ts` plus test; `packages/core/src/security/limits.ts` (`LOGO_MAX_BYTES`, value per Q12); `settings/branding/actions.ts`; new route `apps/web/src/app/(app)/files/logo/route.ts`.
 - [ ] `validate(bytes, allowed)` checks magic bytes (PNG `89 50 4E 47`, JPG `FF D8 FF`, PDF `25 50 44 46`) and size, and ignores the client MIME type and file name. SVG and HTML are always refused.
+- [ ] The DuitNow QR (PR 5) is shown to the owner through a sibling authenticated same-origin route `files/duitnow-qr` that streams from storage, so `img-src 'self'` stays unchanged.
 - [ ] Logo key `ws/{workspace_id}/{uuid}`. The server action receives the file (check the Next server-action body limit, unverified, §10) and audits the change.
-- [ ] **Proposal (Q13):** serve images through an authenticated same-origin route that streams from storage, so `img-src 'self'` stays unchanged.
+- [ ] **Settled (Q13):** serve images through an authenticated same-origin route that streams from storage, so `img-src 'self'` stays unchanged.
 - [ ] Tests: `validate.test.ts` (an SVG renamed to `.png` is refused; an oversize file is refused); `e2e/logo.spec.ts`; a two-workspace test that B's member gets 404 for A's logo route.
 
 **Done when:** the logo uploads and renders under CSP, and the adapter contract passes against MinIO. (Spec lines 846 and 1138, Branding.)
@@ -212,22 +214,22 @@ The migration numbers are indicative; the builder takes the next free number whe
 **Bob looks first at:** step-up bypass (replay, a code reused across sessions, missing rate limit); QR never deleted; PII in the audit log, events and job data; an email sent outside the transaction.
 
 **Task 13: `stepUp()`** (spike first)
-- Files: new `apps/web/src/lib/auth/step-up.ts` plus test; `apps/web/drizzle/0026_step_up.sql` (a system table `step_up` (session_id, verified_at) or a session column; Q15); `limits.ts` (`STEP_UP_WINDOW_SECONDS = 300`, spec line 792).
+- Files: new `apps/web/src/lib/auth/step-up.ts` plus test; `apps/web/drizzle/0026_step_up.sql` (a **tenant** table `step_up(workspace_id, session_id, verified_at)`, unique `(workspace_id, session_id)`, under the RLS template with `crm_app` SELECT/INSERT/UPDATE and no DELETE, a `privileges.ts` entry and a `TENANT_FIXTURES` isolation fixture; Q15 revised; if the spike shows a column on the Better Auth `session` table is simpler, that is the allowed alternative, because `session` is on the TEN-10 allow-list); `limits.ts` (`STEP_UP_WINDOW_SECONDS = 300`, spec line 798).
 - [ ] Spike: read the current Better Auth 1.7.14 twoFactor docs for a server-side TOTP verify that does not issue a new session (unverified, §10). Record the result in DECISIONS.
 - [ ] `requireStepUp(tx, session)` throws `ActionRefusedError('STEP_UP_REQUIRED')` unless a verification exists that is ≤ 300 s old and bound to this session. `verifyStepUp(code)` is rate limited with `consumeUnit` on the two-factor-verify row.
-- [ ] A user without 2FA is refused and sent to enrol (proposal, Q16).
+- [ ] A user without 2FA is refused and sent to enrol (Q16, settled).
 - [ ] Tests: no step-up → refused; 301 s → refused; another session's verification → refused; rate limit hit → `RATE_LIMITED`.
 
 **Task 14: bank details and QR**
 - Files: `tenancy.ts` plus `0027_bank_details.sql` (columns `bank_details` jsonb (fields per Q17), `duitnow_qr_key`, `bank_details_changed_at`); new `apps/web/src/app/(app)/settings/payment/{page.tsx,actions.ts}`.
-- [ ] Owner only, with step-up (spec lines 788 and 792). The audit entry stores account numbers as `{last4, sha256}`, never the full value, and the QR as its key (spec line 794).
+- [ ] Owner only, with step-up (spec lines 788 and 798). The audit entry stores account numbers as `{last4, sha256}`, never the full value, and the QR as its key (spec line 799). Stop-and-ask before this task: an unsalted SHA-256 of a short account number is brute-forceable by anyone who can read `audit_log` (Q26).
 - [ ] QR upload: PNG/JPG magic bytes; `sha256` of the bytes; key `ws/{ws}/duitnow/{sha256}.{ext}`; `put` with `If-None-Match: *`, where an existing key counts as success; set `duitnow_qr_key`. No delete call exists (Task 10).
-- [ ] Set `bank_details_changed_at = now()` on each change. Add `BANK_NOTICE_DAYS = 60` to `limits.ts` (spec line 795; UNI-02 lists "bank notice 60 d").
+- [ ] Set `bank_details_changed_at = now()` on each change. Add `BANK_NOTICE_DAYS = 60` to `limits.ts` (spec line 799; UNI-02 lists "bank notice 60 d").
 - [ ] Test (done-when): `duitnow-qr.test.ts` with Testcontainers MinIO. Upload QR A, replace it with QR B, and A's object still exists via `head`; `duitnow_qr_key` = B (spec line 1280).
 
-**Task 15: notification table**
-- Files: `0028_notification.sql` (schema plus `--custom` RLS: policy template, `crm_app` SELECT/INSERT/UPDATE(read_at), no `crm_purge` grant until Phase 9 decides); `privileges.ts`; `isolation.test.ts` `TENANT_FIXTURES` entry.
-- [ ] Composite FK `(workspace_id, user_id)` against membership, if the catalog test needs it (check the Phase 1 composite-FK rule).
+**Task 15: first producer of the existing `notification` table**
+- Files: `apps/web/src/db/schema/events.ts:26` already defines `notification`, and migrations `0019_domain_event_notification.sql` and `0020_rls_domain_event_notification.sql` already create it with RLS (Phase 1, spec line 285). No new table, migration or fixture. New code: a helper that inserts the rows; extend the existing `isolation.test.ts` fixture only if it does not already cover the row shape used.
+- [ ] Check the existing `crm_app` grants on `notification` in `privileges.ts` cover INSERT (and `UPDATE(read_at)` if the UI marks it read); add a grant migration only if a check shows a gap.
 - [ ] Each bank or QR change inserts one row per owner (`kind='bank_details_changed'`).
 
 **Task 16: owner email**
@@ -260,6 +262,7 @@ The migration numbers are indicative; the builder takes the next free number whe
 **Task 19: preview UI**
 - Files: `apps/web/src/app/(app)/settings/numbering/{page.tsx,actions.ts}`.
 - [ ] Admin and Owner (spec line 788). Live preview as the user types: a client-side `formatNumber` from `@crm/core/numbering` (the same code as the server) with an `aria-live="polite"` region. A pattern change applies to new documents only (copy text).
+- [ ] Re-run `e2e/onboarding.spec.ts` here: the MY invoice pattern default is seeded in this PR, so the "MY and SG defaults applied on sign-up" done-when is only complete after PR 6.
 - [ ] E2E: `e2e/numbering.spec.ts` (preview updates; an invalid token shows an error; a staff member gets `FORBIDDEN`).
 
 **Done when:** "Pattern preview matches issued numbers; concurrency test passes" (spec line 1138).
@@ -277,7 +280,7 @@ The migration numbers are indicative; the builder takes the next free number whe
 - [ ] Tests: exponent 0 and 3 currencies; rounding is refused rather than silent; huge values.
 
 **Task 21: `service` table**
-- Files: `apps/web/src/db/schema/catalog.ts`; `0031_service.sql` (`name`, `default_description`, `default_unit_price_minor` bigint, `currency` char(3), `unit`, `default_taxable`, unique `(workspace_id, id)`, CHECK price ≥ 0); `0032_rls_service.sql` (template; `crm_app` SELECT/INSERT/UPDATE/DELETE? per Q22; no `crm_purge`); `privileges.ts`; `TENANT_FIXTURES`.
+- Files: `apps/web/src/db/schema/catalog.ts`; `0031_service.sql` (`name`, `default_description`, `default_unit_price_minor` bigint, `currency` char(3), `unit`, `default_taxable`, `archived_at` timestamptz null, unique `(workspace_id, id)`, CHECK price ≥ 0); `0032_rls_service.sql` (template; `crm_app` SELECT/INSERT/UPDATE, no DELETE (Q22: archive only), no `crm_purge`); `privileges.ts`; `TENANT_FIXTURES`.
 - [ ] A trigger or check in the action refuses a `currency` change while `default_unit_price_minor IS NOT NULL` (spec line 472).
 
 **Task 22: catalog UI**
@@ -317,13 +320,13 @@ The migration numbers are indicative; the builder takes the next free number whe
 |---|---|---|
 | Pattern preview matches issued numbers (1138) | `preview-matches-issued.test.ts` | 6 |
 | Concurrency test passes (1138, 1191) | `allocate.concurrency.test.ts` | 6 |
-| MY and SG defaults applied on sign-up (1138) | `e2e/onboarding.spec.ts`, `apply-country-defaults.test.ts` | 3 |
+| MY and SG defaults applied on sign-up (1138) | `e2e/onboarding.spec.ts`, `apply-country-defaults.test.ts` | 3 (complete after PR 6 seeds the invoice pattern; re-run there) |
 | Replacing the QR leaves the old file in place (1138, 1280) | `duitnow-qr.test.ts` (MinIO) | 5 |
 | Bank and DuitNow step-up (1282) | `e2e/bank-details.spec.ts`, `step-up.test.ts` | 5 |
 | Numbering uses the workspace timezone (1191) | `packages/core/src/numbering/format.test.ts` | 6 |
 | Template substitution (1191) | `render.test.ts` | 8 |
 | Adapter contract S3 vs MinIO (deferred from Phase 1 line 1536) | `s3.contract.test.ts` | 4 |
-| Two-workspace RLS for each new tenant table | `isolation.test.ts` fixtures: `notification`, `doc_sequence`, `service`, `email_template` | 5–8 |
+| Two-workspace RLS for each new tenant table | `isolation.test.ts` fixtures: `step_up`, `doc_sequence`, `service`, `email_template` (`notification` already has one from Phase 1) | 5–8 |
 
 ---
 
@@ -351,7 +354,7 @@ The migration numbers are indicative; the builder takes the next free number whe
 
 ## 7. Questions for Charlie and how each was settled
 
-**2026-11-04, Charlie: "use your recommendations for all of them".** That adopts the recommendation written under each question below for Q1–Q9, Q11–Q16, Q19–Q22 and Q25, and Q24 (defer: the `proposal_cover` column is not added in Phase 2; the builder takes "only if Charlie agrees" as not agreed). Two need a note: Q5 (the recommendation was "Charlie gives the hex") is settled with a **placeholder default accent `#0e6c84`**, the Kinlo accent read from https://demo.codeandchill.store/kinlo/ (white text on it is about 6:1, passes AA); every workspace can change it in the picker. Q14 is settled as "decide the hosted storage provider before the first non-dev deployment; dev and CI use MinIO".
+**2026-11-04, Charlie: "use your recommendations for all of them".** That adopts the recommendation written under each question below for Q1–Q9, Q11–Q16, Q19–Q22 and Q25, and Q24 (defer: the `proposal_cover` column is not added in Phase 2; the builder takes "only if Charlie agrees" as not agreed). Two items below are **builder placeholders or readings, not Charlie's words, pending his one-line confirmation**: Q5 (the recommendation was "Charlie gives the hex"; the builder uses the placeholder default accent `#0e6c84`, the `--accent` CSS variable the builder read from the live demo https://demo.codeandchill.store/kinlo/ on 2026-11-04; white text on it is about 6:1; every workspace can change it in the picker), and Q24 (the recommendation said "only if Charlie agrees"; the builder reads that as not agreed, so the column is not added). Q1 and Q15 are revised per Bob's R1 and also need his re-confirmation (see those questions). Q14 is settled as "decide the hosted storage provider before the first non-dev deployment; dev and CI use MinIO".
 
 **Not settled by "use your recommendations", because the recommendation was "Charlie supplies the value" and the builder will not invent it:**
 - **Q10** SG invoice pattern, date format and locale (and MY locale). Blocks PR 3 (SG only; MY values come from the spec).
@@ -362,7 +365,7 @@ The migration numbers are indicative; the builder takes the next free number whe
 Each of these stops only the task named; the rest of its PR can proceed.
 
 
-1. **Contrast on the accent** (DECISIONS 2026-11-04 proposal). Recommendation: auto-derive black or white text, and refuse a hex where neither reaches 4.5:1.
+1. **Contrast on the accent** (DECISIONS 2026-11-04 proposal). Charlie's blanket "use your recommendations" was given on the rule "auto-derive black or white text, and refuse a hex where neither reaches 4.5:1". Bob (PR #52 R1 P1) showed that rule never refuses anything (best of black and white is always ≥ 4.58:1). **Revised recommendation, pending Charlie's re-confirmation:** auto-derive black or white text, and also require the accent itself to reach ≥ 3:1 against the page background and the card colour in light and dark, else refuse the hex.
 2. **Who may change branding** (the matrix is silent, spec lines 782–799; DECISIONS proposal). Recommendation: Admin and Owner, like "email settings".
 3. **Where dark mode is stored** (DECISIONS proposal). Recommendation: a per-user cookie read server-side (no DB column, works before login); a user column only if it must follow the user across devices.
 4. **Font.** Recommendation: a self-hosted, OFL-licensed rounded sans (an Urbanist-like face) via `next/font/local`, so `font-src 'self'` holds and the build makes no network fetch.
@@ -376,7 +379,7 @@ Each of these stops only the task named; the rest of its PR can proceed.
 12. **Logo size and dimension limits.** Recommendation: 2 MB, PNG/JPG, in `limits.ts`; Charlie confirms the number.
 13. **How images are served** (`img-src 'self'`). Recommendation: an authenticated same-origin streaming route; do not widen the CSP.
 14. **Storage provider for hosted SaaS** (R2 vs S3) and authorising it as an external service (UNI-11). Recommendation: decide before the first non-dev deployment; dev and CI use MinIO only.
-15. **Step-up storage.** Recommendation: a system table `step_up(session_id, verified_at)`, deleted when the session ends.
+15. **Step-up storage.** The first recommendation (a no-RLS system table) breaks the TEN-10 allow-list, which only a spec revision can widen (Bob PR #52 R1 P1). **Revised recommendation, pending Charlie's re-confirmation:** a tenant table `step_up(workspace_id, session_id, verified_at)` under the RLS template; or a column on the Better Auth `session` table (already on the allow-list) if the Task 13 spike prefers it. A spec revision adding `step_up` to the system module is the third option and is not recommended.
 16. **Step-up for an owner without 2FA.** Recommendation: refuse and send them to enrol.
 17. **Bank detail fields for MY and SG** (bank name, account name, account number, SWIFT/BIC, branch?). Recommendation: Charlie lists them.
 18. **Owner email wording, and whether a domain event `settings.bank_details_changed` is added to `EVENT_NAMES`.** Recommendation: a dedicated queue only (no new event) in Phase 2; Charlie gives the wording.
@@ -387,6 +390,7 @@ Each of these stops only the task named; the rest of its PR can proceed.
 23. **Email template events and default texts, and whether to build the editor in Phase 2 at all** (no Phase 2 email uses it; UNI-05). Recommendation: build the table and renderer now (spec row lists it), with the event list from Charlie.
 24. **Proposal cover options** (spec line 460, undefined). Recommendation: defer to Phase 6 (proposals); the column is not added in Phase 2 (UNI-05).
 25. **`tax_rounding` values beyond `rate_group`.** Recommendation: only `rate_group` until Phase 4.
+26. **Account-number hash in the audit entry** (spec line 799 says last 4 digits + SHA-256). The search space is small, so an unsalted hash can be brute-forced by a reader of `audit_log` (Bob PR #52 R1 P2, deferred to the PR 5 stop-and-ask). Builder proposal: HMAC-SHA-256 with a server-side secret (new env secret, UNI-08) or drop the hash and keep last 4 only. Needs Charlie's choice, recorded in DECISIONS, before Task 14.
 
 ---
 
@@ -407,7 +411,7 @@ Each of these stops only the task named; the rest of its PR can proceed.
 4. **The preview drifting from the allocator** if two formatters exist; there must be one `formatNumber`.
 5. **Timezone period boundaries** (UTC vs workspace timezone).
 6. **Invented values:** the SG defaults, the bank fields, the email wording and the limits stay ASK until answered.
-7. **PR size:** PR 3 and PR 5 are near 400 LOC; split them at the task boundary.
+7. **PR size:** PR 2 and PR 5 are cut now (2a/2b, 5a/5b/5c); PR 3 is near 400 LOC and splits at Task 9 if it goes over.
 8. **Server-action body limit** too small for an upload, which would force a route handler.
 
 ---
@@ -422,7 +426,8 @@ Each of these stops only the task named; the rest of its PR can proceed.
 - The Next server-action body size limit (assumed 1 MB default).
 - AWS SDK v3 and MinIO support for `If-None-Match` conditional puts.
 - Whether Charlie has confirmed the 2026-11-04 design-direction summary (handoff §6 item 5).
-- The exact composite-FK rule for `notification.user_id` (the Phase 1 composite-FK catalog test was not reread).
+- That `#0e6c84` is the Kinlo accent was read once from the demo's `--accent` CSS variable on 2026-11-04; the demo can change.
+- The Phase 1 composite-FK catalog rule for the new `step_up`, `doc_sequence`, `service` and `email_template` tables (not reread; the builder checks it when each table is cut).
 
 ---
 
@@ -432,7 +437,7 @@ Each of these stops only the task named; the rest of its PR can proceed.
 |---|---|
 | Every Phase 2 deliverable in spec line 1138 maps to a PR | yes: branding PR 2/4; country defaults, tax question, TIN/BRN, timezone/locale, currency/tax PR 3; bank, QR, step-up, notification PR 5; numbering and preview PR 6; catalog PR 7; email templates PR 8 |
 | Every done-when item has a named test | yes (§5) |
-| Every new tenant table has RLS, a manifest entry and an isolation fixture | yes: `notification`, `doc_sequence`, `service`, `email_template` |
+| Every new tenant table has RLS, a manifest entry and an isolation fixture | yes: `step_up`, `doc_sequence`, `service`, `email_template` (`notification` exists since Phase 1) |
 | No business value invented | yes: unknowns are Q4–Q25 |
 | DECISIONS proposals kept labelled as proposals | yes (Settled item 4; Q1–Q3) |
 | No `crm_purge` grants on Phase 2 tables | yes (Settled item 13) |
