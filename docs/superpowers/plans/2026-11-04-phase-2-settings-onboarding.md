@@ -2,7 +2,7 @@
 
 > This plan is task data. Implementation follows `agents/START.md`, `agents/roles/builder.md` and the owner's instructions.
 >
-> **Status: DRAFT for Charlie's answers, then Bob's plan review (2026-11-04).** Drafted by an Opus 5.5 sub-agent (read-only) for the builder (Sonnet 5.5, builder §3); the builder spot-checked the file, line and migration citations against `main` at `8a3c461`. Nothing in it is approved. §7 lists 25 open questions that need Charlie; until he answers Q4–Q25 as each PR needs, the matching PR cannot start. Facts the drafter could not verify are in §10.
+> **Status: DRAFT for Bob's plan review (2026-11-04). Charlie answered "use your recommendations for all of them" the same day: §7 records which questions that settles and which three still need a value from him (Q10, Q17, Q18, plus the event list in Q23).** Drafted by an Opus 5.5 sub-agent (read-only) for the builder (Sonnet 5.5, builder §3); the builder spot-checked the file, line and migration citations against `main` at `8a3c461`. Nothing in it is approved until Bob reviews it and Charlie approves. Facts the drafter could not verify are in §10.
 
 - **Spec section:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` v4.7 (revision 8). Phase 2 row at line 1138. Dependencies are at lines 460–462, 472, 512, 533, 730–740, 782–799, 846–847 and 1191/1280/1282.
 - **Milestone:** Phase 2 (target mid-November, spec line 1138).
@@ -18,7 +18,7 @@
 
 ## 0. Gate before anything (read first)
 
-- `.agent/handoff.md` §6 item 5 says Charlie still has to confirm the builder's summary of the 2026-11-04 design direction. PR #51, which records it, is merged (`8a3c461`). Its "Builder proposals (not decided)" line (contrast bar, who may change the colour, dark-mode storage, Orvel for transition ideas) is still unconfirmed. **Before this plan goes to review, Charlie confirms or changes those four proposals** (Q1–Q3 below), or the builder records his confirmation.
+- Charlie confirmed on 2026-11-04 ("use your recommendations for all of them") the four proposals in the DECISIONS 2026-11-04 entry (PR #51): AA contrast with automatic black or white text, Admin and Owner may change the brand colour, dark mode as a per-user cookie, Orvel for transition ideas only (Q1–Q3). A new DECISIONS entry on this branch records that confirmation and the other accepted recommendations.
 - `builder.md` §8: stop and ask before the first PR of each milestone. That is PR 1 below.
 
 ---
@@ -57,7 +57,7 @@ Builder spot-check (2026-11-04, `main` = `8a3c461`): migrations end at `0023_pas
 1. **Kinlo look.** Slim icon sidebar with count badges; a top bar with search, a dark-mode toggle and New; a greeting plus a "what needs you" line; rounded cards on a soft cool background; one rounded sans font; one accent colour. No code or assets copied (both demos are paid templates). Source: `docs/DECISIONS.md` 2026-11-04 (1).
 2. **Motion.** All page and card transitions use view transitions, staggered card entrance, and chart/range-toggle motion. GSAP is used only where CSS and the View Transitions API cannot do the job, and is pinned exactly in the PR that adds it. `prefers-reduced-motion` turns motion off or down. Source: DECISIONS 2026-11-04 (2); FRONTEND_STANDARDS §3.9.
 3. **Accent colour.** A hex field plus a drag picker, stored as the workspace brand colour and applied as a semantic token. Source: DECISIONS 2026-11-04 (3); spec line 460 ("branding (brand colour …)").
-4. **Still proposals, not decided** (DECISIONS 2026-11-04, "Builder proposals"): WCAG AA text on the accent and how it is enforced; which role may change the colour; dark mode as a per-user preference and where it is stored; Orvel for transition ideas only. This plan keeps all four labelled as proposals (see Q1–Q3).
+4. **Confirmed by Charlie 2026-11-04** (accepting the builder recommendations for the DECISIONS 2026-11-04 "Builder proposals"): WCAG AA text on the accent (automatic black or white, hex refused if neither reaches 4.5:1); Admin and Owner may change the colour; dark mode is a per-user cookie; Orvel for transition ideas only (Q1–Q3).
 5. **Permissions.** "Templates, numbering, email settings, catalog" are Admin and Owner. "Bank details, DuitNow QR (step-up)" are Owner only. Source: spec lines 782–799.
 6. **Bank or QR change consequences.** Step-up (a fresh TOTP within the last 5 minutes); an audit entry with account numbers as last-4 plus SHA-256, and the QR as its hash key; an email to all owners; a "Bank details updated on {date}" line on invoices for 60 days (printed in Phase 4). Source: spec lines 792–799.
 7. **The QR is content-addressed and never deleted** (not by replacement, orphan sweep or purge). `duitnow_qr_key` points at the current file. Source: spec line 847; FILE-03 exception (PROJECT.md §9 line 244).
@@ -100,7 +100,7 @@ The migration numbers are indicative; the builder takes the next free number whe
 - Files: `apps/web/src/app/globals.css`; `FRONTEND_STANDARDS.md` (only the FE-13 note, if Charlie agrees).
 - [ ] Replace the HSL tokens with the Kinlo palette as semantic tokens: `--background` (soft cool), `--card`, `--card-foreground`, `--muted`, `--border`, `--ring`, `--accent`, `--accent-foreground`, `--destructive`, radius scale. Map them in `@theme inline`. Keep the existing token names so `button.tsx`, `input.tsx` and `label.tsx` keep working.
 - [ ] Add a dark mode class strategy with `@custom-variant dark (&:where(.dark, .dark *))`. When no preference is stored, fall back to `prefers-color-scheme` (the current behaviour).
-- [ ] The default accent is a neutral placeholder until branding exists (PR 2). The teal hex comes from Charlie (Q5); never invent a brand value.
+- [ ] The default accent is the placeholder `#0e6c84` (Q5, Kinlo accent) until a workspace sets one in PR 2.
 - [ ] Test: extend `e2e/accessibility.spec.ts` so axe runs in light and dark at chromium, tablet-768 and mobile-320.
 
 **Task 2: font, icons, shell**
@@ -131,7 +131,7 @@ The migration numbers are indicative; the builder takes the next free number whe
 
 **Task 4: schema**
 - Files: `apps/web/src/db/schema/tenancy.ts`; `apps/web/drizzle/0024_workspace_settings_columns.sql` (via `pnpm db:generate --name workspace_settings_columns`); `apps/web/src/db/privileges.ts`; `privileges.test.ts`.
-- [ ] Add these columns from spec line 460: `short_code`, `logo_key`, `brand_colour` (text, CHECK `^#[0-9a-f]{6}$`), `proposal_cover` (jsonb; options undefined, Q24), `address` (shape per Q11), `country` (char(2)), `timezone`, `locale`, `date_format`, `base_currency`, `default_currency` (char(3)), `tax_registered` (bool, default false), `tax_registration_no`, `own_tin`, `own_brn`, `default_tax_name`, `default_tax_rate` (numeric, CHECK `>= 0`, and CHECK that tax name and rate are null when `tax_registered` is false), `tax_rounding` (default `'rate_group'`), `email_from_name`, `email_reply_to`, `email_bcc_self`, `auto_send_default`, `default_agreement_pattern` (CHECK in `service_agreement`, `msa_sow`; default `service_agreement`), `require_2fa` (bool, default false).
+- [ ] Add these columns from spec line 460: `short_code`, `logo_key`, `brand_colour` (text, CHECK `^#[0-9a-f]{6}$`), `address` (shape per Q11), `country` (char(2)), `timezone`, `locale`, `date_format`, `base_currency`, `default_currency` (char(3)), `tax_registered` (bool, default false), `tax_registration_no`, `own_tin`, `own_brn`, `default_tax_name`, `default_tax_rate` (numeric, CHECK `>= 0`, and CHECK that tax name and rate are null when `tax_registered` is false), `tax_rounding` (default `'rate_group'`), `email_from_name`, `email_reply_to`, `email_bcc_self`, `auto_send_default`, `default_agreement_pattern` (CHECK in `service_agreement`, `msa_sow`; default `service_agreement`), `require_2fa` (bool, default false).
 - [ ] Every column is nullable or defaulted, so existing rows stay valid. The bank and QR columns come in PR 5.
 - [ ] `crm_app` UPDATE grants are per column (Phase 1 pattern). There are no `crm_purge` grants (spec line 897).
 - [ ] Test: `privileges.test.ts` manifest updated. `isolation.test.ts` already covers `workspace_settings`; add a case that workspace A cannot UPDATE B's `brand_colour`.
@@ -349,7 +349,18 @@ The migration numbers are indicative; the builder takes the next free number whe
 
 ---
 
-## 7. Open questions for Charlie (recommendation given; none decided)
+## 7. Questions for Charlie and how each was settled
+
+**2026-11-04, Charlie: "use your recommendations for all of them".** That adopts the recommendation written under each question below for Q1–Q9, Q11–Q16, Q19–Q22 and Q25, and Q24 (defer: the `proposal_cover` column is not added in Phase 2; the builder takes "only if Charlie agrees" as not agreed). Two need a note: Q5 (the recommendation was "Charlie gives the hex") is settled with a **placeholder default accent `#0e6c84`**, the Kinlo accent read from https://demo.codeandchill.store/kinlo/ (white text on it is about 6:1, passes AA); every workspace can change it in the picker. Q14 is settled as "decide the hosted storage provider before the first non-dev deployment; dev and CI use MinIO".
+
+**Not settled by "use your recommendations", because the recommendation was "Charlie supplies the value" and the builder will not invent it:**
+- **Q10** SG invoice pattern, date format and locale (and MY locale). Blocks PR 3 (SG only; MY values come from the spec).
+- **Q17** bank detail fields for MY and SG. Blocks PR 5 Task 14.
+- **Q18** owner email wording for a bank or QR change. Blocks PR 5 Task 16.
+- **Q23** the email-template event list and default texts (the table and renderer go ahead). Blocks PR 8 Task 25.
+
+Each of these stops only the task named; the rest of its PR can proceed.
+
 
 1. **Contrast on the accent** (DECISIONS 2026-11-04 proposal). Recommendation: auto-derive black or white text, and refuse a hex where neither reaches 4.5:1.
 2. **Who may change branding** (the matrix is silent, spec lines 782–799; DECISIONS proposal). Recommendation: Admin and Owner, like "email settings".
@@ -374,7 +385,7 @@ The migration numbers are indicative; the builder takes the next free number whe
 21. **Short code (`{CODE}`) format and uniqueness.** Recommendation: 2–6 uppercase letters or digits, unique per workspace only.
 22. **Catalog details:** may services be deleted, or only archived? Which currencies are offered? Recommendation: archive only (no DELETE grant); offer ISO 4217 with MYR and SGD on top.
 23. **Email template events and default texts, and whether to build the editor in Phase 2 at all** (no Phase 2 email uses it; UNI-05). Recommendation: build the table and renderer now (spec row lists it), with the event list from Charlie.
-24. **Proposal cover options** (spec line 460, undefined). Recommendation: defer the column contents to Phase 6 (proposals), and add the column now as empty jsonb only if Charlie agrees.
+24. **Proposal cover options** (spec line 460, undefined). Recommendation: defer to Phase 6 (proposals); the column is not added in Phase 2 (UNI-05).
 25. **`tax_rounding` values beyond `rate_group`.** Recommendation: only `rate_group` until Phase 4.
 
 ---

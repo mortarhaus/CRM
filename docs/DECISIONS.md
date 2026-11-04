@@ -2,6 +2,14 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-04 — Charlie accepts the builder recommendations for the design proposals and the Phase 2 plan questions
+- **Decision:** Charlie said "use your recommendations for all of them" on 2026-11-04. That confirms the four "Builder proposals" of the 2026-11-04 design-direction entry (WCAG AA text on the accent with automatic black or white and a refusal when neither reaches 4.5:1; Admin and Owner may change the brand colour; dark mode as a per-user cookie; Orvel for transition ideas only) and adopts the recommendation under each question of the Phase 2 plan §7 (`docs/superpowers/plans/2026-11-04-phase-2-settings-onboarding.md`) except Q10, Q17, Q18 and the event list in Q23, which need a value from him. The default accent before a workspace sets one is the placeholder `#0e6c84` (the Kinlo accent), changeable per workspace.
+- **Why:** the plan cannot go to Bob with the design proposals unconfirmed (plan §0).
+- **Alternatives rejected:** inventing the Singapore defaults, the bank fields or the email wording (they are business facts, builder rule: never guess).
+- **Scope / affects:** the Phase 2 plan; `FRONTEND_STANDARDS.md` FE-13 note only if Charlie agrees later.
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-11-04, in session).
+
 ## 2026-11-04 — Design direction for the app UI (Phase 2 onward)
 - **Decision:** (1) The app UI follows the Kinlo look from https://demo.codeandchill.store/kinlo/: slim icon sidebar with count badges, top bar (search, dark-mode toggle, New), a greeting with a one-line "what needs you" summary, rounded cards on a soft cool background, one rounded sans font, one accent colour. (2) All the page and card transitions Charlie saw in Kinlo and Orvel (https://demo.codeandchill.store/orvel/) are in scope: page-to-page view transitions, staggered card entrance, chart and range-toggle motion. GSAP is allowed where the platform (CSS and the View Transitions API) cannot do it (UNI-06 order). `prefers-reduced-motion` turns motion off or down. (3) The accent colour is chosen with a hex field and a drag colour picker, stored as the workspace brand colour (`workspace_settings` branding, spec Phase 2 "Branding") and applied through a semantic token, never hardcoded (`FRONTEND_STANDARDS.md` rule 5).
 - **Why:** Phase 2 (settings and onboarding, spec "Build phases") is the first phase with a real UI surface, and Charlie's direction was the stated gate before the Phase 2 plan (`CLAUDE.md` Status, handoff).
