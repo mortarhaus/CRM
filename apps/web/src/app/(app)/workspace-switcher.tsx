@@ -4,6 +4,7 @@ import {
   startTransition,
   useActionState,
   useEffect,
+  useId,
   useRef,
   useState,
   type ChangeEvent,
@@ -28,6 +29,10 @@ interface SwitcherProps {
 
 function WorkspaceSwitcherForm({ workspaces, activeId, unreachable }: SwitcherProps & { unreachable: boolean }) {
   const [state, formAction] = useActionState(setActiveWorkspaceAction, EMPTY_FORM_STATE);
+  // The shell renders the switcher twice (top bar and phone menu drawer), so its ids are generated.
+  const id = useId();
+  const selectId = `${id}-select`;
+  const errorId = `${id}-error`;
   const select = useRef<HTMLSelectElement>(null);
   const [selected, setSelected] = useState(activeId ?? "");
   const [serverActiveId, setServerActiveId] = useState(activeId);
@@ -70,15 +75,15 @@ function WorkspaceSwitcherForm({ workspaces, activeId, unreachable }: SwitcherPr
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="flex min-w-0 flex-wrap items-center gap-2">
-      <Label htmlFor="workspace-switcher">Active workspace</Label>
+      <Label htmlFor={selectId}>Active workspace</Label>
       <select
         ref={select}
-        id="workspace-switcher"
+        id={selectId}
         name="organizationId"
         value={selected}
         onChange={onChange}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? "workspace-switcher-error" : undefined}
+        aria-describedby={error ? errorId : undefined}
         className="min-h-10 max-w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         {activeId === null && (
@@ -97,7 +102,7 @@ function WorkspaceSwitcherForm({ workspaces, activeId, unreachable }: SwitcherPr
         Switch
       </Button>
       {error && (
-        <p id="workspace-switcher-error" role="alert" className="text-sm text-destructive">
+        <p id={errorId} role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}

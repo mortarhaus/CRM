@@ -5,7 +5,8 @@ import { expect, type Locator, type Page } from "@playwright/test";
 // is tagged `wcag2aa`, so it runs in every scan.
 const WCAG_A_AA_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
-// globals.css defines dark tokens under `prefers-color-scheme: dark`, so both schemes are scanned.
+// With no crm_theme cookie the tokens follow `prefers-color-scheme`, so both schemes are scanned; with one, both scans
+// must show the chosen theme.
 const COLOR_SCHEMES = ["light", "dark"] as const;
 
 async function expectNoHorizontalOverflow(page: Page, state: string): Promise<void> {
@@ -17,12 +18,12 @@ export async function expectAccessible(page: Page, state: string): Promise<void>
   await expectNoHorizontalOverflow(page, state);
   for (const colorScheme of COLOR_SCHEMES) {
     await page.emulateMedia({ colorScheme });
-    // Buttons use transition-colors; scan the settled colours, not a frame mid-transition.
+    // Buttons use transition-colors and cards fade in; scan the settled colours, not a frame mid-animation.
     await page.evaluate(() =>
       Promise.allSettled(
         document
           .getAnimations()
-          .filter((animation) => animation instanceof CSSTransition)
+          .filter((animation) => animation instanceof CSSTransition || animation instanceof CSSAnimation)
           .map((animation) => animation.finished),
       ),
     );

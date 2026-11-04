@@ -1,4 +1,4 @@
-import { expect, type Page, type Route } from "@playwright/test";
+import { expect, type Locator, type Page, type Route } from "@playwright/test";
 import type { TOTP } from "otpauth";
 import { totpFromUri } from "../src/test/totp";
 
@@ -46,7 +46,38 @@ export async function signIn(page: Page, email: string, password = PASSWORD): Pr
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
 
+// Below md the workspace switcher and Sign out are in the menu drawer; from md up they are in the top bar. Opens the
+// drawer when the menu button shows (mobile-320) and does nothing otherwise. Each control is rendered in both places, one
+// of them hidden, so tests find them by role, which skips hidden elements.
+export async function openShellMenu(page: Page): Promise<void> {
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (!(await menuButton.isVisible())) return;
+  const drawer = page.getByRole("dialog", { name: "Menu" });
+  if (!(await drawer.isVisible())) await menuButton.click();
+  await expectDrawerOpen(drawer);
+}
+
+// Waits for the slide-in to end: with JavaScript off, a click started mid-slide can wait forever for the element to be
+// stable in headless Chromium (no frames are produced once the transition ends).
+export async function expectDrawerOpen(drawer: Locator): Promise<void> {
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toHaveCSS("translate", "0px");
+}
+
+// The open drawer is modal: the page behind it cannot be used until it closes.
+export async function closeShellMenu(page: Page): Promise<void> {
+  const drawer = page.getByRole("dialog", { name: "Menu" });
+  if (!(await drawer.isVisible())) return;
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+}
+
+export function workspaceSwitcher(page: Page): Locator {
+  return page.getByRole("combobox", { name: "Active workspace" });
+}
+
 export async function signOut(page: Page): Promise<void> {
+  await openShellMenu(page);
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
 }
