@@ -93,6 +93,19 @@
 }
 
 @layer base {
+  /* Below md the shell has a sticky top bar (3.75rem) and a fixed tab bar (about 5rem with its inset): keep anything
+     scrolled into view, by focus or by a #fragment, clear of both (WCAG 2.2 SC 2.4.11). */
+  @media (width < 48rem) {
+    html {
+      scroll-padding-block: 4.5rem 6.5rem;
+    }
+  }
+
+  /* The page behind the open menu drawer does not scroll. */
+  html:has(dialog:modal) {
+    overflow: hidden;
+  }
+
   body {
     @apply bg-background font-sans text-foreground antialiased;
   }

@@ -6,7 +6,17 @@ import { SEND_TEST_EMAIL, TEST_EMAIL_QUEUED } from "../src/lib/auth/messages";
 import { searchMessages } from "../src/test/mailpit";
 import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { tabTo } from "./a11y";
-import { PASSWORD, respectRateLimit, signIn, signOut, signUp, uniqueEmail } from "./helpers";
+import {
+  closeShellMenu,
+  openShellMenu,
+  PASSWORD,
+  respectRateLimit,
+  signIn,
+  signOut,
+  signUp,
+  uniqueEmail,
+  workspaceSwitcher,
+} from "./helpers";
 
 // FE-32: every flow here runs in a browser with JavaScript off, so the forms post to their server
 // actions as plain HTML forms and the server renders the result.
@@ -196,7 +206,9 @@ test("workspace creation works without JavaScript and the server refuses what th
 
   await createWorkspace(page, "No Script Studio");
   await expect(workspaces).toContainText("No Script Studio");
-  await expect(page.getByLabel("Active workspace").locator("option:checked")).toHaveText("No Script Studio");
+  await openShellMenu(page);
+  await expect(workspaceSwitcher(page).locator("option:checked")).toHaveText("No Script Studio");
+  await closeShellMenu(page);
 
   await createWorkspace(page, "   ");
   await expect(page.getByRole("main").getByRole("alert")).toHaveText("Enter a workspace name.");
@@ -309,13 +321,16 @@ test("the workspace switcher works without JavaScript and the server refuses a f
   await expect(page).toHaveURL(/\/workspaces$/);
   await createWorkspace(page, "Alpha Studio");
   await createWorkspace(page, "Beta Studio");
-  const switcher = page.getByLabel("Active workspace");
+  // Below md the switcher is in the menu drawer; every post reloads the page, which closes it again.
+  const switcher = workspaceSwitcher(page);
+  await openShellMenu(page);
   await expect(switcher.locator("option:checked")).toHaveText("Beta Studio");
 
   await switcher.selectOption({ label: "Alpha Studio" });
   await page.getByRole("button", { name: "Switch", exact: true }).click();
   await expect(page).toHaveURL(/\/workspaces$/);
   await expect(page.getByRole("listitem").filter({ hasText: "Alpha Studio" })).toContainText("(active)");
+  await openShellMenu(page);
   await expect(switcher.locator("option:checked")).toHaveText("Alpha Studio");
 
   // By keyboard: type-ahead picks the workspace, then the Switch button submits it.
@@ -326,11 +341,13 @@ test("the workspace switcher works without JavaScript and the server refuses a f
   await expect(page.getByRole("listitem").filter({ hasText: "Beta Studio" })).toContainText("(active)");
 
   // A blank id is refused before Better Auth is asked.
+  await openShellMenu(page);
   const blank = await postForm(page, formWithButton(page, "Switch"), { organizationId: "" });
   expect(blank.status()).toBe(200);
   expect(await blank.text()).toContain("Couldn&#x27;t switch workspace. Try again.");
   await page.reload();
   await expect(page.getByRole("listitem").filter({ hasText: "Beta Studio" })).toContainText("(active)");
+  await openShellMenu(page);
 
   // A nonblank id that is not a uuid never reaches Better Auth's uuid lookup.
   const malformed = await postForm(page, formWithButton(page, "Switch"), { organizationId: "not-a-uuid" });
@@ -344,6 +361,7 @@ test("the workspace switcher works without JavaScript and the server refuses a f
   }, randomUUID());
   await switcher.selectOption({ label: "Alpha Studio" });
   await page.getByRole("button", { name: "Switch", exact: true }).click();
+  await openShellMenu(page);
   await expect(page.getByRole("alert").filter({ hasText: "Couldn't switch workspace. Try again." })).toBeVisible();
   await expect(switcher.locator("option:checked")).toHaveText("Choose a workspace");
   await expect(page.getByRole("list", { name: "Your workspaces" })).not.toContainText("(active)");
@@ -367,6 +385,12 @@ test("sign-out works without JavaScript and ends the server session", async ({ p
   await signIn(page, email);
   await expect(page).toHaveURL(/\/workspaces$/);
 
+  // Below md, Sign out is in the menu drawer, which opens from the keyboard without JavaScript.
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await tabTo(page, menuButton);
+    await page.keyboard.press("Enter");
+  }
   await tabTo(page, page.getByRole("button", { name: "Sign out" }));
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/sign-in$/);

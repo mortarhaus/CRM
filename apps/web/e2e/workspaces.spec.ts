@@ -1,6 +1,17 @@
 import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
-import { completeTotpSignIn, enrolTotp, respectRateLimit, signIn, signOut, signUp, uniqueEmail } from "./helpers";
+import {
+  closeShellMenu,
+  completeTotpSignIn,
+  enrolTotp,
+  openShellMenu,
+  respectRateLimit,
+  signIn,
+  signOut,
+  signUp,
+  uniqueEmail,
+  workspaceSwitcher,
+} from "./helpers";
 
 async function createWorkspace(page: Page, name: string): Promise<void> {
   await page.getByLabel("Workspace name").fill(name);
@@ -9,7 +20,9 @@ async function createWorkspace(page: Page, name: string): Promise<void> {
 }
 
 async function expectActiveWorkspace(page: Page, name: string): Promise<void> {
-  await expect(page.getByLabel("Active workspace").locator("option:checked")).toHaveText(name);
+  await openShellMenu(page);
+  await expect(workspaceSwitcher(page).locator("option:checked")).toHaveText(name);
+  await closeShellMenu(page);
 }
 
 test("Phase 0 done-when: sign up, 2FA, create two workspaces, switch between them", async ({ page }) => {
@@ -33,7 +46,8 @@ test("Phase 0 done-when: sign up, 2FA, create two workspaces, switch between the
   await createWorkspace(page, "Studio Beta");
   await expectActiveWorkspace(page, "Studio Beta");
 
-  await page.getByLabel("Active workspace").selectOption({ label: "Studio Alpha" });
+  await openShellMenu(page);
+  await workspaceSwitcher(page).selectOption({ label: "Studio Alpha" });
   await expectActiveWorkspace(page, "Studio Alpha");
   // The select shows the new value at once; wait for the server-rendered marker so the switch is saved.
   await expect(page.getByRole("listitem").filter({ hasText: "Studio Alpha" })).toContainText("(active)");
@@ -53,7 +67,8 @@ test("switching to a workspace you are not a member of is refused and never beco
   await signIn(page, ownerEmail);
   await expect(page).toHaveURL(/\/workspaces$/);
   await createWorkspace(page, "Owner Private");
-  const foreignId = await page.getByLabel("Active workspace").locator("option:checked").getAttribute("value");
+  await openShellMenu(page);
+  const foreignId = await workspaceSwitcher(page).locator("option:checked").getAttribute("value");
   expect(foreignId).toBeTruthy();
 
   const outsiderContext = await browser.newContext();
@@ -80,6 +95,7 @@ test("switching to a workspace you are not a member of is refused and never beco
 
   await outsider.reload();
   await expect(outsider.getByRole("list", { name: "Your workspaces" })).not.toContainText("Owner Private");
-  await expect(outsider.getByLabel("Active workspace").locator("option")).not.toContainText(["Owner Private"]);
+  await openShellMenu(outsider);
+  await expect(workspaceSwitcher(outsider).locator("option")).not.toContainText(["Owner Private"]);
   await outsiderContext.close();
 });

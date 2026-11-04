@@ -28,8 +28,11 @@ const ENTRY_POINTS: Record<string, { exports: string[]; coveredBy: string }> = {
   "apps/web/src/app/(app)/theme/route.ts": {
     exports: ["POST"],
     coveredBy:
-      "Sets only the caller's own crm_theme cookie, reads no tenant data: same-origin Origin check, signed-in session, " +
-      "value allow-listed (lib/theme.test.ts, e2e/theme.spec.ts; Phase 2 plan Task 3).",
+      "AUTH-01 conforming interpretation (Bob, PR #53 R1, pending Charlie): sets only the caller's own crm_theme " +
+      "cookie, and conforms only while (a) no database read or write beyond the session lookup; (b) same-origin " +
+      "Origin required (403 otherwise); (c) signed-in session required; (d) the value allow-listed (parseTheme); " +
+      "(e) the redirect target limited to a same-origin path (returnPath); (f) classified here with these conditions " +
+      "(lib/theme.test.ts, e2e/theme.spec.ts; Phase 2 plan Task 3).",
   },
   "apps/web/src/proxy.ts": {
     exports: ["proxy"],

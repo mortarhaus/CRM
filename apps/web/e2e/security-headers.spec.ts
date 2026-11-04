@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures";
 import type { Page, Response } from "@playwright/test";
 import { isHttpsUrl, isLoopbackUrl } from "../src/lib/origin";
 import { buildCsp } from "../src/lib/security-headers";
-import { enrolTotp, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
+import { enrolTotp, openShellMenu, respectRateLimit, signIn, signUp, uniqueEmail, workspaceSwitcher } from "./helpers";
 
 // UNI-17 / UNI-18 (plan Task 25): the page CSP from src/proxy.ts, the API CSP and static headers from next.config.ts,
 // and the session cookie's flags.
@@ -102,7 +102,8 @@ test("no CSP violation through sign-in, 2FA enrolment and workspace switching; s
   await page.goto("/workspaces");
   await createWorkspace(page, "Headers Alpha");
   await createWorkspace(page, "Headers Beta");
-  await page.getByLabel("Active workspace").selectOption({ label: "Headers Alpha" });
+  await openShellMenu(page);
+  await workspaceSwitcher(page).selectOption({ label: "Headers Alpha" });
   await expect(page.getByRole("listitem").filter({ hasText: "Headers Alpha" })).toContainText("(active)");
 
   expect(violations).toEqual([]);

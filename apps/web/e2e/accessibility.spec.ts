@@ -6,15 +6,19 @@ import { SEND_TEST_EMAIL, TEST_EMAIL_FAILED, TEST_EMAIL_FORBIDDEN, TEST_EMAIL_QU
 import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { expectAccessible, expectVisibleFocus, tabTo } from "./a11y";
 import {
+  closeShellMenu,
   failServerActions,
+  openShellMenu,
   PASSWORD,
   respectRateLimit,
   setMemberRole,
   signIn,
+  signOut,
   signUp,
   startTotpEnrolment,
   submitTotpCode,
   uniqueEmail,
+  workspaceSwitcher,
 } from "./helpers";
 
 // The longest name the form accepts, as one unbroken word to stress wrapping.
@@ -110,8 +114,7 @@ test.describe("axe scan, light and dark, no horizontal overflow", () => {
     await expect(page.getByRole("status")).toHaveText("Two-factor authentication is on.");
     await expectAccessible(page, "/settings/security 2FA on");
 
-    await page.getByRole("button", { name: "Sign out" }).click();
-    await expect(page).toHaveURL(/\/sign-in$/);
+    await signOut(page);
     await respectRateLimit(page);
     await signIn(page, email);
     await expect(page).toHaveURL(/\/two-factor$/);
@@ -126,8 +129,10 @@ test.describe("axe scan, light and dark, no horizontal overflow", () => {
 
     await createWorkspace(page, "Studio Alpha");
     await createWorkspace(page, LONGEST_WORKSPACE_NAME);
-    await expect(page.getByLabel("Active workspace").locator("option:checked")).toHaveText(LONGEST_WORKSPACE_NAME);
+    await openShellMenu(page);
+    await expect(workspaceSwitcher(page).locator("option:checked")).toHaveText(LONGEST_WORKSPACE_NAME);
     await expectAccessible(page, "/workspaces two workspaces, longest name active");
+    await closeShellMenu(page);
 
     await page.getByLabel("Workspace name").fill("   ");
     await page.getByRole("button", { name: "Create workspace" }).click();
@@ -135,7 +140,8 @@ test.describe("axe scan, light and dark, no horizontal overflow", () => {
     await expectAccessible(page, "/workspaces create error");
 
     // Better Auth refuses a workspace the user is not a member of.
-    const switcher = page.getByLabel("Active workspace");
+    await openShellMenu(page);
+    const switcher = workspaceSwitcher(page);
     await switcher.locator("option", { hasText: "Studio Alpha" }).evaluate((option: HTMLOptionElement, id) => {
       option.value = id;
     }, randomUUID());
@@ -252,7 +258,13 @@ test.describe("keyboard only", () => {
     await createWorkspace(page, "Beta Studio");
 
     await page.goto("/workspaces");
-    const switcher = page.getByLabel("Active workspace");
+    // Below md the switcher is in the menu drawer, opened from the keyboard too.
+    const menuButton = page.getByRole("button", { name: "Open menu" });
+    if (await menuButton.isVisible()) {
+      await tabTo(page, menuButton);
+      await page.keyboard.press("Enter");
+    }
+    const switcher = workspaceSwitcher(page);
     await tabTo(page, switcher);
     // Type-ahead on the closed select; arrow keys open the popup on macOS instead of changing the value.
     await page.keyboard.press("a");

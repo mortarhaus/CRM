@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
-import { failServerActions, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
+import { failServerActions, openShellMenu, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
 
 const SIGN_OUT_FAILED = "We couldn't sign you out. Try again.";
 
@@ -25,6 +25,7 @@ for (const [label, failure] of [
   test(`sign-out that fails with ${label} keeps the user on the page and can be retried`, async ({ page }) => {
     await signedInUser(page);
     const restore = await failServerActions(page, failure);
+    await openShellMenu(page);
 
     const signOutButton = page.getByRole("button", { name: "Sign out" });
     await signOutButton.click();
@@ -49,6 +50,7 @@ for (const [label, failure] of [
 
 test("a normal sign-out clears the server session and lands on sign in", async ({ page }) => {
   await signedInUser(page);
+  await openShellMenu(page);
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
   expect(await serverSession(page)).toBeNull();

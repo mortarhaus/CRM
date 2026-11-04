@@ -57,6 +57,15 @@ test("the theme route refuses a cross-site post and an unknown theme", async ({ 
   expect((await page.context().cookies()).some(({ name }) => name === "crm_theme")).toBe(false);
 });
 
+test("the theme route sends a signed-out post to sign in and sets no cookie", async ({ page, baseURL }) => {
+  const origin = new URL(baseURL ?? "http://localhost:3000").origin;
+  const response = await page.request.post("/theme", { form: { theme: "dark" }, headers: { origin }, maxRedirects: 0 });
+  expect(response.status()).toBe(303);
+  expect(response.headers().location).toMatch(/\/sign-in$/);
+  expect(response.headers()["set-cookie"] ?? "").not.toContain("crm_theme");
+  expect((await page.context().cookies()).some(({ name }) => name === "crm_theme")).toBe(false);
+});
+
 test("with reduced motion the cards do not animate", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await signedInWithWorkspace(page);
