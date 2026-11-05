@@ -107,6 +107,9 @@ test("the preview shows both rendered variants, each described through aria-desc
     await page.emulateMedia({ colorScheme });
     await expect.poll(() => background(preview(page, "Light theme").getByText("Button", { exact: true })), colorScheme).toBe(PALE_ON_LIGHT);
     await expect.poll(() => background(preview(page, "Dark theme").getByText("Button", { exact: true })), colorScheme).toBe(PALE_ON_DARK);
+    // The panels' own surfaces follow the panel's theme too (the production CSS compiles light-dark(), see globals.css).
+    expect(await background(preview(page, "Light theme")), colorScheme).toBe("rgb(244, 247, 251)");
+    expect(await background(preview(page, "Dark theme")), colorScheme).toBe("rgb(8, 12, 16)");
   }
   await page.emulateMedia({ colorScheme: null });
   await expectAccessible(page, "/settings/branding, pale colour previewed");
