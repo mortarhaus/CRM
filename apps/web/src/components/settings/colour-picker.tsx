@@ -117,7 +117,7 @@ export function ColourPicker({ value, onChange }: { value: Hsv; onChange: (next:
         <span className={cn(THUMB, "top-1/2")} style={{ left: `${(h / HUE_MAX) * 100}%`, backgroundColor: hsvToHex({ h, s: 100, v: 100 }) }} />
       </div>
       <p id="colour-picker-keys" className="text-sm text-muted-foreground">
-        Arrow keys: left and right change saturation, up and down change brightness. Hold Shift for larger steps.
+        On the colour area, left and right arrows change saturation and up and down change brightness. On the hue slider, left and down lower the hue and right and up raise it. Hold Shift for larger steps.
       </p>
     </fieldset>
   );

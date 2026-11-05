@@ -237,27 +237,43 @@ test.describe("outdated-browser notice", () => {
     expect(conditions).toEqual(["not(color:light-dark(#000,#fff))", "notselector(:has(a))"]);
   });
 
-  for (const [feature, stub] of [
-    ["invoker commands", () => Reflect.deleteProperty(HTMLButtonElement.prototype, "command")],
-    ["<dialog>", () => Reflect.deleteProperty(window, "HTMLDialogElement")],
-  ] as const) {
-    test(`is shown, readable and axe-clean when the browser lacks ${feature}`, async ({ page }) => {
-      await page.addInitScript(stub);
-      await page.goto("/sign-in");
-      await expect(notice(page)).toHaveText(NOTICE_TEXT);
-      await expectAccessible(page, `/sign-in, notice shown (${feature})`);
-      if (feature === "<dialog>") return;
+  test("is shown, readable and axe-clean when the browser lacks <dialog>", async ({ page }) => {
+    await page.addInitScript(() => Reflect.deleteProperty(window, "HTMLDialogElement"));
+    await page.goto("/sign-in");
+    await expect(notice(page)).toHaveText(NOTICE_TEXT);
+    await expectAccessible(page, "/sign-in, notice shown (<dialog>)");
 
-      await signedInOwner(page);
-      await expect(notice(page)).toHaveText(NOTICE_TEXT);
-      // In the page flow at the top, so it covers nothing: the shell starts below it. Boxes are viewport-relative, and
-      // at 320 the page may have scrolled to the focused control, so measure from the top of the document.
-      await page.evaluate(() => window.scrollTo(0, 0));
-      const shellTop = await box(page.getByRole("main"));
-      const noticeBox = await box(notice(page));
-      expect(noticeBox.y).toBe(0);
-      expect(noticeBox.y + noticeBox.height).toBeLessThanOrEqual(shellTop.y);
-      await expectAccessible(page, `/workspaces, notice shown (${feature})`);
-    });
-  }
+    await signedInOwner(page);
+    await expect(notice(page)).toHaveText(NOTICE_TEXT);
+    // In the page flow at the top, so it covers nothing: the shell starts below it. Boxes are viewport-relative, and
+    // at 320 the page may have scrolled to the focused control, so measure from the top of the document.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const shellTop = await box(page.getByRole("main"));
+    const noticeBox = await box(notice(page));
+    expect(noticeBox.y).toBe(0);
+    expect(noticeBox.y + noticeBox.height).toBeLessThanOrEqual(shellTop.y);
+    await expectAccessible(page, "/workspaces, notice shown (<dialog>)");
+  });
+
+  // PR #55 R1: a browser without invoker commands is not outdated for this app, because the drawer falls back to
+  // showModal()/close(). No notice, and the drawer still opens, closes on Esc and returns focus.
+  test("is absent without invoker commands, and the menu drawer still works", async ({ page }) => {
+    test.skip(!isPhone(page), "the drawer is the phone layout only");
+    await page.addInitScript(() => Reflect.deleteProperty(HTMLButtonElement.prototype, "command"));
+    await signedInOwner(page);
+    await expect(notice(page)).toHaveCount(0);
+
+    const button = menuButton(page);
+    await button.click();
+    await expect(drawer(page)).toBeVisible();
+    expect(await drawer(page).evaluate((dialog) => dialog.matches(":modal"))).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(drawer(page)).toBeHidden();
+    await expect(button).toBeFocused();
+    await button.press("Enter");
+    await expect(drawer(page)).toBeVisible();
+    await drawer(page).getByRole("button", { name: "Close menu" }).click();
+    await expect(drawer(page)).toBeHidden();
+    await expect(button).toBeFocused();
+  });
 });

@@ -3,12 +3,13 @@
 import { useSyncExternalStore } from "react";
 import { OUTDATED_BROWSER } from "@/lib/auth/messages";
 
-// What the app relies on and CSS cannot test (globals.css shows the notice for light-dark() and :has()): HTML invoker
-// commands (the phone menu drawer without JavaScript) and <dialog>. Checked in the nonce'd bundle, never an inline
-// script (UNI-09). With JavaScript off, a browser that has light-dark() and :has() but no invoker commands gets no
-// notice (accepted, PR #53 R2).
+// What the app relies on and CSS cannot test (globals.css shows the notice for light-dark() and :has()): <dialog>.
+// Checked in the nonce'd bundle, never an inline script (UNI-09). Invoker commands are deliberately not tested: with
+// JavaScript on, the menu drawer falls back to showModal()/close() (menu-drawer.tsx), so a browser without them works
+// and a notice would be a false positive. With JavaScript off, a browser that has light-dark() and :has() but no
+// invoker commands gets no notice and no working drawer (accepted residual, PR #53 R2, PR #55 R1).
 export function lacksRequiredFeatures(): boolean {
-  return typeof HTMLDialogElement !== "function" || !("command" in HTMLButtonElement.prototype);
+  return typeof HTMLDialogElement !== "function";
 }
 
 const subscribeToNothing = () => () => {};
