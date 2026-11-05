@@ -47,6 +47,8 @@ test("below md a tab bar and a menu button; from md up the rail and no tab bar",
     for (const name of ["Workspaces", "Security", "Email"]) {
       await expect(tabBar(page).getByRole("link", { name })).toBeVisible();
     }
+    // A fourth item does not fit at 320px: Branding is in the menu drawer only.
+    await expect(tabBar(page).getByRole("link", { name: "Branding" })).toHaveCount(0);
     // The current page is the filled item.
     await expect(tabBar(page).getByRole("link", { name: "Workspaces" })).toHaveAttribute("aria-current", "page");
     // The bar floats inside the viewport, inset from its edges.
@@ -77,7 +79,7 @@ test("the menu drawer opens from the menu button, is modal, and Esc or Close ret
   await expect(button).toHaveAttribute("aria-expanded", "true");
   // A modal dialog: the page behind it is inert.
   expect(await drawer(page).evaluate((dialog) => dialog.matches(":modal"))).toBe(true);
-  for (const name of ["Workspaces", "Security", "Email"]) {
+  for (const name of ["Workspaces", "Security", "Email", "Branding"]) {
     await expect(drawer(page).getByRole("link", { name })).toBeVisible();
   }
   await expect(drawer(page).getByRole("combobox", { name: "Active workspace" })).toBeVisible();
@@ -204,4 +206,58 @@ test.describe("without JavaScript", () => {
     await expect(page).toHaveURL(/\/settings\/security$/);
     await expect(drawer(page)).toBeHidden();
   });
+});
+
+// The outdated-browser notice (Charlie via Bob, PR #53 R2): hidden in a current browser, shown on the app shell and the
+// auth pages when a feature check fails.
+test.describe("outdated-browser notice", () => {
+  const notice = (page: Page) => page.getByRole("complementary", { name: "Browser support" });
+  const NOTICE_TEXT = "Your browser is out of date, so parts of CRM may not work properly. Please update your browser.";
+
+  test("is absent in current Chromium on the auth pages and the app shell", async ({ page }) => {
+    for (const path of ["/sign-in", "/sign-up"]) {
+      await page.goto(path);
+      await expect(notice(page), path).toHaveCount(0);
+      await expect(page.getByText(NOTICE_TEXT), path).toBeHidden();
+    }
+    await signedInOwner(page);
+    await expect(notice(page)).toHaveCount(0);
+  });
+
+  // CSS cannot be made to fail a feature test in Chromium; the rules themselves are checked in the served stylesheet.
+  test("is shown by @supports rules for light-dark() and :has()", async ({ page }) => {
+    await page.goto("/sign-in");
+    const conditions = await page.evaluate(() =>
+      [...document.styleSheets]
+        .flatMap((sheet) => [...sheet.cssRules])
+        .filter((rule): rule is CSSSupportsRule => rule instanceof CSSSupportsRule)
+        .filter((rule) => [...rule.cssRules].some((inner) => /^\.outdated-browser-notice\s*\{\s*display:\s*block;?\s*\}$/.test(inner.cssText)))
+        .map((rule) => rule.conditionText.replaceAll(" ", "")),
+    );
+    expect(conditions).toEqual(["not(color:light-dark(#000,#fff))", "notselector(:has(a))"]);
+  });
+
+  for (const [feature, stub] of [
+    ["invoker commands", () => Reflect.deleteProperty(HTMLButtonElement.prototype, "command")],
+    ["<dialog>", () => Reflect.deleteProperty(window, "HTMLDialogElement")],
+  ] as const) {
+    test(`is shown, readable and axe-clean when the browser lacks ${feature}`, async ({ page }) => {
+      await page.addInitScript(stub);
+      await page.goto("/sign-in");
+      await expect(notice(page)).toHaveText(NOTICE_TEXT);
+      await expectAccessible(page, `/sign-in, notice shown (${feature})`);
+      if (feature === "<dialog>") return;
+
+      await signedInOwner(page);
+      await expect(notice(page)).toHaveText(NOTICE_TEXT);
+      // In the page flow at the top, so it covers nothing: the shell starts below it. Boxes are viewport-relative, and
+      // at 320 the page may have scrolled to the focused control, so measure from the top of the document.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const shellTop = await box(page.getByRole("main"));
+      const noticeBox = await box(notice(page));
+      expect(noticeBox.y).toBe(0);
+      expect(noticeBox.y + noticeBox.height).toBeLessThanOrEqual(shellTop.y);
+      await expectAccessible(page, `/workspaces, notice shown (${feature})`);
+    });
+  }
 });

@@ -108,3 +108,25 @@ export async function completeTotpSignIn(page: Page, totp: TOTP): Promise<void> 
   await page.getByRole("button", { name: "Verify", exact: true }).click();
   await expect(page).toHaveURL(/\/workspaces$/);
 }
+
+declare global {
+  interface Window {
+    reportCspViolation?: (violation: string) => void;
+  }
+}
+
+// Every document of the page reports to the test, before any page script runs (init scripts and exposed functions
+// are not subject to the page's CSP). Console CSP errors are collected too.
+export async function recordCspViolations(page: Page): Promise<string[]> {
+  const violations: string[] = [];
+  await page.exposeFunction("reportCspViolation", (violation: string) => violations.push(violation));
+  await page.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", (event) => {
+      window.reportCspViolation?.(`${event.violatedDirective} ${event.blockedURI}`);
+    });
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error" && /content security policy/i.test(message.text())) violations.push(message.text());
+  });
+  return violations;
+}

@@ -1,5 +1,6 @@
 "use server";
 
+import { HEX_COLOUR } from "@crm/core/branding";
 import {
   ADDRESS_LINE_MAX_LENGTH,
   characterCount,
@@ -14,28 +15,32 @@ import { ActionRefusedError, type ActionContext, action } from "@/lib/auth/actio
 // The version the form was rendered from (optimistic concurrency).
 const expectedVersion = z.int().positive();
 
-// Free text: trimmed, no control characters, at most `max` code points (as the CHECK counts); empty clears the field.
+// Free text: trimmed, no control or format characters (a bidi override such as U+202E or a zero-width space would
+// make a name or address on a document display reversed or differently from what is stored), at most `max` code
+// points (as the CHECK counts); empty clears the field.
 const text = (max: number) =>
   z
     .string()
     .trim()
-    .regex(/^\P{Cc}*$/u)
+    .regex(/^[^\p{Cc}\p{Cf}]*$/u)
     .refine((value) => characterCount(value) <= max)
     .transform((value) => (value === "" ? null : value))
     .nullable()
     .optional();
 
+// Empty clears the code, as for text().
 const shortCode = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(new RegExp(`^[A-Z0-9]{${SHORT_CODE_MIN_LENGTH},${SHORT_CODE_MAX_LENGTH}}$`))
+  .regex(new RegExp(`^([A-Z0-9]{${SHORT_CODE_MIN_LENGTH},${SHORT_CODE_MAX_LENGTH}})?$`))
+  .transform((value) => (value === "" ? null : value))
   .nullable()
   .optional();
 
 // Lower-cased before the check, and nothing but six hex digits passes (UNI-03): the value is later rendered into a
-// CSS custom property (PR 2b), and the column's CHECK refuses the same set.
-const brandColour = z.string().trim().toLowerCase().regex(/^#[0-9a-f]{6}$/);
+// CSS custom property (lib/brand.ts, which checks it again), and the column's CHECK refuses the same set.
+const brandColour = z.string().trim().toLowerCase().regex(HEX_COLOUR);
 
 async function save(ctx: ActionContext, patch: SettingsPatch, version: number): Promise<{ version: number }> {
   try {
@@ -51,6 +56,9 @@ export const updateBrandingSettings = action({
   name: "settings.branding.update",
   minRole: "admin",
   input: z.strictObject({ expectedVersion, brandColour }),
+  // The branding page's form (settings/branding), with or without JavaScript. A missing or non-numeric version gives
+  // NaN or 0, which expectedVersion refuses.
+  fromForm: (form) => ({ expectedVersion: Number(form.get("expectedVersion")), brandColour: form.get("brandColour") }),
   idempotent: false,
   handler: (ctx, { expectedVersion: version, ...patch }) => save(ctx, patch, version),
 });

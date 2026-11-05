@@ -302,6 +302,32 @@ describe("action(): input", () => {
   });
 });
 
+describe("action(): a form posted through useActionState, called as (previous state, form data)", () => {
+  const noteForm = (note: string) => {
+    const form = new FormData();
+    form.append("note", note);
+    return form;
+  };
+
+  it("validates what fromForm picks from the form, never the previous state", async () => {
+    const { handler, seen } = recordingHandler();
+    const fromForm = (form: FormData) => ({ note: form.get("note") });
+    const run = action({ name: "test.form", minRole: "staff", input: noteInput, idempotent: false, handler, fromForm });
+    expect(await run({ note: "previous state" }, noteForm("from the form"))).toMatchObject({ ok: true, status: "DONE" });
+    expect(seen.map(({ input }) => input)).toEqual([{ note: "from the form" }]);
+    expect(await run(null, noteForm(""))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"] });
+  });
+
+  it("an action without fromForm takes only its first argument, and a form is never an idempotency key", async () => {
+    const { handler, seen } = recordingHandler();
+    const run = noteAction("test.no-form", "staff", handler);
+    expect(await run({ note: "first argument" }, noteForm("ignored"))).toMatchObject({ ok: true });
+    expect(seen.map(({ input }) => input)).toEqual([{ note: "first argument" }]);
+    const keyed = noteAction("test.no-form.keyed", "staff", handler, true);
+    expect(await keyed({ note: "x" }, noteForm("x"))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["idempotencyKey"] });
+  });
+});
+
 describe("action(): idempotency", () => {
   it("runs the handler once for the same key and input, and replays the stored response", async () => {
     const { handler } = recordingHandler();

@@ -2,35 +2,22 @@ import { expect, test } from "./fixtures";
 import type { Page, Response } from "@playwright/test";
 import { isHttpsUrl, isLoopbackUrl } from "../src/lib/origin";
 import { buildCsp } from "../src/lib/security-headers";
-import { enrolTotp, openShellMenu, respectRateLimit, signIn, signUp, uniqueEmail, workspaceSwitcher } from "./helpers";
+import {
+  enrolTotp,
+  openShellMenu,
+  recordCspViolations,
+  respectRateLimit,
+  signIn,
+  signUp,
+  uniqueEmail,
+  workspaceSwitcher,
+} from "./helpers";
 
 // UNI-17 / UNI-18 (plan Task 25): the page CSP from src/proxy.ts, the API CSP and static headers from next.config.ts,
 // and the session cookie's flags.
 
 // `pnpm test:e2e` starts `pnpm dev` (the dev policy); with E2E_BASE_URL it runs against the image, a production build.
 const DEV_SERVER = !process.env.E2E_BASE_URL;
-
-declare global {
-  interface Window {
-    reportCspViolation?: (violation: string) => void;
-  }
-}
-
-// Every document of the page reports to the test, before any page script runs (init scripts and exposed functions
-// are not subject to the page's CSP). Console CSP errors are collected too.
-async function recordCspViolations(page: Page): Promise<string[]> {
-  const violations: string[] = [];
-  await page.exposeFunction("reportCspViolation", (violation: string) => violations.push(violation));
-  await page.addInitScript(() => {
-    document.addEventListener("securitypolicyviolation", (event) => {
-      window.reportCspViolation?.(`${event.violatedDirective} ${event.blockedURI}`);
-    });
-  });
-  page.on("console", (message) => {
-    if (message.type() === "error" && /content security policy/i.test(message.text())) violations.push(message.text());
-  });
-  return violations;
-}
 
 function nonceOf(response: Response): string {
   const csp = response.headers()["content-security-policy"] ?? "";
