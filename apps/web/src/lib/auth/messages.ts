@@ -27,6 +27,21 @@ export const TEST_EMAIL_FORBIDDEN = "Only an Admin or Owner can send a test emai
 export const TEST_EMAIL_FAILED = "We couldn't send the test email. Try again.";
 export const TEST_EMAIL_RATE_LIMITED = "You sent several test emails already. Try again in an hour.";
 
+// /settings/branding (plan Task 6; builder copy).
+export const BRANDING_INTRO =
+  "Your brand colour fills buttons and the selected menu item, and outlines the control in focus. Text on it is black or white, whichever reads better.";
+export const BRANDING_HINT = "Enter # and six hex digits, for example #0e6c84, or pick a colour below.";
+export const SAVE_BRANDING = "Save colour";
+export const SAVING_BRANDING = "Saving…";
+export const BRANDING_SAVED = "Brand colour saved.";
+export const BRANDING_INVALID = "That isn't a colour we can use. Enter # and six hex digits, for example #0e6c84.";
+export const BRANDING_STALE = "Someone else changed the branding after this page loaded. Reload the page, then save again.";
+export const BRANDING_FORBIDDEN = "Only an Admin or Owner can change the branding.";
+export const BRANDING_FAILED = "We couldn't save the colour. Try again.";
+
+// Shown on every page when the browser lacks a feature the app relies on (Charlie via Bob, PR #53 R2; builder copy).
+export const OUTDATED_BROWSER = "Your browser is out of date, so parts of CRM may not work properly. Please update your browser.";
+
 // Keyed by the codes `input-limits.ts` refuses with; the text follows the shared limits.
 const LIMIT_MESSAGES: Record<LimitErrorCode, string> = {
   PASSWORD_TOO_SHORT: `Use at least ${PASSWORD_MIN_LENGTH} characters for your password.`,

@@ -14,9 +14,14 @@
 
 /* Each token is light-dark(light, dark), resolved by the root's color-scheme. The four surface values are fixed:
    the Phase 2 brand-colour contrast check is computed against them (plan Task 1 and Task 6). The accent is a fill
-   and focus ring only, never a text colour (3:1 against both surfaces in both themes). */
-:root {
-  color-scheme: light dark;
+   and focus ring only, never a text colour (3:1 against both surfaces in both themes).
+   The production CSS build (lightningcss) compiles light-dark() into a pair of variables that resolve where a token is
+   declared, so a token declared on :root alone would follow the root's theme everywhere. An element with its own
+   color-scheme (the branding preview panels) therefore declares the themed tokens again. The accent is not in this
+   rule: the brand token and the preview set it themselves. */
+:root,
+.scheme-light,
+.scheme-dark {
   --background: light-dark(#f4f7fb, #080c10);
   --card: light-dark(#ffffff, #0c1218);
   --foreground: light-dark(#0f1b26, #e7eef5);
@@ -25,13 +30,22 @@
   --muted-foreground: light-dark(#4b5a6a, #9babbb);
   --border: light-dark(#d9e1ea, #1f2b38);
   --input: light-dark(#738295, #66778a);
+  --destructive: light-dark(#b42318, #f97066);
+}
+
+:root {
+  color-scheme: light dark;
   --accent: #0e6c84;
   --accent-foreground: #ffffff;
   --ring: var(--accent);
   --primary: var(--accent);
   --primary-foreground: var(--accent-foreground);
-  --destructive: light-dark(#b42318, #f97066);
   --radius: 1rem;
+  /* The outdated-browser notice: plain colours, never light-dark(), so it reads in the browsers it is shown in, in
+     either theme (#3d2a00 on #fff4d6 is 12.5:1). */
+  --notice: #fff4d6;
+  --notice-foreground: #3d2a00;
+  --notice-border: #b38600;
 }
 
 :root.light {
@@ -89,6 +103,35 @@
   ::view-transition-old(*),
   ::view-transition-new(*) {
     animation: none;
+  }
+}
+
+/* Hidden unless the browser lacks a feature the app relies on: @supports for what CSS can test, data-outdated from
+   components/outdated-browser-notice.tsx for the rest. Unlayered, so no utility can hide or show it by accident. */
+.outdated-browser-notice {
+  display: none;
+  border-bottom: 1px solid var(--notice-border);
+  background-color: var(--notice);
+  color: var(--notice-foreground);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  text-align: center;
+}
+
+.outdated-browser-notice[data-outdated] {
+  display: block;
+}
+
+@supports not (color: light-dark(#000, #fff)) {
+  .outdated-browser-notice {
+    display: block;
+  }
+}
+
+@supports not selector(:has(a)) {
+  .outdated-browser-notice {
+    display: block;
   }
 }
 

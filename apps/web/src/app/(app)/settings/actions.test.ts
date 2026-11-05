@@ -112,6 +112,34 @@ describe("updateBrandingSettings", () => {
     });
     expect(await settings()).toEqual(before);
   });
+
+  // The branding page posts its form through useActionState: (previous state, form data).
+  function brandingForm(fields: Record<string, string>): FormData {
+    const form = new FormData();
+    for (const [name, value] of Object.entries(fields)) form.append(name, value);
+    return form;
+  }
+
+  it("takes a form post's fields from the form, not from the previous state", async () => {
+    await signInAs("admin");
+    const { version } = await settings();
+    const previous = { ok: false, status: "STALE_VERSION" };
+    const form = brandingForm({ expectedVersion: String(version), brandColour: "#FFE066", extra: "ignored" });
+    expect(await updateBrandingSettings(previous, form)).toEqual({ ok: true, status: "DONE", data: { version: version + 1 } });
+    expect(await settings()).toMatchObject({ version: version + 1, brand_colour: "#ffe066" });
+  });
+
+  it.each([
+    ["CSS in the colour", { brandColour: "#fff;}body{x:y" }, ["brandColour"]],
+    ["no version", { brandColour: "#000000", expectedVersion: "" }, ["expectedVersion"]],
+    ["a non-numeric version", { brandColour: "#000000", expectedVersion: "1;drop" }, ["expectedVersion"]],
+  ])("refuses a form post with %s and changes nothing", async (_case, fields, paths) => {
+    await signInAs("owner");
+    const before = await settings();
+    const form = brandingForm({ expectedVersion: String(before.version), ...fields });
+    expect(await updateBrandingSettings(null, form)).toEqual({ ok: false, status: "INVALID_INPUT", fields: paths });
+    expect(await settings()).toEqual(before);
+  });
 });
 
 describe("updateGeneralSettings", () => {
@@ -123,9 +151,19 @@ describe("updateGeneralSettings", () => {
     expect(await settings()).toMatchObject({ short_code: "MS1" });
   });
 
+  it("clears the short code with an empty string, as text fields do", async () => {
+    await signInAs("owner");
+    const { version } = await settings();
+    await updateGeneralSettings({ expectedVersion: version, shortCode: "AB" });
+    expect(await updateGeneralSettings({ expectedVersion: version + 1, shortCode: "  " })).toMatchObject({ ok: true });
+    expect(await settings()).toMatchObject({ short_code: null });
+  });
+
   it.each([
     ["a short code of 7", { shortCode: "ABCDEFG" }, ["shortCode"]],
     ["a control character", { addressLine1: "1 Jalan\u0000" }, ["addressLine1"]],
+    ["a right-to-left override (format character)", { addressLine1: "1 Jalan\u202Eabc" }, ["addressLine1"]],
+    ["a zero-width space (format character)", { addressCity: "Kuala\u200BLumpur" }, ["addressCity"]],
     ["an address line over the limit", { addressLine1: "x".repeat(ADDRESS_LINE_MAX_LENGTH + 1) }, ["addressLine1"]],
     ["a field of another group", { brandColour: "#000000" }, [""]],
   ])("refuses %s with INVALID_INPUT", async (_case, input, fields) => {

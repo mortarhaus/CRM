@@ -6,7 +6,7 @@ import { sqlState, startDatabase, type TestDatabase } from "../../test/postgres"
 import { createDb, type DbHandle } from "../client";
 import { organization, workspaceSettings } from "../schema";
 import { runInWorkspace } from "../workspace";
-import { getSettings, StaleSettingsError, updateSettings } from "./workspace-settings";
+import { findBrandColour, getSettings, StaleSettingsError, updateSettings } from "./workspace-settings";
 
 // Phase 2 plan Tasks 4-5: the CHECKs and the settings data layer, as crm_app under RLS.
 let database: TestDatabase;
@@ -106,5 +106,18 @@ describe("updateSettings", () => {
     const result = await inWorkspace((tx) => updateSettings(tx, { brandColour: current.brandColour }, current.version, actor));
     expect(result).toEqual(current);
     expect(await auditRows()).toHaveLength(audits);
+  });
+});
+
+describe("findBrandColour", () => {
+  it("reads the workspace's colour, and null for a workspace with no settings row yet", async () => {
+    await setRaw(sql`brand_colour = '#123abc'`);
+    expect(await inWorkspace((tx) => findBrandColour(tx))).toBe("#123abc");
+    const [other] = await handle.db
+      .insert(organization)
+      .values({ name: "no settings", slug: `no-settings-${randomUUID()}`, createdAt: new Date() })
+      .returning({ id: organization.id });
+    if (!other) throw new Error("workspace not created");
+    expect(await runInWorkspace(handle.db, other.id, (tx) => findBrandColour(tx))).toBeNull();
   });
 });

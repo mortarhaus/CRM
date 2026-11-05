@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
+import { OutdatedBrowserNotice } from "@/components/outdated-browser-notice";
 import { currentTheme, themeClass } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import "./globals.css";
@@ -25,7 +26,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const theme = await currentTheme();
   return (
     <html lang="en" className={cn(urbanist.variable, themeClass(theme))}>
-      <body className="min-h-dvh">{children}</body>
+      <body className="min-h-dvh">
+        {/* First in the page, above the app shell and the auth pages alike, and in the flow so it covers nothing. */}
+        <OutdatedBrowserNotice />
+        {children}
+      </body>
     </html>
   );
 }

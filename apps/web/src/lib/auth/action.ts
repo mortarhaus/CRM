@@ -115,8 +115,11 @@ export function action<I, O extends Json>(spec: {
   input: z.ZodType<I>;
   idempotent: boolean;
   handler: (ctx: ActionContext, input: I) => Promise<O>;
-}): (raw: unknown, idempotencyKey?: string) => Promise<ActionResult<O>> {
-  return async (raw, idempotencyKey) => {
+  // A form posted through useActionState calls the action as (previousState, formData), with JavaScript or without.
+  // An action that names fromForm takes its raw input from that form instead; Zod still checks it in step 4.
+  fromForm?: (form: FormData) => unknown;
+}): (raw: unknown, idempotencyKey?: string | FormData) => Promise<ActionResult<O>> {
+  return async (raw, keyOrForm) => {
     let member: Awaited<ReturnType<typeof requireWorkspaceMember>>;
     try {
       member = await requireWorkspaceMember(spec.minRole);
@@ -124,7 +127,9 @@ export function action<I, O extends Json>(spec: {
       if (error instanceof ActionRefusedError) return { ok: false, status: error.status };
       throw error;
     }
-    const parsed = spec.input.safeParse(raw);
+    const idempotencyKey = typeof keyOrForm === "string" ? keyOrForm : undefined;
+    const form = keyOrForm instanceof FormData ? keyOrForm : null;
+    const parsed = spec.input.safeParse(form && spec.fromForm ? spec.fromForm(form) : raw);
     if (!parsed.success) return { ok: false, status: "INVALID_INPUT", fields: fieldPaths(parsed.error) };
     if (spec.idempotent && !validKey(idempotencyKey)) return { ok: false, status: "INVALID_INPUT", fields: ["idempotencyKey"] };
     const input = parsed.data;

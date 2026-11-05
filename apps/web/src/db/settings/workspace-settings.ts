@@ -46,6 +46,16 @@ export async function getSettings(tx: Tx, options: { forUpdate?: boolean } = {})
   return row;
 }
 
+// The colour the app layout renders on every page; null when unset or when the row is still to be healed (the
+// layout must not fail where getSettings would throw).
+export async function findBrandColour(tx: Tx): Promise<string | null> {
+  const [row] = await tx
+    .select({ brandColour: workspaceSettings.brandColour })
+    .from(workspaceSettings)
+    .where(eq(workspaceSettings.workspaceId, workspaceId()));
+  return row?.brandColour ?? null;
+}
+
 // Optimistic concurrency: the patch applies only to the version the caller read, which becomes version + 1. The row
 // is locked first, so the audit's before is the row the update replaces. Only changed fields are written to the audit
 // entry, under their column names, with PII_COLUMNS redacted. An unchanged patch writes nothing.

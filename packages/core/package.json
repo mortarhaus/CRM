@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./audit": "./src/audit/redact.ts",
+    "./branding": "./src/branding/index.ts",
     "./events": "./src/events/index.ts",
     "./password": "./src/password/index.ts",
     "./security": "./src/security/limits.ts",
