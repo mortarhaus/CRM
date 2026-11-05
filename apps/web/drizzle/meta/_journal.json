@@ -169,6 +169,20 @@
       "when": 1793519691505,
       "tag": "0023_password_change_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793801415144,
+      "tag": "0024_workspace_settings_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793801421679,
+      "tag": "0025_workspace_settings_update_grants",
+      "breakpoints": true
     }
   ]
 }

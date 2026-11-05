@@ -11,6 +11,39 @@ const table = (name: string, ...privileges: string[]) =>
 const columns = (name: string, privilege: string, ...names: string[]) =>
   names.map((column) => `column:${qualified(name)}.${column}:${privilege}`);
 
+// Every workspace_settings column crm_app may UPDATE (migration 0025).
+const WORKSPACE_SETTINGS_UPDATE_COLUMNS = [
+  "short_code",
+  "logo_key",
+  "brand_colour",
+  "address_line1",
+  "address_line2",
+  "address_city",
+  "address_postcode",
+  "address_state",
+  "country",
+  "timezone",
+  "locale",
+  "date_format",
+  "base_currency",
+  "default_currency",
+  "tax_registered",
+  "tax_registration_no",
+  "own_tin",
+  "own_brn",
+  "default_tax_name",
+  "default_tax_rate_bps",
+  "tax_rounding",
+  "email_from_name",
+  "email_reply_to",
+  "email_bcc_self",
+  "auto_send_default",
+  "default_agreement_pattern",
+  "require_2fa",
+  "version",
+  "updated_at",
+];
+
 // PostgreSQL defaults kept for PUBLIC; migration 0001 revokes TEMPORARY and function EXECUTE.
 const PUBLIC_DEFAULTS = ["database:CONNECT", "schema:public:USAGE"];
 
@@ -37,7 +70,9 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...table("auth_audit_log", "INSERT"), // system table, no RLS, append-only, no reader (migration 0008)
     ...table("rate_limit", "SELECT", "INSERT", "UPDATE", "DELETE"), // system table, no RLS (migration 0022)
     // Tenant tables, under RLS (migrations 0003, 0012, 0014 and 0020).
-    ...table("workspace_settings", "SELECT", "INSERT", "UPDATE"),
+    ...table("workspace_settings", "SELECT", "INSERT"),
+    // Per column since migration 0025: never workspace_id or created_at.
+    ...columns("workspace_settings", "UPDATE", ...WORKSPACE_SETTINGS_UPDATE_COLUMNS),
     ...table("audit_log", "SELECT", "INSERT"), // append-only (TEN-03)
     ...table("idempotency_key", "SELECT", "INSERT", "DELETE"),
     ...columns("idempotency_key", "UPDATE", "response"),

@@ -70,6 +70,7 @@ const TENANT_FIXTURES: Record<string, TenantFixture> = {
       return result.count;
     },
   },
+  // The update writes brand_colour (Phase 2 plan Task 4): workspace A cannot change B's branding.
   workspace_settings: {
     async seed(tx, workspaceId) {
       await tx.insert(workspaceSettings).values({ workspaceId });
@@ -77,7 +78,7 @@ const TENANT_FIXTURES: Record<string, TenantFixture> = {
     async update(tx, workspaceId) {
       const result = await tx
         .update(workspaceSettings)
-        .set({ version: sql`${workspaceSettings.version} + 1` })
+        .set({ brandColour: "#123456", version: sql`${workspaceSettings.version} + 1` })
         .where(eq(workspaceSettings.workspaceId, workspaceId));
       return result.count;
     },

@@ -33,6 +33,16 @@ export const RATE_LIMIT_ROW_RETENTION_SECONDS = 24 * 60 * 60;
 export const TEST_EMAIL_USER_LIMIT: RateLimit = { windowSeconds: 60 * 60, max: 5 };
 export const TEST_EMAIL_WORKSPACE_LIMIT: RateLimit = { windowSeconds: 60 * 60, max: 20 };
 
+// workspace_settings (Phase 2 PR 2a, DECISIONS 2026-11-04). The short code is 2 to 6 uppercase letters or digits
+// (Phase 2 plan Q21, settled by Charlie 2026-11-04). The text bounds are builder proposals pending Charlie: they bound
+// storage and input (UNI-03), they are not business rules. EMAIL_ADDRESS_MAX_LENGTH is the RFC 5321 path limit.
+// Each is enforced by Zod and by a char_length CHECK, both in code points.
+export const SHORT_CODE_MIN_LENGTH = 2;
+export const SHORT_CODE_MAX_LENGTH = 6;
+export const ADDRESS_LINE_MAX_LENGTH = 200;
+export const SETTINGS_TEXT_MAX_LENGTH = 100;
+export const EMAIL_ADDRESS_MAX_LENGTH = 254;
+
 // A code point, not a UTF-16 unit: an emoji counts once, like NIST and unlike String#length.
 export function characterCount(value: string): number {
   return [...value].length;

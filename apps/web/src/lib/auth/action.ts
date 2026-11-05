@@ -10,8 +10,9 @@ export type Role = WorkspaceRole;
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
-// RATE_LIMITED is thrown by a handler (an action's own limit, e.g. the test email); the others by the checks below.
-type Refusal = "UNAUTHENTICATED" | "NO_WORKSPACE" | "FORBIDDEN" | "RATE_LIMITED";
+// RATE_LIMITED and STALE_VERSION are thrown by a handler (an action's own limit, e.g. the test email; a row changed
+// since the caller read its version, e.g. the settings); the others by the checks below.
+type Refusal = "UNAUTHENTICATED" | "NO_WORKSPACE" | "FORBIDDEN" | "RATE_LIMITED" | "STALE_VERSION";
 
 export type ActionResult<O> =
   | { ok: true; status: "DONE" | "REPLAYED"; data: O }
