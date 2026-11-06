@@ -1,6 +1,6 @@
 import { NAME_MAX_LENGTH, WORKSPACE_NAME_MAX_LENGTH } from "@crm/core/security";
 import { expect, test } from "./fixtures";
-import { PASSWORD, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
+import { createWorkspace, PASSWORD, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
 
 // UNI-02: the server counts characters (code points); an emoji is two UTF-16 units, so a native
 // maxlength would cut these names at half the limit. With JavaScript on, they must arrive whole too.
@@ -24,9 +24,7 @@ test("names of emoji at the limit arrive whole and one over is refused visibly",
   await expect(page).toHaveURL(/\/workspaces$/);
   const workspaces = page.getByRole("list", { name: "Your workspaces" });
   const workspaceName = "😀".repeat(WORKSPACE_NAME_MAX_LENGTH);
-  await page.getByLabel("Workspace name").fill(workspaceName);
-  await expect(page.getByLabel("Workspace name")).toHaveValue(workspaceName);
-  await page.getByRole("button", { name: "Create workspace" }).click();
+  await createWorkspace(page, workspaceName);
   await expect(workspaces).toContainText(workspaceName);
 
   const tooLongWorkspace = "😀".repeat(WORKSPACE_NAME_MAX_LENGTH + 1);

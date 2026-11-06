@@ -1,0 +1,3 @@
+-- Phase 2 PR 3: a tax-registered workspace has its registration number (spec line 732). No row can violate it when
+-- this runs: tax_registered defaults to false (0024) and no app path set it before this PR (onboarding is its first writer).
+ALTER TABLE "workspace_settings" ADD CONSTRAINT "workspace_settings_tax_registration_required_check" CHECK (not "workspace_settings"."tax_registered" or "workspace_settings"."tax_registration_no" is not null);

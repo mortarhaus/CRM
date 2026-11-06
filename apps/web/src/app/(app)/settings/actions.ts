@@ -3,7 +3,6 @@
 import { HEX_COLOUR } from "@crm/core/branding";
 import {
   ADDRESS_LINE_MAX_LENGTH,
-  characterCount,
   SETTINGS_TEXT_MAX_LENGTH,
   SHORT_CODE_MAX_LENGTH,
   SHORT_CODE_MIN_LENGTH,
@@ -11,22 +10,7 @@ import {
 import { z } from "zod";
 import { StaleSettingsError, type SettingsPatch, updateSettings } from "@/db/settings/workspace-settings";
 import { ActionRefusedError, type ActionContext, action } from "@/lib/auth/action";
-
-// The version the form was rendered from (optimistic concurrency).
-const expectedVersion = z.int().positive();
-
-// Free text: trimmed, no control or format characters (a bidi override such as U+202E or a zero-width space would
-// make a name or address on a document display reversed or differently from what is stored), at most `max` code
-// points (as the CHECK counts); empty clears the field.
-const text = (max: number) =>
-  z
-    .string()
-    .trim()
-    .regex(/^[^\p{Cc}\p{Cf}]*$/u)
-    .refine((value) => characterCount(value) <= max)
-    .transform((value) => (value === "" ? null : value))
-    .nullable()
-    .optional();
+import { expectedVersion, text } from "@/lib/settings-input";
 
 // Empty clears the code, as for text().
 const shortCode = z

@@ -46,14 +46,15 @@ export async function getSettings(tx: Tx, options: { forUpdate?: boolean } = {})
   return row;
 }
 
-// The colour the app layout renders on every page; null when unset or when the row is still to be healed (the
-// layout must not fail where getSettings would throw).
-export async function findBrandColour(tx: Tx): Promise<string | null> {
+// What the app layout reads on every page: the colour it renders, and whether the workspace has been through
+// onboarding (a country is set). Both null when the row is still to be healed (the layout must not fail where
+// getSettings would throw); a missing row counts as not onboarded.
+export async function findShellSettings(tx: Tx): Promise<{ brandColour: string | null; country: string | null }> {
   const [row] = await tx
-    .select({ brandColour: workspaceSettings.brandColour })
+    .select({ brandColour: workspaceSettings.brandColour, country: workspaceSettings.country })
     .from(workspaceSettings)
     .where(eq(workspaceSettings.workspaceId, workspaceId()));
-  return row?.brandColour ?? null;
+  return row ?? { brandColour: null, country: null };
 }
 
 // Optimistic concurrency: the patch applies only to the version the caller read, which becomes version + 1. The row
@@ -64,6 +65,7 @@ export async function updateSettings(
   patch: SettingsPatch,
   expectedVersion: number,
   actorUserId: string,
+  auditAction: "workspace_settings.updated" | "workspace_settings.onboarded" = "workspace_settings.updated",
 ): Promise<WorkspaceSettings> {
   const current = await getSettings(tx, { forUpdate: true });
   if (current.version !== expectedVersion) throw new StaleSettingsError();
@@ -83,7 +85,7 @@ export async function updateSettings(
     Object.fromEntries([...changed, "version" as const].map((key) => [COLUMNS[key].name, row[key]]));
   await recordAudit(tx, {
     actorUserId,
-    action: "workspace_settings.updated",
+    action: auditAction,
     targetType: "workspace_settings",
     targetId: current.workspaceId,
     before: snapshot(current),

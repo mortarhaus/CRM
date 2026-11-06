@@ -39,6 +39,33 @@ export async function signUp(page: Page, email: string, password = PASSWORD, nam
   await expect(page).toHaveURL(/\/sign-in\?registered=1$/);
 }
 
+// Answers the onboarding questions as the new workspace's Owner (Phase 2 plan Task 8): the country, then No to the
+// SST/GST question unless `registrationNo` is given. Ends where the app sends a set-up Owner (/workspaces).
+export async function completeOnboarding(
+  page: Page,
+  country: "Malaysia" | "Singapore" = "Malaysia",
+  registrationNo?: string,
+): Promise<void> {
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByLabel(country, { exact: true }).check();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/\/onboarding\?country=(MY|SG)$/);
+  if (registrationNo !== undefined) {
+    await page.getByLabel("Yes", { exact: true }).check();
+    await page.getByLabel(/registration number$/).first().fill(registrationNo);
+  }
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await expect(page).toHaveURL(/\/workspaces$/);
+}
+
+// Creates a workspace from /workspaces (its creator is the Owner) and completes its onboarding.
+export async function createWorkspace(page: Page, name: string): Promise<void> {
+  await page.getByLabel("Workspace name").fill(name);
+  await page.getByRole("button", { name: "Create workspace" }).click();
+  await completeOnboarding(page);
+  await expect(page.getByRole("list", { name: "Your workspaces" })).toContainText(name);
+}
+
 export async function signIn(page: Page, email: string, password = PASSWORD): Promise<void> {
   await page.goto("/sign-in");
   await page.getByLabel("Email", { exact: true }).fill(email);

@@ -1,8 +1,9 @@
 import { expect, test } from "./fixtures";
-import type { Page, Response } from "@playwright/test";
+import type { Response } from "@playwright/test";
 import { isHttpsUrl, isLoopbackUrl } from "../src/lib/origin";
 import { buildCsp } from "../src/lib/security-headers";
 import {
+  createWorkspace,
   enrolTotp,
   openShellMenu,
   recordCspViolations,
@@ -38,12 +39,6 @@ async function expectNoncedPage(response: Response | null): Promise<string> {
   expect(page.headers()["strict-transport-security"]).toBe("max-age=31536000");
   expect(page.headers()["x-content-type-options"]).toBe("nosniff");
   return nonce;
-}
-
-async function createWorkspace(page: Page, name: string): Promise<void> {
-  await page.getByLabel("Workspace name").fill(name);
-  await page.getByRole("button", { name: "Create workspace" }).click();
-  await expect(page.getByRole("list", { name: "Your workspaces" })).toContainText(name);
 }
 
 test("/sign-in has a nonce CSP whose nonce changes per load and is on every script", async ({ page }) => {

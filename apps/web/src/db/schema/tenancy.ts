@@ -90,6 +90,11 @@ export const workspaceSettings = pgTable(
       "workspace_settings_default_tax_check",
       sql`${table.taxRegistered} or (${table.defaultTaxName} is null and ${table.defaultTaxRateBps} is null)`,
     ),
+    // A Yes to the SST/GST question requires the registration number (spec line 732; Phase 2 plan PR 3).
+    check(
+      "workspace_settings_tax_registration_required_check",
+      sql`not ${table.taxRegistered} or ${table.taxRegistrationNo} is not null`,
+    ),
     // Only rate_group until Phase 4 (plan Q25).
     check("workspace_settings_tax_rounding_check", sql`${table.taxRounding} = 'rate_group'`),
     check("workspace_settings_email_from_name_check", bounded(table.emailFromName, SETTINGS_TEXT_MAX_LENGTH)),

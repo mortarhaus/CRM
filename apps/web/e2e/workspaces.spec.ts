@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import {
   closeShellMenu,
   completeTotpSignIn,
+  createWorkspace,
   enrolTotp,
   openShellMenu,
   respectRateLimit,
@@ -12,12 +13,6 @@ import {
   uniqueEmail,
   workspaceSwitcher,
 } from "./helpers";
-
-async function createWorkspace(page: Page, name: string): Promise<void> {
-  await page.getByLabel("Workspace name").fill(name);
-  await page.getByRole("button", { name: "Create workspace" }).click();
-  await expect(page.getByRole("list", { name: "Your workspaces" })).toContainText(name);
-}
 
 async function expectActiveWorkspace(page: Page, name: string): Promise<void> {
   await openShellMenu(page);

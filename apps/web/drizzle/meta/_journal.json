@@ -183,6 +183,13 @@
       "when": 1793801421679,
       "tag": "0025_workspace_settings_update_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793925168305,
+      "tag": "0026_tax_registration_required",
+      "breakpoints": true
     }
   ]
 }

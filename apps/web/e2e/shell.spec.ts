@@ -1,18 +1,12 @@
 import { expect, test } from "./fixtures";
 import type { Locator, Page } from "@playwright/test";
 import { expectAccessible } from "./a11y";
-import { expectDrawerOpen, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
+import { createWorkspace, expectDrawerOpen, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
 
 // The app shell (plan Task 2; PR #53 R1): below md a sticky top bar, a floating tab bar and a menu drawer, as in the
 // Kinlo sample (Charlie, 2026-11-04); from md up the icon rail and the full top bar.
 
 const MD = 768;
-
-async function createWorkspace(page: Page, name: string): Promise<void> {
-  await page.getByLabel("Workspace name").fill(name);
-  await page.getByRole("button", { name: "Create workspace" }).click();
-  await expect(page.getByRole("list", { name: "Your workspaces" })).toContainText(name);
-}
 
 // A new Owner of one workspace, so every destination (Email included) is in the navigation.
 async function signedInOwner(page: Page): Promise<void> {

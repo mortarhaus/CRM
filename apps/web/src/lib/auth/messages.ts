@@ -2,8 +2,10 @@ import {
   NAME_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  SETTINGS_TEXT_MAX_LENGTH,
   WORKSPACE_NAME_MAX_LENGTH,
 } from "@crm/core/security";
+import type { Country } from "@crm/core/settings";
 import type { LimitErrorCode } from "./input-limits";
 
 export const TOO_MANY_ATTEMPTS = "Too many attempts. Wait a moment and try again.";
@@ -38,6 +40,39 @@ export const BRANDING_INVALID = "That isn't a colour we can use. Enter # and six
 export const BRANDING_STALE = "Someone else changed the branding after this page loaded. Reload the page, then save again.";
 export const BRANDING_FORBIDDEN = "Only an Admin or Owner can change the branding.";
 export const BRANDING_FAILED = "We couldn't save the colour. Try again.";
+
+// /onboarding (plan Task 8; the SST/GST question is the spec's, line 732; the rest is builder copy).
+export const ONBOARDING_TITLE = "Set up your workspace";
+export const COUNTRY_NAMES: Record<Country, string> = { MY: "Malaysia", SG: "Singapore" };
+// The question names the country's own tax (spec line 732: "SST (MY) / GST (SG)").
+export const TAX_SCHEMES: Record<Country, string> = { MY: "SST", SG: "GST" };
+export const ONBOARDING_COUNTRY_LEGEND = "Where is your business registered?";
+export const ONBOARDING_CONTINUE = "Continue";
+export const ONBOARDING_CHANGE_COUNTRY = "Change country";
+export const ONBOARDING_SAVE = "Finish setup";
+export const ONBOARDING_SAVING = "Saving…";
+export const ONBOARDING_YES = "Yes";
+export const onboardingTaxQuestion = (scheme: string) => `Are you registered for ${scheme}?`;
+export const onboardingRegistrationNo = (scheme: string) => `${scheme} registration number`;
+export const ONBOARDING_OWN_IDS_LEGEND = "Registration numbers";
+export const ONBOARDING_NO = "No";
+export const ONBOARDING_TAX_HINT = "You can change this later in settings. A change applies to new documents only.";
+export const ONBOARDING_TAX_NAME = "Tax name";
+export const ONBOARDING_TAX_RATE = "Tax rate (%)";
+export const ONBOARDING_TAX_RATE_HINT = "A percentage, for example 8 or 6.5.";
+export const ONBOARDING_OPTIONAL_IDS = "Optional. You can add these later in settings.";
+export const ONBOARDING_OWN_TIN = "Tax identification number (TIN)";
+export const ONBOARDING_OWN_BRN = "Business registration number (BRN)";
+export const ONBOARDING_INVALID = "Check the fields marked below, then try again.";
+export const ONBOARDING_REGISTRATION_REQUIRED = "Enter your registration number.";
+export const ONBOARDING_TAX_NAME_REQUIRED = "Enter the tax name.";
+export const ONBOARDING_TAX_RATE_INVALID = "Enter the rate as a percentage, for example 8 or 6.5.";
+export const ONBOARDING_TEXT_INVALID = `Use at most ${SETTINGS_TEXT_MAX_LENGTH} characters, without special formatting characters.`;
+export const ONBOARDING_STALE = "This workspace was set up after this page loaded. Reload the page.";
+export const ONBOARDING_FAILED = "We couldn't save your answers. Try again.";
+// Shown to an Admin or Staff member while the Owner has not finished onboarding (plan Task 8).
+export const SETUP_PENDING = "The owner has not finished setting up this workspace.";
+export const SETUP_PENDING_HINT = "You can switch to another workspace or sign out.";
 
 // Shown on every page when the browser lacks a feature the app relies on (Charlie via Bob, PR #53 R2; builder copy).
 export const OUTDATED_BROWSER = "Your browser is out of date, so parts of CRM may not work properly. Please update your browser.";

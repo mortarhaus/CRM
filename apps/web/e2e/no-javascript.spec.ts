@@ -8,6 +8,7 @@ import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { tabTo } from "./a11y";
 import {
   closeShellMenu,
+  createWorkspace,
   openShellMenu,
   PASSWORD,
   respectRateLimit,
@@ -45,7 +46,8 @@ async function postForm(page: Page, form: Locator, values: Record<string, string
   });
 }
 
-async function createWorkspace(page: Page, name: string): Promise<void> {
+// Submits the create form only, for a name the server refuses (so no onboarding follows).
+async function submitWorkspaceName(page: Page, name: string): Promise<void> {
   await page.getByLabel("Workspace name").fill(name);
   await page.getByRole("button", { name: "Create workspace" }).click();
 }
@@ -210,7 +212,7 @@ test("workspace creation works without JavaScript and the server refuses what th
   await expect(workspaceSwitcher(page).locator("option:checked")).toHaveText("No Script Studio");
   await closeShellMenu(page);
 
-  await createWorkspace(page, "   ");
+  await submitWorkspaceName(page, "   ");
   await expect(page.getByRole("main").getByRole("alert")).toHaveText("Enter a workspace name.");
 
   const longest = "w".repeat(WORKSPACE_NAME_MAX_LENGTH);
@@ -426,7 +428,7 @@ test("names of emoji at the limit arrive whole and one over is refused visibly, 
   await expect(workspaces).toContainText(workspaceName);
 
   const tooLongWorkspace = "😀".repeat(WORKSPACE_NAME_MAX_LENGTH + 1);
-  await createWorkspace(page, tooLongWorkspace);
+  await submitWorkspaceName(page, tooLongWorkspace);
   await expect(page.getByRole("main").getByRole("alert")).toHaveText(
     `Use at most ${WORKSPACE_NAME_MAX_LENGTH} characters for the workspace name.`,
   );
