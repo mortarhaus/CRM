@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { IDEMPOTENCY_KEY_EXPIRY_SECONDS, IDEMPOTENCY_KEY_MAX_LENGTH } from "@crm/core/security";
 import { sql } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import type { z } from "zod";
 import { findMembership, healWorkspaceSettings, type WorkspaceRole } from "../../db/system";
 import { type Tx, withWorkspace } from "../../db/workspace";
@@ -118,6 +119,11 @@ export function action<I, O extends Json>(spec: {
   // A form posted through useActionState calls the action as (previousState, formData), with JavaScript or without.
   // An action that names fromForm takes its raw input from that form instead; Zod still checks it in step 4.
   fromForm?: (form: FormData) => unknown;
+  // Where a done or replayed result sends the browser, after the transaction has committed: a redirect from the
+  // action, which Next answers with a 303. Needed by a form that works without JavaScript when the page it was posted
+  // from redirects once the action is done: a redirect while the page renders is a 307, which repeats the POST at
+  // the new URL, where Next finds no such action. A refusal is still returned.
+  redirectTo?: string;
 }): (raw: unknown, idempotencyKey?: string | FormData) => Promise<ActionResult<O>> {
   return async (raw, keyOrForm) => {
     let member: Awaited<ReturnType<typeof requireWorkspaceMember>>;
@@ -134,7 +140,7 @@ export function action<I, O extends Json>(spec: {
     if (spec.idempotent && !validKey(idempotencyKey)) return { ok: false, status: "INVALID_INPUT", fields: ["idempotencyKey"] };
     const input = parsed.data;
 
-    return withWorkspace(member.workspaceId, async (tx): Promise<ActionResult<O>> => {
+    const result = await withWorkspace(member.workspaceId, async (tx): Promise<ActionResult<O>> => {
       const ctx = { tx, ...member };
       if (!spec.idempotent || idempotencyKey === undefined) return { ok: true, status: "DONE", data: await spec.handler(ctx, input) };
       const claim = await claimKey(tx, spec.name, idempotencyKey, requestHash(input));
@@ -149,5 +155,7 @@ export function action<I, O extends Json>(spec: {
       if (error instanceof ActionRefusedError) return { ok: false, status: error.status };
       throw error;
     });
+    if (result.ok && spec.redirectTo !== undefined) redirect(spec.redirectTo);
+    return result;
   };
 }

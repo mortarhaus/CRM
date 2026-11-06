@@ -2,7 +2,7 @@
 
 import type { Country } from "@crm/core/settings";
 import Link from "next/link";
-import { redirect, useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
 import { type FormEvent, startTransition, useActionState, useEffect, useRef } from "react";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,8 @@ import {
 type SaveResult = ActionResult<{ version: number }>;
 
 interface FormProps {
-  // completeOnboarding: called as (previous state, form data), it reads the form's fields (action() fromForm).
+  // completeOnboarding: called as (previous state, form data), it reads the form's fields (action() fromForm). Done,
+  // it redirects instead of returning.
   action: (previous: SaveResult | null, form: FormData) => Promise<SaveResult>;
   country: Country;
   // The country's tax name and rate (a percentage), preselected for a Yes and editable (spec line 732).
@@ -105,16 +106,14 @@ function Field({ id, name, label, hint, error, defaultValue, inputMode = "text" 
 
 function OnboardingFields({ action, country, taxName, taxRate, version, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
-  const router = useRouter();
   const button = useRef<HTMLButtonElement>(null);
   const scheme = TAX_SCHEMES[country];
 
-  // Done: the app takes over (its layout no longer sends the Owner here). Otherwise focus goes back to the button,
-  // which was disabled while the post was in flight (A11Y-01).
+  // Done, the action redirects to the app, so a result here is a refusal: focus goes back to the button, which was
+  // disabled while the post was in flight (A11Y-01).
   useEffect(() => {
-    if (result?.ok) router.replace("/");
-    else if (result !== null || unreachable) button.current?.focus();
-  }, [result, unreachable, router]);
+    if (result !== null || unreachable) button.current?.focus();
+  }, [result, unreachable]);
 
   if (result?.ok === false && result.status === "UNAUTHENTICATED") redirect("/sign-in");
   const error = result && !result.ok ? formError(result) : unreachable ? ONBOARDING_FAILED : null;

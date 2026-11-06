@@ -6,6 +6,16 @@ import { startDatabase, type TestDatabase } from "@/test/postgres";
 // Phase 2 plan Task 8: the onboarding action through action() on the real crm_app role, Owner only.
 let databaseUrl = "";
 vi.mock("@/lib/env", () => ({ getEnv: () => ({ DATABASE_URL: databaseUrl }) }));
+class Redirect extends Error {
+  constructor(readonly url: string) {
+    super(`redirect ${url}`);
+  }
+}
+vi.mock("next/navigation", () => ({
+  redirect: (url: string) => {
+    throw new Redirect(url);
+  },
+}));
 let signedIn: { userId: string; workspaceId: string } | null = null;
 vi.mock("@/lib/auth/session", () => ({
   getCurrentSession: async () =>
@@ -68,11 +78,14 @@ afterAll(async () => {
 describe("completeOnboarding", () => {
   it("Owner, MY, No: sets the country, leaves tax off and ignores the hidden tax fields of the form", async () => {
     const workspaceId = await signInToNewWorkspace("owner");
-    const result = await completeOnboarding(
-      null,
-      form({ expectedVersion: "1", country: "MY", taxRegistered: "no", taxRegistrationNo: "typed", taxName: "Service Tax", taxRate: "8" }),
-    );
-    expect(result).toEqual({ ok: true, status: "DONE", data: { version: 2 } });
+    // Done: a redirect from the action itself (a 303), so a form posted without JavaScript ends in the app. The page
+    // it was posted from would redirect while rendering instead, a 307 that repeats the POST at "/".
+    await expect(
+      completeOnboarding(
+        null,
+        form({ expectedVersion: "1", country: "MY", taxRegistered: "no", taxRegistrationNo: "typed", taxName: "Service Tax", taxRate: "8" }),
+      ),
+    ).rejects.toMatchObject({ url: "/" });
     expect(await settings(workspaceId)).toMatchObject({
       country: "MY",
       tax_registered: false,
@@ -84,7 +97,7 @@ describe("completeOnboarding", () => {
 
   it("Owner, SG, Yes: stores the registration number and the edited rate in basis points", async () => {
     const workspaceId = await signInToNewWorkspace("owner");
-    const result = await completeOnboarding(
+    const result = completeOnboarding(
       null,
       form({
         expectedVersion: "1",
@@ -97,7 +110,7 @@ describe("completeOnboarding", () => {
         ownBrn: "",
       }),
     );
-    expect(result.ok).toBe(true);
+    await expect(result).rejects.toMatchObject({ url: "/" });
     expect(await settings(workspaceId)).toMatchObject({
       country: "SG",
       tax_registered: true,
@@ -141,7 +154,9 @@ describe("completeOnboarding", () => {
 
   it("a second onboarding is refused with STALE_VERSION and changes nothing", async () => {
     const workspaceId = await signInToNewWorkspace("owner");
-    await completeOnboarding(null, form({ expectedVersion: "1", country: "MY", taxRegistered: "no" }));
+    await expect(completeOnboarding(null, form({ expectedVersion: "1", country: "MY", taxRegistered: "no" }))).rejects.toMatchObject({
+      url: "/",
+    });
     expect(await completeOnboarding(null, form({ expectedVersion: "2", country: "SG", taxRegistered: "no" }))).toEqual({
       ok: false,
       status: "STALE_VERSION",

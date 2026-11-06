@@ -457,6 +457,33 @@ describe("action(): idempotency", () => {
   });
 });
 
+describe("action(): redirectTo", () => {
+  // A redirect while a page renders is a 307, which repeats a no-JavaScript POST at the new URL; one from the action
+  // is a 303. Next's redirect() throws; its digest carries the URL and the status the action handler replaces.
+  const redirectTo = (url: string) => expect.objectContaining({ digest: expect.stringContaining(`;${url};`) });
+
+  it("redirects once the transaction has committed, for a done and for a replayed result", async () => {
+    const { handler } = recordingHandler();
+    const key = randomUUID();
+    const run = action({ name: "test.redirect", minRole: "staff", input: noteInput, idempotent: true, handler, redirectTo: "/done" });
+    await expect(run({ note: "x" }, key)).rejects.toEqual(redirectTo("/done"));
+    expect(await keyRows(owner.workspaceId, key)).toEqual([{ action: "test.redirect", response: { done: true, n: 1 } }]);
+    await expect(run({ note: "x" }, key)).rejects.toEqual(redirectTo("/done"));
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a refusal instead of redirecting", async () => {
+    const refuse = async (): Promise<Json> => {
+      throw new ActionRefusedError("STALE_VERSION");
+    };
+    const run = action({ name: "test.redirect", minRole: "staff", input: noteInput, idempotent: false, handler: refuse, redirectTo: "/done" });
+    expect(await run({ note: "x" })).toEqual({ ok: false, status: "STALE_VERSION" });
+    expect(await run({ note: "" })).toMatchObject({ ok: false, status: "INVALID_INPUT" });
+    signedInAs(null);
+    expect(await run({ note: "x" })).toEqual({ ok: false, status: "UNAUTHENTICATED" });
+  });
+});
+
 describe("action(): order", () => {
   it("runs session, membership, Zod, idempotency, handler and store, in exactly that order", async () => {
     const { handler } = recordingHandler();

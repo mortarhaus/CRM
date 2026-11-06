@@ -59,13 +59,15 @@ function fromForm(form: FormData) {
 }
 
 // The workspace's country and SST/GST answer, once, by its Owner (plan Q9). A workspace that already has a country is
-// refused as STALE_VERSION: the page it was posted from is out of date.
+// refused as STALE_VERSION: the page it was posted from is out of date. Done, the Owner goes on to the app ("/"), by a
+// redirect from the action so that a post without JavaScript ends there too (see redirectTo in action()).
 export const completeOnboarding = action({
   name: "settings.onboarding.complete",
   minRole: "owner",
   input,
   fromForm,
   idempotent: false,
+  redirectTo: "/",
   handler: async (ctx, { expectedVersion: version, country, ownTin, ownBrn, ...answer }) => {
     const tax = answer.taxRegistered
       ? { registered: true as const, registrationNo: answer.taxRegistrationNo, taxName: answer.taxName, taxRateBps: answer.taxRate }
