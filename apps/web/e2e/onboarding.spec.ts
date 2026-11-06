@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { ONBOARDING_REGISTRATION_REQUIRED, SETUP_PENDING } from "../src/lib/auth/messages";
+import { ONBOARDING_INVALID, ONBOARDING_REGISTRATION_REQUIRED, SETUP_PENDING } from "../src/lib/auth/messages";
 import { readWorkspaceSettings } from "../src/test/workspace-settings";
 import { expectAccessible } from "./a11y";
 import { expect, test } from "./fixtures";
@@ -130,6 +130,37 @@ test.describe("without JavaScript", () => {
       tax_registration_no: "W10-1808-32000001",
       default_tax_name: "Service Tax",
       default_tax_rate_bps: 800,
+    });
+  });
+
+  // PR #56 R1: a refused Yes comes back as a Yes, with the refused field shown and its error, and the tax name and rate
+  // as typed. The registration number is not sent back (it is personal data for a sole trader); here it was empty.
+  test("a refused Yes comes back with Yes selected, the refused field shown, and the typed tax name and rate", async ({ page }) => {
+    const email = await newOwnerAtOnboarding(page, "No Script Refused");
+    await page.getByLabel("Malaysia", { exact: true }).check();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByLabel("Yes", { exact: true }).check();
+    await page.getByLabel("Tax name").fill("Sales and Service Tax");
+    await page.getByLabel("Tax rate (%)").fill("6");
+    await page.getByRole("button", { name: "Finish setup" }).click();
+
+    await expect(page.getByRole("alert")).toHaveText(ONBOARDING_INVALID);
+    await expect(page.getByLabel("Yes", { exact: true })).toBeChecked();
+    const number = page.getByLabel("SST registration number");
+    await expect(number).toBeVisible();
+    await expect(number).toHaveAttribute("aria-invalid", "true");
+    await expect(number).toHaveAccessibleDescription(ONBOARDING_REGISTRATION_REQUIRED);
+    await expect(page.getByLabel("Tax name")).toHaveValue("Sales and Service Tax");
+    await expect(page.getByLabel("Tax rate (%)")).toHaveValue("6");
+
+    await number.fill("W10-1808-32000002");
+    await page.getByRole("button", { name: "Finish setup" }).click();
+    await expect(page).toHaveURL(/\/workspaces$/);
+    expect(await readWorkspaceSettings(email)).toMatchObject({
+      tax_registered: true,
+      tax_registration_no: "W10-1808-32000002",
+      default_tax_name: "Sales and Service Tax",
+      default_tax_rate_bps: 600,
     });
   });
 });

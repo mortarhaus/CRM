@@ -130,7 +130,14 @@ describe("completeOnboarding", () => {
   ])("Yes with %j is refused as INVALID_INPUT and writes nothing", async (override, fields) => {
     const workspaceId = await signInToNewWorkspace("owner");
     const yes = { expectedVersion: "1", country: "MY", taxRegistered: "yes", taxRegistrationNo: "W10", taxName: "Service Tax", taxRate: "8" };
-    expect(await completeOnboarding(null, form({ ...yes, ...override }))).toEqual({ ok: false, status: "INVALID_INPUT", fields });
+    const posted = { ...yes, ...override, ownTin: "T-1", ownBrn: "B-1" };
+    // The answer and the tax name and rate come back for the form to show again; the number, TIN and BRN never do.
+    expect(await completeOnboarding(null, form(posted))).toEqual({
+      ok: false,
+      status: "INVALID_INPUT",
+      fields,
+      echo: { taxRegistered: "yes", taxName: posted.taxName, taxRate: posted.taxRate },
+    });
     expect((await settings(workspaceId)).country).toBeNull();
   });
 

@@ -318,6 +318,16 @@ describe("action(): a form posted through useActionState, called as (previous st
     expect(await run(null, noteForm(""))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"] });
   });
 
+  it("sends back what echo picks from a refused form, and nothing for a valid one or an input that is not a form", async () => {
+    const { handler } = recordingHandler();
+    const fromForm = (form: FormData) => ({ note: form.get("note") });
+    const echo = (form: FormData) => ({ shown: String(form.get("note")) });
+    const run = action({ name: "test.echo", minRole: "staff", input: noteInput, idempotent: false, handler, fromForm, echo });
+    expect(await run(null, noteForm(""))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"], echo: { shown: "" } });
+    expect(await run({ note: "" })).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"] });
+    expect(await run(null, noteForm("fine"))).toEqual({ ok: true, status: "DONE", data: { done: true, n: 1 } });
+  });
+
   it("an action without fromForm takes only its first argument, and a form is never an idempotency key", async () => {
     const { handler, seen } = recordingHandler();
     const run = noteAction("test.no-form", "staff", handler);

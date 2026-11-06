@@ -58,6 +58,20 @@ function fromForm(form: FormData) {
   };
 }
 
+// What a refused form shows again (PR #56 R1): the Yes or No, and the tax name and rate, which are neither secret nor
+// personal data. The registration number, TIN and BRN are not sent back (personal data for a sole trader, as in the
+// audit redaction); without JavaScript the Owner types them again.
+function echo(form: FormData): Record<string, string> {
+  const shown: Record<string, string> = {};
+  const answer = form.get("taxRegistered");
+  if (answer === "yes" || answer === "no") shown.taxRegistered = answer;
+  for (const name of ["taxName", "taxRate"]) {
+    const value = form.get(name);
+    if (typeof value === "string") shown[name] = value;
+  }
+  return shown;
+}
+
 // The workspace's country and SST/GST answer, once, by its Owner (plan Q9). A workspace that already has a country is
 // refused as STALE_VERSION: the page it was posted from is out of date. Done, the Owner goes on to the app ("/"), by a
 // redirect from the action so that a post without JavaScript ends there too (see redirectTo in action()).
@@ -66,6 +80,7 @@ export const completeOnboarding = action({
   minRole: "owner",
   input,
   fromForm,
+  echo,
   idempotent: false,
   redirectTo: "/",
   handler: async (ctx, { expectedVersion: version, country, ownTin, ownBrn, ...answer }) => {

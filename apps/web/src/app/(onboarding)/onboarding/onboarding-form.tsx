@@ -117,7 +117,12 @@ function OnboardingFields({ action, country, taxName, taxRate, version, unreacha
 
   if (result?.ok === false && result.status === "UNAUTHENTICATED") redirect("/sign-in");
   const error = result && !result.ok ? formError(result) : unreachable ? ONBOARDING_FAILED : null;
-  const invalid = new Set(result?.ok === false && result.status === "INVALID_INPUT" ? result.fields : []);
+  const refused = result?.ok === false && result.status === "INVALID_INPUT" ? result : null;
+  const invalid = new Set(refused?.fields ?? []);
+  // Without JavaScript the page is rendered from the result: the echoed answer and tax values come back as defaults.
+  // With JavaScript the form is not reset (onSubmit below), so the inputs keep what was typed either way.
+  const echoed = refused?.echo ?? {};
+  const yes = echoed.taxRegistered === "yes";
   const fieldError = (name: string) => (invalid.has(name) ? FIELD_ERRORS[name] : undefined);
 
   // React resets a form after its action, which would clear what the Owner typed when a field is refused; dispatching
@@ -145,11 +150,11 @@ function OnboardingFields({ action, country, taxName, taxRate, version, unreacha
           {ONBOARDING_TAX_HINT}
         </p>
         <div className="flex min-h-10 items-center gap-3">
-          <Radio id="tax-registered-no" name="taxRegistered" value="no" defaultChecked />
+          <Radio id="tax-registered-no" name="taxRegistered" value="no" defaultChecked={!yes} />
           <Label htmlFor="tax-registered-no">{ONBOARDING_NO}</Label>
         </div>
         <div className="flex min-h-10 items-center gap-3">
-          <Radio id="tax-registered-yes" name="taxRegistered" value="yes" />
+          <Radio id="tax-registered-yes" name="taxRegistered" value="yes" defaultChecked={yes} />
           <Label htmlFor="tax-registered-yes">{ONBOARDING_YES}</Label>
         </div>
       </fieldset>
@@ -162,13 +167,13 @@ function OnboardingFields({ action, country, taxName, taxRate, version, unreacha
           label={onboardingRegistrationNo(scheme)}
           error={fieldError("taxRegistrationNo")}
         />
-        <Field id="tax-name" name="taxName" label={ONBOARDING_TAX_NAME} defaultValue={taxName} error={fieldError("taxName")} />
+        <Field id="tax-name" name="taxName" label={ONBOARDING_TAX_NAME} defaultValue={echoed.taxName ?? taxName} error={fieldError("taxName")} />
         <Field
           id="tax-rate"
           name="taxRate"
           label={ONBOARDING_TAX_RATE}
           hint={ONBOARDING_TAX_RATE_HINT}
-          defaultValue={taxRate}
+          defaultValue={echoed.taxRate ?? taxRate}
           inputMode="decimal"
           error={fieldError("taxRate")}
         />
