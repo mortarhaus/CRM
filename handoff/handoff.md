@@ -1,4 +1,4 @@
-# Handoff — 2026-11-02 · main checkout · HEAD 516c6ec · reconcile branch local
+# Handoff — 2026-11-06 · branch main · HEAD 1db8371
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,50 +6,56 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: none (PR #49 merged)
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: none (PR #55 merged)
 - Working folder: main checkout. Untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine.
 
 ## 1. Current PR / branch
-- None. PR #49 (Phase 1 PR 8) merged 2026-11-01T16:18:49Z, merge commit `516c6ecdbca1584b47d91464e051a516388a6e2f`. Branch and worktree removed. Log, review and receipt are on agent-logs (`log/2026-11-02_PR49_headers-email-phase-1-close.md`).
+- None. PR #55 (Phase 2 PR 2b: branding page, colour picker, contrast, outdated-browser notice) merged 2026-11-05T07:03:43Z, merge commit `1db83719e6cb7e1ac338a30c456db42c530c9fab`; `main` = `1db8371`. Final head `f1918ec` = reviewed head. Review R2 Approved with conditions (no required conditions). Log (`cebc094`), review archive and receipt are on agent-logs.
+- Merged branch worktree `.agent/worktrees/build-feat-p2-branding` still exists (remove when Charlie agrees).
 
 ## 2. Milestones
-- Done: Phase 0; Phase 1 plan PRs 1-8 (#39, #41, #43, #44, #45, #46, #48, #49) and side fixes #35, #37, #40, #47. All logged.
-- Done: Task 30 = PR #36 (merged 2026-10-22, approved by Charlie 2026-10-22, DECISIONS 2026-10-22). Spec text still labels revision 8 "draft; not approved" (stale label; fix at the next spec revision, since a spec edit needs a Bob spec review).
-- Pending: `setup` reconcile of PROJECT.md §7 and §9 and CLAUDE.md Status; then Phase 2 (needs Charlie's design direction and the VPS spec-text revision first).
+- Done: Phase 0; Phase 1 (plan PRs 1-8) and its `setup` reconcile (#50). All logged.
+- Done, Phase 2 so far: design direction (#51), Phase 2 plan `docs/superpowers/plans/2026-11-04-phase-2-settings-onboarding.md` (#52, 8 PRs), PR 1 UI foundation (#53), PR 2a `workspace_settings` columns and settings data layer (#54), PR 2b branding page (#55). All logged (`merged 55` found its log already pushed).
+- In progress: none.
+- Pending: Phase 2 PR 3 (country defaults and onboarding; new core module `settings` = stop-and-ask), then PRs 4-8 (storage and logo; step-up/bank/QR/notifications/owner email; numbering; money core and catalog; email templates).
 
 ## 3. Git state
 ```
-main = origin/main 516c6ec (fast-forwarded)
+main = origin/main 1db8371 (clean apart from the untracked files below)
 ```
 Uncommitted files — fingerprint every staged, modified or untracked path when writing this handoff:
 | Path | Status | Content hash (`git hash-object <path>`, or `deleted`) |
 |---|---|---|
-| (none of mine) | clean | - |
+| `.playwright-mcp/` | untracked, not mine | directory |
+| `docker/sync-export.sh` | untracked, not mine | `51dcde23b372ecaaf041cea716ec3f95fa70226a` |
+| `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
 ## 4. Just finished
-2026-11-02 `merged 49` done. Log 2617536 on agent-logs. No gate breach (receipt 69 s before merge). Bob's review ran on Sonnet 5.5, below the Opus tier for security review; Charlie merged without a second pass.
+2026-11-06 `merged 55`: verified on the host (state MERGED, commit reachable from `origin/main`) that PR 55 is merged and that its log, review archive and receipt were already on the remote `agent-logs` (`cebc094`, `bc204a6`, `c073ab9`), no gate breach; wrote nothing new. Hard gate clear. Then `status` and this `handoff`. Verified by me: git and host state only. CI and tests for PR 55 were reported green in its log (not re-run now).
 
 ## 5. Next step (file-level)
-`setup` reconcile done on branch chore/setup-reconcile-phase-1-close (worktree .agent/worktrees/build-chore-setup-reconcile-phase-1-close, commits 7e60db3 + one UNI-04 line fix), NOT pushed. Waiting for Charlie's yes to push and open the PR; then Bob `review`, `approved`, merge, `merged`. After that: Phase 2 needs Charlie's design direction.
+Charlie says `build` for Phase 2 PR 3. Stop-and-ask first (new core module `settings`), then: migration 0026 or later adding CHECK `not tax_registered or tax_registration_no is not null` on `workspace_settings` plus the matching Zod rule (carried from PR 54); country defaults and onboarding per the Phase 2 plan, PR 3. Offered alternatives: a small test-reliability PR (`boss.test.ts` stall, axe wait-for-title); a reviewed PR to fix `CLAUDE.md` Status (still says the Phase 2 plan is next) and add the AUTH-01 ruling via `setup`.
 
 ## 6. Open ASK items, blockers, and owner answers
 1. ASK 7 (production `EMAIL_FROM`, SPF/DKIM/DMARC owner) open for Charlie.
 2. ASK 9 (`require_2fa` timing; builder proposal Phase 2) open.
 3. Charlie to confirm the `RATE_LIMITED` wording and numbers (5 per user, 20 per workspace per hour).
-4. (Corrected 2026-11-02) The spec already says Hostinger KVM 2 (rev 5/6). No hosting revision is owed. Stage 3 database provider is still open (chosen at first sale).
-5. Carried: rotate dev AUTH_SECRET, refresh local `.env`, repo visibility, untracked files in main checkout, optional P3s from the PR 49 log, old worktrees `build-feat-p1-events`, `build-feat-p1-rate-limits`, `build-fix-audit-better-auth` (merged; remove when Charlie agrees).
+4. Charlie still owes (from the PR 55 log): greeting and "New" in the page header at every width; Urbanist font source; Q10, Q17, Q18, Q23 values; Q24/Q26 readings; confirm the outdated-browser notice wording if not already given.
+5. Stage 3 database provider is still open (chosen at first sale). No hosting revision is owed.
+6. Carried (Charlie's naming rule: Docker containers are `crm` / `crm-<something>`, in memory): rotate dev AUTH_SECRET, refresh local `.env`, repo visibility, untracked files in main checkout, optional P3s from the PR 49 log, old merged worktrees `build-feat-p1-events`, `build-feat-p1-rate-limits`, `build-fix-audit-better-auth`, `build-feat-p2-branding` (remove when Charlie agrees).
+7. Optional P3s: emit a plain `--accent` before the `light-dark()` rule in `lib/brand.ts`; guard for an action wired into `useActionState` without `fromForm`; PR 8 makes `email_bcc_self`/`auto_send_default` `default false not null`.
 
 ## 7. Open review findings (P0/P1) and verdict
-- None. PR 49 Approved, merged.
+- None. PR 55 R2 Approved with conditions, merged.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- None.
+- None this session. (The 2026-11-04 design direction is in DECISIONS via PR #51.)
 
 ## 9. Files touched but not committed
 - None.
 
 ## 10. Model for the next session
-Opus 5.5 (auth, rate limits and review fixes are the deep tier). Sonnet 5 only for mechanical edits.
+Opus 5.5 for PR 3 (new core module, migrations, RLS and settings are the deep tier). Sonnet 5 only for mechanical edits.
 
 
 - 2026-10-15 (fix, Bob PR #27 R1): review archived (ae70237). Runbook P2 + PR body P3 fixed in 088d013, pushed; CI re-running. Next: Charlie runs `review 27` when CI is green.
@@ -404,3 +410,70 @@ Opus 5.5 (auth, rate limits and review fixes are the deep tier). Sonnet 5 only f
 
 - 2026-11-01 Phase 1 PR 7 opened: PR #48 (feat/p1-rate-limits, head e5d2036). Charlie 1A/2A built; security-scan HIGH fixed. Next: review 48.
 - 2026-11-01 CI image job failed on e5d2036 (worker exit 1, TRUSTED_CLIENT_IP_HEADER required by migrate in the worker container). Fixed in 69b738f (test first); CI-like local stack up OK; CI all green on 69b738f. Next: review 48.
+
+- 2026-11-02: reconcile branch chore/setup-reconcile-phase-1-close pushed (head 2b30fa3), PR #50 opened. Next: Charlie runs `review 50` (Bob); then `approved 50` BEFORE merge; then `merged 50`.
+
+- 2026-11-03 (fix, Bob PR #50 R1): review archived on agent-logs. P2 fixed in 8083c53 (pushed), P1 self-check added to PR body, P3 not applied (premise stale). Next: Charlie runs `review 50` again.
+
+- 2026-11-03: `approved 50` done. Bob R2 Approved at head 8083c53; review archived, receipt written. Next: Charlie merges PR 50, then `merged 50`.
+
+- 2026-11-03: `merged 50` done. Merge 1485123 (2026-11-03T03:32:03Z). Log on agent-logs (log/2026-11-03_PR50_setup-reconcile-phase-1-close.md). No gate breach (receipt 14 s before merge). Branch+worktree removed; main fast-forwarded. Next: Phase 2 needs Charlie's design direction.
+
+- 2026-11-04: design direction recorded; branch docs/design-direction-phase-2 pushed (4339e01), PR opened (see §1/§5). Phase 2 plan not started (first PR of a milestone needs Charlie's OK, builder §8).
+
+- 2026-11-04 (fix, Bob PR #51 R1): review archived on agent-logs. P2 + both P3s fixed in a3d318c (pushed), PR body updated. "Decided by" says the builder proposals await Charlie. Next: Charlie runs `review 51` again.
+
+- 2026-11-04: `approved 51` done. Bob R2 Approved at head a3d318c; review archived, receipt written. Next: Charlie merges PR 51, then `merged 51`.
+
+- 2026-11-04: `merged 51` done. Merge 8a3c461 (2026-11-04T05:17:30Z), main = 8a3c461. Log on agent-logs (log/2026-11-04_PR51_design-direction-phase-2.md). No gate breach. Branch+worktree removed. Next: Charlie's go to start the Phase 2 plan (first PR of the milestone, builder §8).
+
+- 2026-11-04: Charlie said "start" (Phase 2 plan). Builder is on Sonnet 5.5; plan drafting handed to an Opus 5.5 sub-agent (builder §3), read-only, returns text. Next: write it to docs/superpowers/plans/2026-11-04-phase-2-settings-onboarding.md on a branch, verify its citations, open the PR, tell Charlie to run `review`.
+
+- 2026-11-04: Phase 2 plan drafted (Opus 5.5 sub-agent, read-only; builder spot-checked citations) and committed on docs/phase-2-plan (worktree .agent/worktrees/build-docs-phase-2-plan, head 1a4796c), DRAFT PR #52 (not for Bob yet). Blocked on Charlie: confirm the 4 design proposals (Q1-Q3 + Orvel note) and answer the PR 1 questions Q4-Q7; later PRs need Q8-Q25. Next: Charlie answers; I fold answers into the plan, mark PR #52 ready, he runs `review 52`.
+
+- 2026-11-04: Charlie: "use your recommendations for all of them". Plan folded (a414f10 on docs/phase-2-plan), DECISIONS entry added on the same branch, PR #52 marked ready. Still open for Charlie (each blocks one task only): Q10 SG defaults (PR 3), Q17 bank fields + Q18 email wording (PR 5), Q23 template event list (PR 8). Placeholder accent #0e6c84. Next: Charlie runs `review 52`.
+
+- 2026-11-04 (fix, Bob PR #52 R1): review archived. Fixes pushed (head 5a304b6): contrast rule revised, step_up as tenant table, notification exists, placeholders labelled, tasks folded, Q26 account-hash added. Charlie to re-confirm revised Q1 and Q15 and the #0e6c84 / Q24 readings. Bob asks for Round 2 on Opus 5.5. Next: Charlie runs `review 52` (Opus).
+
+- 2026-11-04 (fix, Bob PR #52 R2): review archived. Contrast rule completed (fills only, derived per-theme variant, fixed dark tokens), P3s applied, head 17f7ea1. Charlie to re-confirm Q1 (new wording), Q15, #0e6c84, Q24, Q26. Bob asks Round 3 on Opus 5.5.
+
+- 2026-11-04: `approved 52` done. Bob R3 Approved with conditions at head 17f7ea1 (deferred P2s: preview period reset + free-text bound in PR 6, subject CR/LF in PR 8; P3: allocator lock position, service currency trigger); review archived, receipt written. Next: Charlie merges PR 52, then `merged 52`. Charlie still owes: re-confirm Q1/Q15, #0e6c84, Q24, Q26; Q10/Q17/Q18/Q23 values.
+
+- 2026-11-04: `merged 52` done. PR #52 merged (592eab6, 08:20:11Z); log pushed to agent-logs (6def27d), no gate breach; branch and worktree docs/phase-2-plan removed; main fast-forwarded. CI flake on first run (boss.test.ts 30 s timeout), re-run passed. Next: Charlie answers the owed items (re-confirm Q1/Q15, #0e6c84, Q24, Q26; Q10, Q17, Q18, Q23) and gives the go for Phase 2 PR 1 (UI foundation); then `build`. CLAUDE.md Status still says "Next: the Phase 2 plan" and should be updated in a reviewed PR (the setup/reconcile step).
+
+- 2026-11-04: `build` Phase 2 PR 1 done. PR #53 open (branch feat/p2-ui-foundation, worktree .agent/worktrees/build-feat-p2-ui-foundation, head 1be1723, `main` 592eab6). Code by an Opus sub-agent, verified by me: typecheck, lint, build, 27 targeted tests; sub-agent ran full test + e2e (not run: auth, name-limits, two-factor, test-email, image stack, gates). Flags for Charlie/Bob: theme toggle is a route handler not a server action (AUTH-01 lint); mobile-320 nav is an in-flow strip not a bottom bar (FE-70); copy "Nothing needs you right now."; size ~490 added lines incl ~145 tests (over 400, plan forbids mid-task split). DECISIONS entry added on the branch. Side effects: gitignored `.env` in the PR worktree; dev Postgres `crm-dev-postgres-1` running; Playwright chromium installed; root `.env` is out of date (no DATABASE_WORKER_URL). Next: Charlie runs `review 53` (Opus).
+
+- 2026-11-04 (fix, Bob PR #53 R1): review archived. Fixes pushed (head c8e7adf): New menu inside viewport at 320, AUTH-01 ruling recorded (pending Charlie), mobile layout = Kinlo bottom bar + modal <dialog> drawer, greeting line dropped, P3s. Builder re-ran typecheck, lint, build, 27 tests; sub-agent ran full test + e2e (3 no-JS test-email failures from another project's MailHog on the Mailpit ports). Charlie owes: confirm AUTH-01 ruling; confirm desktop header change; font source OK. Next: Charlie runs `review 53`.
+
+- 2026-11-04 (`fix 53`, nothing to fix): Bob PR #53 R2 = Approved at head c8e7adf, no P0-P2 open. Charlie (in Bob's session) answered 1A (AUTH-01 reading for POST /theme confirmed), 2B modified (old-browser drawer gap accepted; replace the Sign out fallback with an outdated-browser notice), 3A (merge on the sub-agent's e2e plus green CI). I made NO new commit, so the head stays c8e7adf and the review matches the PR head. Deferred to Phase 2 PR 2 (or a small PR before it): (1) outdated-browser notice per Bob's R2 requirement (CSS @supports not for light-dark()/:has(), JS check for invoker commands/dialog, no inline script/style, shell + auth pages, persistent non-alert note, tests); (2) DECISIONS item (3) and the entry-points.test.ts row from "pending Charlie" to "confirmed by Charlie 2026-11-04", then `setup` adds the ruling to PROJECT.md Hard-rule rulings. Next: wait for green CI on PR #53, then `approved 53`, then Charlie merges.
+
+- 2026-11-04: `approved 53` done. CI green on head c8e7adf (all four jobs). Review archived (hash 536f3528), receipt written 13:25:06Z on agent-logs. PR #53 still open. Next: Charlie merges, then `merged 53`. After that: Phase 2 PR 2 (stop-and-ask not required; Q1 re-confirmation needed before PR 2b) plus the two PR 2 carry-overs (outdated-browser notice; AUTH-01 text to "confirmed").
+
+- 2026-11-04: `merged 53` done. PR #53 merged 13:34:54Z (86040d2); log on agent-logs (a331ea7), no gate breach; branch and worktree feat/p2-ui-foundation removed (tip c8e7adf is on main); main fast-forwarded. Next: Phase 2 PR 2 (workspace_settings columns + branding). Needs from Charlie first: re-confirm Q1 (contrast rule + fixed dark tokens) and Q15 for 2b/5a; the PR 2 carry-overs (outdated-browser notice; AUTH-01 text to "confirmed"). Side effects still around: dev Postgres crm-dev-postgres-1 running; gitignored .env was in the removed worktree (root .env still lacks DATABASE_WORKER_URL).
+
+- 2026-11-04: `build` Phase 2 PR 2a done. PR opened from feat/p2-settings-columns (head 5537c6a, worktree .agent/worktrees/build-feat-p2-settings-columns). Migrations 0024/0025, getSettings/updateSettings, two settings actions, STALE_VERSION in action(), AUTH-01 text confirmed. Deviations flagged in the PR: default_tax_rate_bps, flat address, country Zod-only, STALE_VERSION, invented limits 200/100. Over 400 LOC (about 590 hand-written). Builder re-ran typecheck, lint, build, 104 targeted tests; sub-agent ran full suite (boss.test.ts flake once) and fresh-DB migrate. Left running: none of mine (sub-agent removed crm-test-postgres-p2a); Docker Desktop was started by me. Next: Charlie runs `review <PR>`. Still owed: Q1/Q15 re-confirmation (before 2b/5a); outdated-browser notice PR; greeting/header move and Urbanist font OK.
+
+- 2026-11-05: `approved 54` done. Bob R1 Approved at head 5537c6a (re-check: all 4 CI jobs green after two flake re-runs: boss.test.ts timeout, then axe document-title at /two-factor mobile-320). Review archived (hash 11493a67), receipt 2026-11-05T01:49:22Z on agent-logs. PR #54 still open; next: Charlie merges, then `merged 54`.
+  Charlie decisions recorded by Bob (to write into DECISIONS as "confirmed by Charlie" in PR 2b, docs only): limits 200/100/254 confirmed; tax rate in bps confirmed (2026-11-04); Q1 = A (revised contrast rule, fixed dark tokens), Q5 = A (default accent #0e6c84), Q15 = A (step_up tenant table, or a session column if the Task 13 spike prefers), 2026-11-05. Also change the plan's "pending re-confirmation" text to confirmed (PR 2b). PR 2b is unblocked.
+  PR 2b must also include: the outdated-browser notice (Bob: "at the latest"). Bob P3s for later: text() lets \p{Cf} bidi/invisible chars through; shortCode "" refused instead of cleared; email_bcc_self/auto_send_default nullable (make default false not null in PR 8); PR 3 must add CHECK not tax_registered or tax_registration_no is not null. Pending offer to Charlie: small test-reliability PR (boss.test.ts stall + axe wait-for-title).
+
+- 2026-11-05: `merged 54` done. PR #54 merged 03:03:15Z (f90fd5f); log on agent-logs (fa04ad4), no gate breach; branch and worktree feat/p2-settings-columns removed; main fast-forwarded. Next: Phase 2 PR 2b (Task 6: branding page, colour picker, contrast.ts, brand token, plus the outdated-browser notice and the docs-only DECISIONS/plan confirmations of Q1/Q5/Q15 and limits/bps). Optional first: small test-reliability PR (boss.test.ts stall, axe title wait) if Charlie says go.
+
+- 2026-11-05: `build` Phase 2 PR 2b done. PR opened from feat/p2-branding (head 5eab7ab, worktree .agent/worktrees/build-feat-p2-branding). Branding page + picker + contrast core + nonce'd brand token + outdated-browser notice + fromForm in action() + docs confirmations (Q1/Q5/Q15, limits, bps) + PR 2a P3s. About 1,280 lines (split offered: 2b-i / 2b-ii). Builder re-ran typecheck, lint, build, 420 targeted tests; sub-agent ran full suite (1054 passed) and dev e2e (139 passed, 3 no-JS test-email failures from MailHog on Mailpit ports). Not run: prod-build e2e, screenshots, gates. Cleaned up: removed crm-test-postgres-p2b, killed leftover dev server/playwright. Next: Charlie runs `review <PR>`.
+
+- 2026-11-05: PR #55 (Phase 2 PR 2b) updated: head b0e3a3c adds a fix for a production-only bug (lightningcss light-dark() compile made the branding preview panels follow the root theme; tokens re-declared on .scheme-light/.scheme-dark, spec asserts panel surfaces). Production-build e2e after the fix: branding 18/18, theme/accessibility/shell/security-headers 70 passed, 8 skipped. Builder re-ran typecheck, lint, build, 392 unit tests. Container and servers cleaned up. Note from sub-agent: gitignored root .env may point at port 5434 (check, repoint or delete). Next: Charlie runs `review 55` (head b0e3a3c).
+
+## fix 55 done (2026-11-05)
+R1 P2 + P3 #2 fixed at f1918ec, pushed to feat/p2-branding; PR body updated. Next: CI green incl. Image, Trivy, E2E, then Charlie runs `review 55` (Round 2).
+
+## merged 55 done (2026-11-05)
+PR #55 merged 1db8371; log on agent-logs (cebc094), no gate breaches. Next: Phase 2 PR 3 (country defaults and onboarding; new core module `settings` is stop-and-ask).
+
+## build (Phase 2 PR 3) paused at stop-and-ask (2026-11-05)
+State: main at 1db8371 (PR #55 merged, logged). No branch, no worktree and no code for PR 3. Spec hash 733cc0e9 equals the last reconcile; spec gate and log gate clear.
+Waiting on Charlie before any work (builder §8, plan §8):
+1. New core module `packages/core/src/settings` (country defaults, Task 7; closes PROJECT.md §9 "where country defaults live", Q8). Plan recommends yes. I asked; Charlie declined the question dialog and said "update handoff", so there is no answer yet.
+2. Q10: SG invoice pattern, SG date format, SG locale, and the MY locale. The spec gives none of them. Options I was going to offer: Charlie gives the values; ship MY in full and SG partial (SGD, Asia/Singapore, GST 9% only), with the rest unset; or reuse the MY pattern and format for SG, flagged as a builder proposal.
+Nothing invented. Still owed by Charlie: Q17, Q18, Q23 values, Q24/Q26 readings, the greeting and "New" in the page header at every width, and the Urbanist font source.
+PR 3 scope (plan lines 157-183): Task 7 country defaults module; Task 8 onboarding step, redirect after org create, and the `applyCountryDefaults` action; Task 9 general settings page. It must add the CHECK `not tax_registered or tax_registration_no is not null` and use migration 0026 or later. Split Task 9 out if it passes ~400 LOC. Run it on Opus 5.5 (deep) via a sub-agent; I keep git, verification, DECISIONS and the PR.
+Leftovers: the `build-feat-p2-branding` worktree and the branch (tip f1918ec is on main via the merge, so cleanup is allowed after the `merged` proof; not done yet); untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine. Offered but not taken: the test-reliability PR (`boss.test.ts`, axe title wait).
