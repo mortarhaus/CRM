@@ -65,6 +65,8 @@ test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselect
 
   await page.getByRole("button", { name: "Finish setup" }).click();
   await expect(page.getByRole("alert")).toBeVisible();
+  // A11Y-01: the button was disabled while the post was in flight, so focus goes back to it after the refusal.
+  await expect(page.getByRole("button", { name: "Finish setup" })).toBeFocused();
   await expect(number).toHaveAttribute("aria-invalid", "true");
   await expect(number).toHaveAccessibleDescription(ONBOARDING_REGISTRATION_REQUIRED);
   await expectAccessible(page, "/onboarding refused Yes");
