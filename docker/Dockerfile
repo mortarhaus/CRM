@@ -20,8 +20,9 @@ RUN pnpm --filter @crm/web build
 
 FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runtime
 # The base digest above has musl 1.2.6-r2 and zlib 1.3.2-r0, which Trivy flags HIGH (CVE-2026-107891, CVE-2026-85091).
-# Upgrade only those packages to the fixed Alpine builds until the pinned base image catches up (docs/DECISIONS.md).
-RUN apk upgrade --no-cache musl musl-utils zlib
+# Install the fixed Alpine builds, pinned exactly (UNI-14). Alpine keeps only the newest build per branch, so when it
+# moves on this fails with "unable to select packages": re-pin, or re-pin the base image (docs/DECISIONS.md 2026-11-07).
+RUN apk add --no-cache musl=1.2.6-r3 musl-utils=1.2.6-r3 zlib=1.4-r0
 # The runtime runs only `node`; removing the bundled package managers shrinks the scanned surface.
 RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
     /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-*
