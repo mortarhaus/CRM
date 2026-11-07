@@ -178,7 +178,7 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 
 ## Docker image and compose stack (Phase 0 PR 4)
 
-- One image, `crm-app:dev`, built by `docker/Dockerfile` from `node:24.21.0-alpine` (pinned by digest). The
+- One image, `crm-app:dev`, built by `docker/Dockerfile` from `node:24.21.0-alpine` (pinned by digest; the runtime stage also runs `apk upgrade musl musl-utils zlib` for the Trivy findings of 2026-11-07, to be removed when the base is re-pinned past them, docs/DECISIONS.md). The
   entrypoint (`docker/entrypoint.sh`) takes `web` (migrations, then `node server.js`, the Next standalone
   server), `worker` (migrations, then `node dist/worker.mjs`) or `migrate` (migrations only). Migrations run
   from `dist/migrate.mjs` under the advisory lock, so `web` and `worker` starting together is safe: one waits,
