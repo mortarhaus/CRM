@@ -64,7 +64,7 @@ test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselect
   await expect(page.getByLabel("Tax rate (%)")).toHaveValue("9");
 
   await page.getByRole("button", { name: "Finish setup" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
   // A11Y-01: the button was disabled while the post was in flight, so focus goes back to it after the refusal.
   await expect(page.getByRole("button", { name: "Finish setup" })).toBeFocused();
   await expect(number).toHaveAttribute("aria-invalid", "true");
@@ -146,7 +146,7 @@ test.describe("without JavaScript", () => {
     await page.getByLabel("Tax rate (%)").fill("6");
     await page.getByRole("button", { name: "Finish setup" }).click();
 
-    await expect(page.getByRole("alert")).toHaveText(ONBOARDING_INVALID);
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(ONBOARDING_INVALID);
     await expect(page.getByLabel("Yes", { exact: true })).toBeChecked();
     const number = page.getByLabel("SST registration number");
     await expect(number).toBeVisible();
