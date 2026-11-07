@@ -1,22 +1,12 @@
 "use server";
 
 import { SETTINGS_TEXT_MAX_LENGTH } from "@crm/core/security";
-import { percentToBps, SUPPORTED_COUNTRIES } from "@crm/core/settings";
+import { SUPPORTED_COUNTRIES } from "@crm/core/settings";
 import { z } from "zod";
 import { AlreadyOnboardedError, applyCountryDefaults } from "@/db/settings/apply-country-defaults";
 import { StaleSettingsError } from "@/db/settings/workspace-settings";
 import { ActionRefusedError, action } from "@/lib/auth/action";
-import { expectedVersion, requiredText, text } from "@/lib/settings-input";
-
-// Typed as a percentage, stored in basis points; never below 0 (spec line 460).
-const taxRate = z.string().transform((value, context) => {
-  const bps = percentToBps(value);
-  if (bps === null) {
-    context.addIssue({ code: "custom", message: "not a percentage" });
-    return z.NEVER;
-  }
-  return bps;
-});
+import { echoFields, expectedVersion, requiredText, taxAnswerFromForm, taxRate, text } from "@/lib/settings-input";
 
 const common = {
   expectedVersion,
@@ -37,40 +27,20 @@ const input = z.discriminatedUnion("taxRegistered", [
   }),
 ]);
 
-const YES_NO: Record<string, boolean> = { yes: true, no: false };
-
-// The onboarding form (plan Task 8), with or without JavaScript. The tax fields are posted with a No as well (they are
-// only hidden), so they are read only for a Yes.
+// The onboarding form (plan Task 8), with or without JavaScript.
 function fromForm(form: FormData) {
-  const answer = form.get("taxRegistered");
-  const registered = typeof answer === "string" && Object.hasOwn(YES_NO, answer) ? YES_NO[answer] : answer;
   return {
     expectedVersion: Number(form.get("expectedVersion")),
     country: form.get("country"),
-    taxRegistered: registered,
     ownTin: form.get("ownTin") ?? undefined,
     ownBrn: form.get("ownBrn") ?? undefined,
-    ...(registered === true && {
-      taxRegistrationNo: form.get("taxRegistrationNo"),
-      taxName: form.get("taxName"),
-      taxRate: form.get("taxRate"),
-    }),
+    ...taxAnswerFromForm(form),
   };
 }
 
-// What a refused form shows again (PR #56 R1): the Yes or No, and the tax name and rate, which are neither secret nor
-// personal data. The registration number, TIN and BRN are not sent back (personal data for a sole trader, as in the
-// audit redaction); without JavaScript the Owner types them again.
-function echo(form: FormData): Record<string, string> {
-  const shown: Record<string, string> = {};
-  const answer = form.get("taxRegistered");
-  if (answer === "yes" || answer === "no") shown.taxRegistered = answer;
-  for (const name of ["taxName", "taxRate"]) {
-    const value = form.get(name);
-    if (typeof value === "string") shown[name] = value;
-  }
-  return shown;
-}
+// A refused form shows the answer and the tax name and rate again; the registration number, TIN and BRN are typed
+// again (personal data for a sole trader, as in the audit redaction).
+const echo = (form: FormData) => echoFields(form, ["taxName", "taxRate"]);
 
 // The workspace's country and SST/GST answer, once, by its Owner (plan Q9). A workspace that already has a country is
 // refused as STALE_VERSION: the page it was posted from is out of date. Done, the Owner goes on to the app ("/"), by a

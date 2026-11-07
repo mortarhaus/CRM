@@ -90,6 +90,12 @@ export const workspaceSettings = pgTable(
       "workspace_settings_default_tax_check",
       sql`${table.taxRegistered} or (${table.defaultTaxName} is null and ${table.defaultTaxRateBps} is null)`,
     ),
+    // The default tax is a name with its rate: both set or both empty (plan Task 9; a name without a rate, or a rate
+    // without a name, cannot be applied to a new document).
+    check(
+      "workspace_settings_default_tax_pair_check",
+      sql`(${table.defaultTaxName} is null) = (${table.defaultTaxRateBps} is null)`,
+    ),
     // A Yes to the SST/GST question requires the registration number (spec line 732; Phase 2 plan PR 3).
     check(
       "workspace_settings_tax_registration_required_check",

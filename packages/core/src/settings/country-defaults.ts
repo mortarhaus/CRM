@@ -50,3 +50,8 @@ export const COUNTRY_DEFAULTS: Readonly<Record<Country, Readonly<CountryDefaults
 export function isSupportedCountry(value: string): value is Country {
   return (SUPPORTED_COUNTRIES as readonly string[]).includes(value);
 }
+
+// The currencies a settings form may choose until the money module (Phase 2 PR 7) brings ISO 4217 (plan Task 9): the
+// supported countries' own (spec line 731). A test keeps it equal to COUNTRY_DEFAULTS.
+export const SETTINGS_CURRENCIES = ["MYR", "SGD"] as const;
+export type SettingsCurrency = (typeof SETTINGS_CURRENCIES)[number];
