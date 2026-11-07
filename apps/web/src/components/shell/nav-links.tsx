@@ -1,4 +1,4 @@
-import { Building2, Mail, Palette, ShieldCheck } from "lucide-react";
+import { Building2, Mail, Palette, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { NavItem, type NavItemProps } from "./nav-item";
 
 const ICON = "size-5";
@@ -6,13 +6,14 @@ const ICON = "size-5";
 interface NavLinksProps {
   showAdminSettings: boolean;
   layout: NavItemProps["layout"];
-  // The phone tab bar: four 4.5rem items do not fit at 320px, so Branding is reached through the menu drawer there.
+  // The phone tab bar: four 4.5rem items do not fit at 320px, so General and Branding are reached through the menu
+  // drawer there.
   quick?: boolean;
   className?: string;
 }
 
 // The destinations that exist today, shared by the rail, the phone tab bar and the menu drawer (UNI-05: nothing
-// from a later phase). Email and Branding settings are Admin and Owner only (AUTH-03); each page and action checks
+// from a later phase). Email, General and Branding settings are Admin and Owner only (AUTH-03); each page and action checks
 // the role.
 export function NavLinks({ showAdminSettings, layout, quick = false, className }: NavLinksProps) {
   return (
@@ -31,6 +32,16 @@ export function NavLinks({ showAdminSettings, layout, quick = false, className }
       {showAdminSettings && (
         <li>
           <NavItem href="/settings/email" label="Email" layout={layout} icon={<Mail aria-hidden className={ICON} />} />
+        </li>
+      )}
+      {showAdminSettings && !quick && (
+        <li>
+          <NavItem
+            href="/settings/general"
+            label="General"
+            layout={layout}
+            icon={<SlidersHorizontal aria-hidden className={ICON} />}
+          />
         </li>
       )}
       {showAdminSettings && !quick && (

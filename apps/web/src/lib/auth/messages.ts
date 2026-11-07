@@ -1,4 +1,5 @@
 import {
+  ADDRESS_LINE_MAX_LENGTH,
   NAME_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
@@ -73,6 +74,37 @@ export const ONBOARDING_FAILED = "We couldn't save your answers. Try again.";
 // Shown to an Admin or Staff member while the Owner has not finished onboarding (plan Task 8).
 export const SETUP_PENDING = "The owner has not finished setting up this workspace.";
 export const SETUP_PENDING_HINT = "You can switch to another workspace or sign out.";
+
+// /settings/general (plan Task 9; builder copy, except "applies to new documents only", spec lines 460 and 731). The
+// tax and registration-number fields reuse the onboarding copy above.
+export const GENERAL_TITLE = "General settings";
+export const GENERAL_INTRO = "Your business details, timezone, currencies and tax.";
+export const GENERAL_BUSINESS_LEGEND = "Business details";
+export const GENERAL_REGIONAL_LEGEND = "Timezone and currencies";
+export const GENERAL_COUNTRY = "Country";
+export const GENERAL_SHORT_CODE = "Short code";
+export const GENERAL_SHORT_CODE_HINT = "2 to 6 letters or digits, used in document numbers.";
+export const GENERAL_SHORT_CODE_INVALID = "Use 2 to 6 letters or digits.";
+export const GENERAL_ADDRESS_LINE1 = "Address line 1";
+export const GENERAL_ADDRESS_LINE2 = "Address line 2";
+export const GENERAL_ADDRESS_CITY = "City";
+export const GENERAL_ADDRESS_POSTCODE = "Postcode";
+export const GENERAL_ADDRESS_STATE = "State";
+export const GENERAL_ADDRESS_INVALID = `Use at most ${ADDRESS_LINE_MAX_LENGTH} characters, without special formatting characters.`;
+export const GENERAL_TIMEZONE = "Timezone";
+export const GENERAL_BASE_CURRENCY = "Base currency";
+export const GENERAL_DEFAULT_CURRENCY = "Default currency";
+export const GENERAL_CHOICE_INVALID = "Choose one from the list.";
+export const NOT_SET = "Not set";
+export const GENERAL_OPTIONAL = "Optional.";
+export const NEW_DOCUMENTS_ONLY = "A change applies to new documents only.";
+export const GENERAL_SAVE = "Save settings";
+export const GENERAL_SAVING = "Saving…";
+export const GENERAL_SAVED = "Settings saved.";
+export const GENERAL_SAVED_NEW_DOCUMENTS = "Settings saved. The change to the base currency or tax applies to new documents only.";
+export const GENERAL_STALE = "Someone else changed these settings after this page loaded. Reload the page, then save again.";
+export const GENERAL_FORBIDDEN = "Only an Admin or Owner can change these settings.";
+export const GENERAL_FAILED = "We couldn't save the settings. Try again.";
 
 // Shown on every page when the browser lacks a feature the app relies on (Charlie via Bob, PR #53 R2; builder copy).
 export const OUTDATED_BROWSER = "Your browser is out of date, so parts of CRM may not work properly. Please update your browser.";

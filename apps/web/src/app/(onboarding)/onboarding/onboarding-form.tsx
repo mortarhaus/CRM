@@ -4,36 +4,20 @@ import type { Country } from "@crm/core/settings";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { type FormEvent, startTransition, useActionState, useEffect, useRef } from "react";
+import { TAX_FIELD_ERRORS, TaxFields } from "@/components/settings/tax-fields";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Radio } from "@/components/ui/radio";
 import type { ActionResult } from "@/lib/auth/action";
 import {
   COUNTRY_NAMES,
   ONBOARDING_CHANGE_COUNTRY,
   ONBOARDING_FAILED,
   ONBOARDING_INVALID,
-  ONBOARDING_NO,
   ONBOARDING_OPTIONAL_IDS,
-  ONBOARDING_OWN_BRN,
-  ONBOARDING_OWN_IDS_LEGEND,
-  ONBOARDING_OWN_TIN,
-  ONBOARDING_REGISTRATION_REQUIRED,
   ONBOARDING_SAVE,
   ONBOARDING_SAVING,
   ONBOARDING_STALE,
   ONBOARDING_TAX_HINT,
-  ONBOARDING_TAX_NAME,
-  ONBOARDING_TAX_NAME_REQUIRED,
-  ONBOARDING_TAX_RATE,
-  ONBOARDING_TAX_RATE_HINT,
-  ONBOARDING_TAX_RATE_INVALID,
-  ONBOARDING_TEXT_INVALID,
-  ONBOARDING_YES,
-  onboardingRegistrationNo,
-  onboardingTaxQuestion,
   TAX_SCHEMES,
 } from "@/lib/auth/messages";
 
@@ -50,58 +34,10 @@ interface FormProps {
   version: number;
 }
 
-const FIELD_ERRORS: Record<string, string> = {
-  taxRegistrationNo: ONBOARDING_REGISTRATION_REQUIRED,
-  taxName: ONBOARDING_TAX_NAME_REQUIRED,
-  taxRate: ONBOARDING_TAX_RATE_INVALID,
-  ownTin: ONBOARDING_TEXT_INVALID,
-  ownBrn: ONBOARDING_TEXT_INVALID,
-};
-
 function formError(result: SaveResult): string {
   if (result.ok) return "";
   if (result.status === "INVALID_INPUT") return ONBOARDING_INVALID;
   return result.status === "STALE_VERSION" ? ONBOARDING_STALE : ONBOARDING_FAILED;
-}
-
-interface FieldProps {
-  id: string;
-  name: string;
-  label: string;
-  hint?: string;
-  error: string | undefined;
-  defaultValue?: string;
-  inputMode?: "text" | "decimal";
-}
-
-function Field({ id, name, label, hint, error, defaultValue, inputMode = "text" }: FieldProps) {
-  const describedBy = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(" ") || undefined;
-  return (
-    <div className="flex max-w-sm flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      {hint && (
-        <p id={`${id}-hint`} className="text-sm text-muted-foreground">
-          {hint}
-        </p>
-      )}
-      <Input
-        id={id}
-        name={name}
-        type="text"
-        inputMode={inputMode}
-        autoComplete="off"
-        spellCheck={false}
-        defaultValue={defaultValue}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy}
-      />
-      {error && (
-        <p id={`${id}-error`} className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
-    </div>
-  );
 }
 
 function OnboardingFields({ action, country, taxName, taxRate, version, unreachable }: FormProps & { unreachable: boolean }) {
@@ -123,7 +59,7 @@ function OnboardingFields({ action, country, taxName, taxRate, version, unreacha
   // With JavaScript the form is not reset (onSubmit below), so the inputs keep what was typed either way.
   const echoed = refused?.echo ?? {};
   const yes = echoed.taxRegistered === "yes";
-  const fieldError = (name: string) => (invalid.has(name) ? FIELD_ERRORS[name] : undefined);
+  const fieldError = (name: string) => (invalid.has(name) ? TAX_FIELD_ERRORS[name] : undefined);
 
   // React resets a form after its action, which would clear what the Owner typed when a field is refused; dispatching
   // the action here skips that reset. Without JavaScript the form posts as usual.
@@ -144,49 +80,14 @@ function OnboardingFields({ action, country, taxName, taxRate, version, unreacha
         </Link>
       </p>
 
-      <fieldset className="flex flex-col gap-3" aria-describedby="tax-registered-hint">
-        <legend className="mb-1 text-lg font-semibold">{onboardingTaxQuestion(scheme)}</legend>
-        <p id="tax-registered-hint" className="text-sm text-muted-foreground">
-          {ONBOARDING_TAX_HINT}
-        </p>
-        <div className="flex min-h-10 items-center gap-3">
-          <Radio id="tax-registered-no" name="taxRegistered" value="no" defaultChecked={!yes} />
-          <Label htmlFor="tax-registered-no">{ONBOARDING_NO}</Label>
-        </div>
-        <div className="flex min-h-10 items-center gap-3">
-          <Radio id="tax-registered-yes" name="taxRegistered" value="yes" defaultChecked={yes} />
-          <Label htmlFor="tax-registered-yes">{ONBOARDING_YES}</Label>
-        </div>
-      </fieldset>
-
-      {/* Shown only for a Yes, by CSS (no JavaScript needed). The fields are posted with a No as well and ignored. */}
-      <div className="hidden flex-col gap-6 group-has-[#tax-registered-yes:checked]:flex">
-        <Field
-          id="tax-registration-no"
-          name="taxRegistrationNo"
-          label={onboardingRegistrationNo(scheme)}
-          error={fieldError("taxRegistrationNo")}
-        />
-        <Field id="tax-name" name="taxName" label={ONBOARDING_TAX_NAME} defaultValue={echoed.taxName ?? taxName} error={fieldError("taxName")} />
-        <Field
-          id="tax-rate"
-          name="taxRate"
-          label={ONBOARDING_TAX_RATE}
-          hint={ONBOARDING_TAX_RATE_HINT}
-          defaultValue={echoed.taxRate ?? taxRate}
-          inputMode="decimal"
-          error={fieldError("taxRate")}
-        />
-      </div>
-
-      <fieldset className="flex flex-col gap-6" aria-describedby="own-ids-hint">
-        <legend className="mb-1 text-lg font-semibold">{ONBOARDING_OWN_IDS_LEGEND}</legend>
-        <p id="own-ids-hint" className="text-sm text-muted-foreground">
-          {ONBOARDING_OPTIONAL_IDS}
-        </p>
-        <Field id="own-tin" name="ownTin" label={ONBOARDING_OWN_TIN} error={fieldError("ownTin")} />
-        <Field id="own-brn" name="ownBrn" label={ONBOARDING_OWN_BRN} error={fieldError("ownBrn")} />
-      </fieldset>
+      <TaxFields
+        scheme={scheme}
+        taxHint={ONBOARDING_TAX_HINT}
+        idsHint={ONBOARDING_OPTIONAL_IDS}
+        yes={yes}
+        values={{ taxName: echoed.taxName ?? taxName, taxRate: echoed.taxRate ?? taxRate }}
+        fieldError={fieldError}
+      />
 
       {error && (
         <p role="alert" className="text-sm text-destructive">
