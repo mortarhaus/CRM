@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { toWorkspaceSlug } from "@crm/core/workspace";
-import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { postToAuth } from "@/lib/auth/forward";
 import {
@@ -12,7 +11,7 @@ import {
   WORKSPACE_NAME_REQUIRED,
 } from "@/lib/auth/messages";
 import { getCurrentSession } from "@/lib/auth/session";
-import { EMPTY_FORM_STATE, textField, type FormState } from "@/lib/forms";
+import { textField, type FormState } from "@/lib/forms";
 
 export async function createWorkspaceAction(_previous: FormState, form: FormData): Promise<FormState> {
   // The page's layout guard is not a boundary for a posted action (AUTH-02).
@@ -25,6 +24,6 @@ export async function createWorkspaceAction(_previous: FormState, form: FormData
     const error = result.status === 429 ? TOO_MANY_ATTEMPTS : (limitMessage(result.code) ?? WORKSPACE_CREATE_FAILED);
     return { error, fields: { name } };
   }
-  refresh();
-  return EMPTY_FORM_STATE;
+  // The new workspace is the active one; its Owner answers the onboarding questions next (plan Task 8).
+  redirect("/onboarding");
 }

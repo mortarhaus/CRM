@@ -7,6 +7,7 @@ import { totpFromUri, wrongTotpCode } from "../src/test/totp";
 import { expectAccessible, expectVisibleFocus, tabTo } from "./a11y";
 import {
   closeShellMenu,
+  createWorkspace,
   failServerActions,
   openShellMenu,
   PASSWORD,
@@ -25,12 +26,6 @@ import {
 const LONGEST_WORKSPACE_NAME = "Supercalifragilisticexpialidocious-Creative-Partnership-Studio-International-Ltd"
   .padEnd(WORKSPACE_NAME_MAX_LENGTH, "s")
   .slice(0, WORKSPACE_NAME_MAX_LENGTH);
-
-async function createWorkspace(page: Page, name: string): Promise<void> {
-  await page.getByLabel("Workspace name").fill(name);
-  await page.getByRole("button", { name: "Create workspace" }).click();
-  await expect(page.getByRole("list", { name: "Your workspaces" })).toContainText(name);
-}
 
 // A new Owner of one workspace, on /settings/email.
 async function openEmailSettingsAsOwner(page: Page): Promise<string> {

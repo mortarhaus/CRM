@@ -9,7 +9,7 @@ import {
 } from "../src/lib/auth/messages";
 import { searchMessages } from "../src/test/mailpit";
 import { expect, test } from "./fixtures";
-import { failServerActions, respectRateLimit, setMemberRole, signIn, signUp, uniqueEmail } from "./helpers";
+import { createWorkspace, failServerActions, respectRateLimit, setMemberRole, signIn, signUp, uniqueEmail } from "./helpers";
 
 // Plan Task 27 Step 4: /settings/email → server action → email.send job → worker → Mailpit. The worker runs beside the
 // app (playwright.config.ts) and Mailpit's API is at MAILPIT_URL or localhost:8025 (src/test/mailpit.ts).
@@ -32,8 +32,7 @@ async function openAsOwner(page: Page): Promise<string> {
   await signUp(page, email);
   await signIn(page, email);
   await expect(page).toHaveURL(/\/workspaces$/);
-  await page.getByLabel("Workspace name").fill("Mail Studio");
-  await page.getByRole("button", { name: "Create workspace" }).click();
+  await createWorkspace(page, "Mail Studio");
   const link = page.getByRole("link", { name: "Email", exact: true });
   await link.click();
   await expect(page).toHaveURL(/\/settings\/email$/);

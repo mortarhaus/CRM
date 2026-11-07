@@ -318,6 +318,16 @@ describe("action(): a form posted through useActionState, called as (previous st
     expect(await run(null, noteForm(""))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"] });
   });
 
+  it("sends back what echo picks from a refused form, and nothing for a valid one or an input that is not a form", async () => {
+    const { handler } = recordingHandler();
+    const fromForm = (form: FormData) => ({ note: form.get("note") });
+    const echo = (form: FormData) => ({ shown: String(form.get("note")) });
+    const run = action({ name: "test.echo", minRole: "staff", input: noteInput, idempotent: false, handler, fromForm, echo });
+    expect(await run(null, noteForm(""))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"], echo: { shown: "" } });
+    expect(await run({ note: "" })).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"] });
+    expect(await run(null, noteForm("fine"))).toEqual({ ok: true, status: "DONE", data: { done: true, n: 1 } });
+  });
+
   it("an action without fromForm takes only its first argument, and a form is never an idempotency key", async () => {
     const { handler, seen } = recordingHandler();
     const run = noteAction("test.no-form", "staff", handler);
@@ -454,6 +464,33 @@ describe("action(): idempotency", () => {
     expect((await run({ note: "x" }, key)).status).toBe("DONE");
     expect(handler).toHaveBeenCalledTimes(2);
     expect(await keyRows(owner.workspaceId, key)).toEqual([]);
+  });
+});
+
+describe("action(): redirectTo", () => {
+  // A redirect while a page renders is a 307, which repeats a no-JavaScript POST at the new URL; one from the action
+  // is a 303. Next's redirect() throws; its digest carries the URL and the status the action handler replaces.
+  const redirectTo = (url: string) => expect.objectContaining({ digest: expect.stringContaining(`;${url};`) });
+
+  it("redirects once the transaction has committed, for a done and for a replayed result", async () => {
+    const { handler } = recordingHandler();
+    const key = randomUUID();
+    const run = action({ name: "test.redirect", minRole: "staff", input: noteInput, idempotent: true, handler, redirectTo: "/done" });
+    await expect(run({ note: "x" }, key)).rejects.toEqual(redirectTo("/done"));
+    expect(await keyRows(owner.workspaceId, key)).toEqual([{ action: "test.redirect", response: { done: true, n: 1 } }]);
+    await expect(run({ note: "x" }, key)).rejects.toEqual(redirectTo("/done"));
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a refusal instead of redirecting", async () => {
+    const refuse = async (): Promise<Json> => {
+      throw new ActionRefusedError("STALE_VERSION");
+    };
+    const run = action({ name: "test.redirect", minRole: "staff", input: noteInput, idempotent: false, handler: refuse, redirectTo: "/done" });
+    expect(await run({ note: "x" })).toEqual({ ok: false, status: "STALE_VERSION" });
+    expect(await run({ note: "" })).toMatchObject({ ok: false, status: "INVALID_INPUT" });
+    signedInAs(null);
+    expect(await run({ note: "x" })).toEqual({ ok: false, status: "UNAUTHENTICATED" });
   });
 });
 

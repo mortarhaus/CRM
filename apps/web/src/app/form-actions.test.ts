@@ -182,16 +182,15 @@ describe("createWorkspaceAction", () => {
       expect(postToAuth).not.toHaveBeenCalled();
     });
 
-    it("creates the trimmed name with a unique slug and refreshes the page", async () => {
+    it("creates the trimmed name with a unique slug and sends the Owner to onboarding", async () => {
       vi.mocked(postToAuth).mockResolvedValue(answer(200, { id: "w1" }));
-      await expect(createWorkspaceAction(EMPTY_FORM_STATE, formData({ name: "  Studio Alpha " }))).resolves.toEqual(
-        EMPTY_FORM_STATE,
+      await expect(createWorkspaceAction(EMPTY_FORM_STATE, formData({ name: "  Studio Alpha " }))).rejects.toEqual(
+        new Redirect("/onboarding"),
       );
       expect(postToAuth).toHaveBeenCalledWith("/organization/create", {
         name: "Studio Alpha",
         slug: expect.stringMatching(/^studio-alpha-[0-9a-f]{8}$/),
       });
-      expect(refresh).toHaveBeenCalledOnce();
     });
 
     it.each([

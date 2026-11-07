@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { IDEMPOTENCY_KEY_EXPIRY_SECONDS, IDEMPOTENCY_KEY_MAX_LENGTH } from "@crm/core/security";
 import { sql } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import type { z } from "zod";
 import { findMembership, healWorkspaceSettings, type WorkspaceRole } from "../../db/system";
 import { type Tx, withWorkspace } from "../../db/workspace";
@@ -17,8 +18,9 @@ type Refusal = "UNAUTHENTICATED" | "NO_WORKSPACE" | "FORBIDDEN" | "RATE_LIMITED"
 export type ActionResult<O> =
   | { ok: true; status: "DONE" | "REPLAYED"; data: O }
   | { ok: false; status: Refusal | "IDEMPOTENCY_KEY_REUSED" }
-  // Field paths only, never the submitted values (UNI-09).
-  | { ok: false; status: "INVALID_INPUT"; fields: string[] };
+  // Field paths only, never the submitted values (UNI-09); for a posted form, also the values its action's `echo`
+  // names as safe to show again (never a secret or personal data), so a page posted without JavaScript can render them.
+  | { ok: false; status: "INVALID_INPUT"; fields: string[]; echo?: Record<string, string> };
 
 export interface ActionContext {
   tx: Tx;
@@ -118,6 +120,15 @@ export function action<I, O extends Json>(spec: {
   // A form posted through useActionState calls the action as (previousState, formData), with JavaScript or without.
   // An action that names fromForm takes its raw input from that form instead; Zod still checks it in step 4.
   fromForm?: (form: FormData) => unknown;
+  // Where a done or replayed result sends the browser, after the transaction has committed: a redirect from the
+  // action, which Next answers with a 303. Needed by a form that works without JavaScript when the page it was posted
+  // from redirects once the action is done: a redirect while the page renders is a 307, which repeats the POST at
+  // the new URL, where Next finds no such action. A refusal is still returned.
+  redirectTo?: string;
+  // With fromForm: the posted values a refused form shows again (INVALID_INPUT only). Without JavaScript the page is
+  // rendered from the result, not from what was typed, so anything not echoed comes back empty. Only values that are
+  // neither secret nor personal data; strings only, read from the form as posted.
+  echo?: (form: FormData) => Record<string, string>;
 }): (raw: unknown, idempotencyKey?: string | FormData) => Promise<ActionResult<O>> {
   return async (raw, keyOrForm) => {
     let member: Awaited<ReturnType<typeof requireWorkspaceMember>>;
@@ -130,11 +141,14 @@ export function action<I, O extends Json>(spec: {
     const idempotencyKey = typeof keyOrForm === "string" ? keyOrForm : undefined;
     const form = keyOrForm instanceof FormData ? keyOrForm : null;
     const parsed = spec.input.safeParse(form && spec.fromForm ? spec.fromForm(form) : raw);
-    if (!parsed.success) return { ok: false, status: "INVALID_INPUT", fields: fieldPaths(parsed.error) };
+    if (!parsed.success) {
+      const fields = fieldPaths(parsed.error);
+      return form && spec.echo ? { ok: false, status: "INVALID_INPUT", fields, echo: spec.echo(form) } : { ok: false, status: "INVALID_INPUT", fields };
+    }
     if (spec.idempotent && !validKey(idempotencyKey)) return { ok: false, status: "INVALID_INPUT", fields: ["idempotencyKey"] };
     const input = parsed.data;
 
-    return withWorkspace(member.workspaceId, async (tx): Promise<ActionResult<O>> => {
+    const result = await withWorkspace(member.workspaceId, async (tx): Promise<ActionResult<O>> => {
       const ctx = { tx, ...member };
       if (!spec.idempotent || idempotencyKey === undefined) return { ok: true, status: "DONE", data: await spec.handler(ctx, input) };
       const claim = await claimKey(tx, spec.name, idempotencyKey, requestHash(input));
@@ -149,5 +163,7 @@ export function action<I, O extends Json>(spec: {
       if (error instanceof ActionRefusedError) return { ok: false, status: error.status };
       throw error;
     });
+    if (result.ok && spec.redirectTo !== undefined) redirect(spec.redirectTo);
+    return result;
   };
 }

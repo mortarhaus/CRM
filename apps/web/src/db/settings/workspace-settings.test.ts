@@ -6,7 +6,7 @@ import { sqlState, startDatabase, type TestDatabase } from "../../test/postgres"
 import { createDb, type DbHandle } from "../client";
 import { organization, workspaceSettings } from "../schema";
 import { runInWorkspace } from "../workspace";
-import { findBrandColour, getSettings, StaleSettingsError, updateSettings } from "./workspace-settings";
+import { findShellSettings, getSettings, StaleSettingsError, updateSettings } from "./workspace-settings";
 
 // Phase 2 plan Tasks 4-5: the CHECKs and the settings data layer, as crm_app under RLS.
 let database: TestDatabase;
@@ -53,7 +53,8 @@ describe("workspace_settings CHECKs (crm_app)", () => {
 
   it.each([
     ["a default tax on a workspace that is not tax-registered", sql`default_tax_name = 'Tax', default_tax_rate_bps = 800`],
-    ["a negative tax rate", sql`tax_registered = true, default_tax_rate_bps = -1`],
+    ["a negative tax rate", sql`tax_registered = true, tax_registration_no = 'W10-1', default_tax_rate_bps = -1`],
+    ["a tax-registered workspace with no registration number", sql`tax_registered = true`],
     ["a rounding other than rate_group", sql`tax_rounding = 'line'`],
     ["an agreement pattern outside the two", sql`default_agreement_pattern = 'nda'`],
     ["a lower-case country", sql`country = 'my'`],
@@ -66,8 +67,8 @@ describe("workspace_settings CHECKs (crm_app)", () => {
 
   it("accepts a tax-registered default with a zero rate, and the workspace's own logo key", async () => {
     const logoKey = `ws/${workspaceId}/${randomUUID()}`;
-    expect(await setRaw(sql`tax_registered = true, default_tax_name = 'Tax', default_tax_rate_bps = 0, logo_key = ${logoKey}`)).toBeUndefined();
-    expect(await setRaw(sql`tax_registered = false, default_tax_name = null, default_tax_rate_bps = null`)).toBeUndefined();
+    expect(await setRaw(sql`tax_registered = true, tax_registration_no = 'W10-1', default_tax_name = 'Tax', default_tax_rate_bps = 0, logo_key = ${logoKey}`)).toBeUndefined();
+    expect(await setRaw(sql`tax_registered = false, tax_registration_no = null, default_tax_name = null, default_tax_rate_bps = null`)).toBeUndefined();
   });
 
   it.each(["workspace_id = workspace_id", "created_at = now()"])("refuses an UPDATE of %s (42501, per-column grants)", async (set) => {
@@ -109,15 +110,15 @@ describe("updateSettings", () => {
   });
 });
 
-describe("findBrandColour", () => {
-  it("reads the workspace's colour, and null for a workspace with no settings row yet", async () => {
-    await setRaw(sql`brand_colour = '#123abc'`);
-    expect(await inWorkspace((tx) => findBrandColour(tx))).toBe("#123abc");
+describe("findShellSettings", () => {
+  it("reads the workspace's colour and country, and nulls for a workspace with no settings row yet", async () => {
+    await setRaw(sql`brand_colour = '#123abc', country = 'MY'`);
+    expect(await inWorkspace((tx) => findShellSettings(tx))).toEqual({ brandColour: "#123abc", country: "MY" });
     const [other] = await handle.db
       .insert(organization)
       .values({ name: "no settings", slug: `no-settings-${randomUUID()}`, createdAt: new Date() })
       .returning({ id: organization.id });
     if (!other) throw new Error("workspace not created");
-    expect(await runInWorkspace(handle.db, other.id, (tx) => findBrandColour(tx))).toBeNull();
+    expect(await runInWorkspace(handle.db, other.id, (tx) => findShellSettings(tx))).toEqual({ brandColour: null, country: null });
   });
 });

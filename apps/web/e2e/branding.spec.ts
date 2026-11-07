@@ -8,7 +8,7 @@ import {
   SAVE_BRANDING,
 } from "../src/lib/auth/messages";
 import { expectAccessible } from "./a11y";
-import { openShellMenu, recordCspViolations, respectRateLimit, setMemberRole, signIn, signUp, uniqueEmail } from "./helpers";
+import { createWorkspace, openShellMenu, recordCspViolations, respectRateLimit, setMemberRole, signIn, signUp, uniqueEmail } from "./helpers";
 
 // Plan Task 6: the branding page, the drag picker, both derived variants, and the nonce'd brand token.
 // #ffe066 is pale: the light theme renders it darkened to #ad8a00 (3.05:1 on the page), the dark theme as it is.
@@ -34,9 +34,7 @@ async function openAsOwner(page: Page): Promise<string> {
   await signUp(page, email);
   await signIn(page, email);
   await expect(page).toHaveURL(/\/workspaces$/);
-  await page.getByLabel("Workspace name").fill("Brand Studio");
-  await page.getByRole("button", { name: "Create workspace" }).click();
-  await expect(page.getByRole("list", { name: "Your workspaces" })).toContainText("Brand Studio");
+  await createWorkspace(page, "Brand Studio");
   await openShellMenu(page);
   await page.getByRole("link", { name: "Branding" }).click();
   await expect(page).toHaveURL(/\/settings\/branding$/);
@@ -191,8 +189,7 @@ test.describe("without JavaScript", () => {
     const email = uniqueEmail();
     await signUp(page, email);
     await signIn(page, email);
-    await page.getByLabel("Workspace name").fill("No Script Brand");
-    await page.getByRole("button", { name: "Create workspace" }).click();
+    await createWorkspace(page, "No Script Brand");
     await page.goto("/settings/branding");
     await expect(page.getByRole("slider")).toHaveCount(0);
 

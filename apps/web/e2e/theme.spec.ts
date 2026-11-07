@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
-import { respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
+import { createWorkspace, respectRateLimit, signIn, signUp, uniqueEmail } from "./helpers";
 
 // Plan Task 3: the theme is a cookie set by a plain form post and rendered as a class on <html> by the server.
 
@@ -10,9 +10,7 @@ async function signedInWithWorkspace(page: Page): Promise<void> {
   await signUp(page, email);
   await signIn(page, email);
   await expect(page).toHaveURL(/\/workspaces$/);
-  await page.getByLabel("Workspace name").fill("Theme Studio");
-  await page.getByRole("button", { name: "Create workspace" }).click();
-  await expect(page.getByRole("list", { name: "Your workspaces" })).toContainText("Theme Studio");
+  await createWorkspace(page, "Theme Studio");
 }
 
 async function chooseTheme(page: Page, name: string): Promise<void> {
