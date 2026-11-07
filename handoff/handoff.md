@@ -1,4 +1,4 @@
-# Handoff — 2026-11-06 · branch main · HEAD 1db8371
+# Handoff — 2026-11-07 · branch main · HEAD 3db1fcc
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,12 +6,14 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 revision 8, hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`, equals PROJECT.md §2) · Active PR number: none (PR #55 merged)
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 8, hash `733cc0e9…`) · Active PR number: none (PR #56 merged)
 - Working folder: main checkout. Untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine.
 
+
 ## 1. Current PR / branch
-- None. PR #55 (Phase 2 PR 2b: branding page, colour picker, contrast, outdated-browser notice) merged 2026-11-05T07:03:43Z, merge commit `1db83719e6cb7e1ac338a30c456db42c530c9fab`; `main` = `1db8371`. Final head `f1918ec` = reviewed head. Review R2 Approved with conditions (no required conditions). Log (`cebc094`), review archive and receipt are on agent-logs.
-- Merged branch worktree `.agent/worktrees/build-feat-p2-branding` still exists (remove when Charlie agrees).
+- None. PR #56 (Phase 2 PR 3) merged 2026-11-07T02:55:15Z, merge commit `3db1fcca646f5f484994a390d6bb5b963d2dbd46`; `main` = `3db1fcc`. Log, review (R1, R2 Revision required; R3 Approved) and receipt are on agent-logs.
+- Merged worktrees still on disk (remove when Charlie agrees): `build-feat-p2-country-onboarding` (holds a dev `.env`), `build-feat-p2-branding`, `build-feat-p1-events`, `build-feat-p1-rate-limits`, `build-fix-audit-better-auth`.
+
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1 (plan PRs 1-8) and its `setup` reconcile (#50). All logged.
@@ -31,10 +33,12 @@ Uncommitted files — fingerprint every staged, modified or untracked path when 
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
 ## 4. Just finished
-2026-11-06 `merged 55`: verified on the host (state MERGED, commit reachable from `origin/main`) that PR 55 is merged and that its log, review archive and receipt were already on the remote `agent-logs` (`cebc094`, `bc204a6`, `c073ab9`), no gate breach; wrote nothing new. Hard gate clear. Then `status` and this `handoff`. Verified by me: git and host state only. CI and tests for PR 55 were reported green in its log (not re-run now).
+2026-11-07 `merged 56` done: verified (PR state MERGED, commit reachable from `origin/main`, receipt 97 s before merge, no gate breach), log written and pushed to agent-logs. Main fast-forwarded. Phase 2 PRs 1, 2a, 2b, 3 done.
+
 
 ## 5. Next step (file-level)
-Charlie says `build` for Phase 2 PR 3. Stop-and-ask first (new core module `settings`), then: migration 0026 or later adding CHECK `not tax_registered or tax_registration_no is not null` on `workspace_settings` plus the matching Zod rule (carried from PR 54); country defaults and onboarding per the Phase 2 plan, PR 3. Offered alternatives: a small test-reliability PR (`boss.test.ts` stall, axe wait-for-title); a reviewed PR to fix `CLAUDE.md` Status (still says the Phase 2 plan is next) and add the AUTH-01 ruling via `setup`.
+Charlie says `build` for the next Phase 2 PR: Task 9 settings page (with the Bob P3: refuse settings writes before onboarding or handle tax set earlier) or PR 4 (stop-and-ask: new storage module). Q10 (SG values) still open. Charlie to choose on the no-JS render-redirect 409.
+
 
 ## 6. Open ASK items, blockers, and owner answers
 1. ASK 7 (production `EMAIL_FROM`, SPF/DKIM/DMARC owner) open for Charlie.
