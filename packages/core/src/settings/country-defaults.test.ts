@@ -1,33 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { COUNTRY_DEFAULTS, isSupportedCountry, SUPPORTED_COUNTRIES } from "./country-defaults";
 
-// Phase 2 plan Task 7: every value equals the spec text (Onboarding, spec lines 731-732), and nothing the spec does
-// not give is filled in (plan Q10, unanswered).
+// Phase 2 plan Task 7: every value equals the spec text (Onboarding, spec lines 731-732) or Charlie's plan Q10 answer
+// (2026-11-08: SG pattern as MY, date format dd-mmm-yyyy for both, locale "en" for both).
 describe("COUNTRY_DEFAULTS", () => {
   it("holds only Malaysia and Singapore (plan Q11)", () => {
     expect(SUPPORTED_COUNTRIES).toEqual(["MY", "SG"]);
     expect(Object.keys(COUNTRY_DEFAULTS).sort()).toEqual(["MY", "SG"]);
   });
 
-  it("MY: MYR, INV-{CODE}-{YYYY}-{SEQ:4}, Asia/Kuala_Lumpur, dd/mm/yyyy, Service Tax 8%", () => {
+  it("MY: MYR, INV-{CODE}-{YYYY}-{SEQ:4}, Asia/Kuala_Lumpur, dd-mmm-yyyy, en, Service Tax 8%", () => {
     expect(COUNTRY_DEFAULTS.MY).toEqual({
       currency: "MYR",
       invoicePattern: "INV-{CODE}-{YYYY}-{SEQ:4}",
       timezone: "Asia/Kuala_Lumpur",
-      dateFormat: "dd/mm/yyyy",
-      locale: null,
+      dateFormat: "dd-mmm-yyyy",
+      locale: "en",
       taxName: "Service Tax",
       taxRateBps: 800,
     });
   });
 
-  it("SG: SGD, Asia/Singapore, GST 9%; the invoice pattern, date format and locale are unresolved", () => {
+  it("SG: SGD, Asia/Singapore, INV-{CODE}-{YYYY}-{SEQ:4}, dd-mmm-yyyy, en, GST 9%", () => {
     expect(COUNTRY_DEFAULTS.SG).toEqual({
       currency: "SGD",
-      invoicePattern: null,
+      invoicePattern: "INV-{CODE}-{YYYY}-{SEQ:4}",
       timezone: "Asia/Singapore",
-      dateFormat: null,
-      locale: null,
+      dateFormat: "dd-mmm-yyyy",
+      locale: "en",
       taxName: "GST",
       taxRateBps: 900,
     });
