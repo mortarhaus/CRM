@@ -6,8 +6,7 @@ import { expect, test } from "./fixtures";
 import { completeOnboarding, respectRateLimit, setMemberRole, signIn, signUp, uniqueEmail, workspaceSwitcher } from "./helpers";
 
 // Phase 2 plan Task 8, done-when "MY and SG defaults applied on sign-up" (spec line 1138) as far as the spec gives the
-// values: the MY invoice pattern is seeded with doc_sequence (plan PR 6, re-run there), and the SG invoice pattern, the
-// SG date format and both locales are unanswered (plan Q10), so they must stay empty.
+// values: the invoice pattern (the same for MY and SG, plan Q10) is seeded with doc_sequence (plan PR 6, re-run there).
 
 // A new user who creates a workspace and is sent to its onboarding. Returns their email.
 async function newOwnerAtOnboarding(page: Page, workspace: string): Promise<string> {
@@ -22,7 +21,7 @@ async function newOwnerAtOnboarding(page: Page, workspace: string): Promise<stri
   return email;
 }
 
-test("MY, not SST-registered: MYR, Asia/Kuala_Lumpur and dd/mm/yyyy are applied, and tax stays off", async ({ page }) => {
+test("MY, not SST-registered: MYR, Asia/Kuala_Lumpur and dd-mmm-yyyy are applied, and tax stays off", async ({ page }) => {
   const email = await newOwnerAtOnboarding(page, "MY Studio");
   await expect(page.getByRole("heading", { level: 1, name: "Set up your workspace" })).toBeVisible();
   await expectAccessible(page, "/onboarding country step");
@@ -42,8 +41,8 @@ test("MY, not SST-registered: MYR, Asia/Kuala_Lumpur and dd/mm/yyyy are applied,
     base_currency: "MYR",
     default_currency: "MYR",
     timezone: "Asia/Kuala_Lumpur",
-    date_format: "dd/mm/yyyy",
-    locale: null,
+    date_format: "dd-mmm-yyyy",
+    locale: "en",
     tax_registered: false,
     tax_registration_no: null,
     default_tax_name: null,
@@ -64,7 +63,7 @@ test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselect
   await expect(page.getByLabel("Tax rate (%)")).toHaveValue("9");
 
   await page.getByRole("button", { name: "Finish setup" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
   // A11Y-01: the button was disabled while the post was in flight, so focus goes back to it after the refusal.
   await expect(page.getByRole("button", { name: "Finish setup" })).toBeFocused();
   await expect(number).toHaveAttribute("aria-invalid", "true");
@@ -80,8 +79,8 @@ test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselect
     base_currency: "SGD",
     default_currency: "SGD",
     timezone: "Asia/Singapore",
-    date_format: null,
-    locale: null,
+    date_format: "dd-mmm-yyyy",
+    locale: "en",
     tax_registered: true,
     tax_registration_no: "M90312345A",
     default_tax_name: "GST",
@@ -146,7 +145,7 @@ test.describe("without JavaScript", () => {
     await page.getByLabel("Tax rate (%)").fill("6");
     await page.getByRole("button", { name: "Finish setup" }).click();
 
-    await expect(page.getByRole("alert")).toHaveText(ONBOARDING_INVALID);
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(ONBOARDING_INVALID);
     await expect(page.getByLabel("Yes", { exact: true })).toBeChecked();
     const number = page.getByLabel("SST registration number");
     await expect(number).toBeVisible();

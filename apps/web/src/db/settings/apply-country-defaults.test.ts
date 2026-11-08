@@ -8,7 +8,7 @@ import { AlreadyOnboardedError, applyCountryDefaults, type OnboardingAnswer } fr
 import { getSettings, StaleSettingsError } from "./workspace-settings";
 
 // Phase 2 plan Task 8: the onboarding answer and the country defaults, as crm_app under RLS. Only empty fields are
-// filled, and the values the spec does not give (plan Q10) stay empty.
+// filled (plan Q10 answered 2026-11-08: dd-mmm-yyyy and locale en for both countries).
 let database: TestDatabase;
 let admin: postgres.Sql;
 let handle: DbHandle;
@@ -51,7 +51,7 @@ afterAll(async () => {
 });
 
 describe("applyCountryDefaults", () => {
-  it("MY, not registered: MYR, Asia/Kuala_Lumpur, dd/mm/yyyy; no locale; tax off with every tax field empty", async () => {
+  it("MY, not registered: MYR, Asia/Kuala_Lumpur, dd-mmm-yyyy, en; tax off with every tax field empty", async () => {
     const workspaceId = await newWorkspace();
     const updated = await apply(workspaceId, { country: "MY", tax: NO_TAX, ownTin: null, ownBrn: null });
     expect(updated).toMatchObject({
@@ -59,8 +59,8 @@ describe("applyCountryDefaults", () => {
       baseCurrency: "MYR",
       defaultCurrency: "MYR",
       timezone: "Asia/Kuala_Lumpur",
-      dateFormat: "dd/mm/yyyy",
-      locale: null,
+      dateFormat: "dd-mmm-yyyy",
+      locale: "en",
       taxRegistered: false,
       taxRegistrationNo: null,
       defaultTaxName: null,
@@ -71,7 +71,7 @@ describe("applyCountryDefaults", () => {
     });
   });
 
-  it("SG, GST-registered: SGD, Asia/Singapore, the edited tax; the date format and locale stay empty (plan Q10)", async () => {
+  it("SG, GST-registered: SGD, Asia/Singapore, the edited tax; dd-mmm-yyyy and en", async () => {
     const workspaceId = await newWorkspace();
     const updated = await apply(workspaceId, {
       country: "SG",
@@ -84,8 +84,8 @@ describe("applyCountryDefaults", () => {
       baseCurrency: "SGD",
       defaultCurrency: "SGD",
       timezone: "Asia/Singapore",
-      dateFormat: null,
-      locale: null,
+      dateFormat: "dd-mmm-yyyy",
+      locale: "en",
       taxRegistered: true,
       taxRegistrationNo: "M90312345A",
       defaultTaxName: "GST",
@@ -110,7 +110,8 @@ describe("applyCountryDefaults", () => {
     expect(row?.after).toEqual({
       country: "MY",
       timezone: "Asia/Kuala_Lumpur",
-      date_format: "dd/mm/yyyy",
+      date_format: "dd-mmm-yyyy",
+      locale: "en",
       base_currency: "MYR",
       default_currency: "MYR",
       tax_registered: true,
@@ -133,7 +134,7 @@ describe("applyCountryDefaults", () => {
       timezone: "Asia/Singapore",
       baseCurrency: "USD",
       defaultCurrency: "MYR",
-      dateFormat: "dd/mm/yyyy",
+      dateFormat: "dd-mmm-yyyy",
       ownBrn: "kept",
     });
   });
