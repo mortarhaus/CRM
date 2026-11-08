@@ -117,7 +117,7 @@ function generalPatch(fields: GeneralFields): SettingsPatch {
 }
 
 // General settings are Admin and Owner (plan Q9): the short code, the structured address (plan Q11, Q21), the
-// timezone, the currencies, the SST/GST answer and the own TIN and BRN. Locale and date format wait for plan Q10.
+// timezone, the currencies, the SST/GST answer and the own TIN and BRN. Locale and date format: plan Q10 is answered (DECISIONS 2026-11-08); the editable date-format field is a follow-up PR.
 export const updateGeneralSettings = action({
   name: "settings.general.update",
   minRole: "admin",
