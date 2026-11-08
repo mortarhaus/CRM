@@ -24,7 +24,7 @@ export class AlreadyOnboardedError extends Error {
 
 // Onboarding (Phase 2 plan Task 8): runs once, while the workspace has no country, in the caller's withWorkspace
 // transaction (action(), Owner). Each value fills only a field that is still empty, so an existing setting is never
-// overwritten, and a country default that is unresolved (null, plan Q10) is not written at all. Versioned and audited
+// overwritten, and a country default that is unresolved (null) is not written at all. Versioned and audited
 // through updateSettings.
 export async function applyCountryDefaults(
   tx: Tx,
