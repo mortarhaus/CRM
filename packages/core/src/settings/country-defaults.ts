@@ -1,6 +1,6 @@
 // Country defaults applied to workspace_settings at onboarding (spec "Onboarding", lines 731-732; Phase 2 plan Task 7;
-// the module's location is DECISIONS 2026-11-06). Only the spec's own values are here. A null value is UNRESOLVED,
-// not a default: nothing is written for it, and the field stays empty until the owner sets it.
+// the module's location is DECISIONS 2026-11-06). The values are the spec's, except those Charlie set for plan Q10
+// (below). A null value would mean UNRESOLVED, not a default: nothing is written for it. None is null today.
 //
 // Plan Q10 (Charlie, 2026-11-08): the SG invoice pattern is MY's; the date format is dd-mmm-yyyy for both countries,
 // whatever the locale; the locale is plain "en" for both. The date format is a default: the owner can change it.
