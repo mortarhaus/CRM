@@ -45,13 +45,16 @@ test("the Owner opens General from the navigation and saves the timezone and sho
 
   await page.getByLabel("Short code").fill("gs1");
   await page.getByLabel("Timezone").selectOption("Asia/Singapore");
+  await expect(page.getByLabel("Date format")).toHaveValue("dd-mmm-yyyy");
+  await page.getByLabel("Date format").selectOption("yyyy-mm-dd");
   await save(page);
   await expect(status(page)).toHaveText(GENERAL_SAVED);
 
   await page.reload();
   await expect(page.getByLabel("Short code")).toHaveValue("GS1");
   await expect(page.getByLabel("Timezone")).toHaveValue("Asia/Singapore");
-  expect(await readWorkspaceSettings(email)).toMatchObject({ timezone: "Asia/Singapore", tax_registered: false });
+  await expect(page.getByLabel("Date format")).toHaveValue("yyyy-mm-dd");
+  expect(await readWorkspaceSettings(email)).toMatchObject({ timezone: "Asia/Singapore", date_format: "yyyy-mm-dd", tax_registered: false });
 });
 
 test("an Admin turns SST on: a Yes needs the number, and the save says it applies to new documents only", async ({ page }) => {

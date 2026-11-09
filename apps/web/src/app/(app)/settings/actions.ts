@@ -7,7 +7,7 @@ import {
   SHORT_CODE_MAX_LENGTH,
   SHORT_CODE_MIN_LENGTH,
 } from "@crm/core/security";
-import { SETTINGS_CURRENCIES } from "@crm/core/settings";
+import { DATE_FORMATS, SETTINGS_CURRENCIES } from "@crm/core/settings";
 import { z } from "zod";
 import {
   getSettings,
@@ -63,6 +63,8 @@ const TIME_ZONES = new Set(Intl.supportedValuesOf("timeZone"));
 const timezone = z.string().refine((value) => TIME_ZONES.has(value)).optional();
 // MYR and SGD until the money module (PR 7) brings ISO 4217 (MON-01).
 const currency = z.enum(SETTINGS_CURRENCIES).optional();
+// The formats of DATE_FORMATS (plan Q10). Empty or missing leaves the setting as it is.
+const dateFormat = z.enum(DATE_FORMATS).optional();
 
 const general = {
   expectedVersion,
@@ -73,6 +75,7 @@ const general = {
   addressPostcode: text(SETTINGS_TEXT_MAX_LENGTH),
   addressState: text(SETTINGS_TEXT_MAX_LENGTH),
   timezone,
+  dateFormat,
   baseCurrency: currency,
   defaultCurrency: currency,
   ownTin: text(SETTINGS_TEXT_MAX_LENGTH),
@@ -93,7 +96,7 @@ const generalInput = z.discriminatedUnion("taxRegistered", [
 ]);
 
 const GENERAL_TEXT_FIELDS = ["shortCode", "addressLine1", "addressLine2", "addressCity", "addressPostcode", "addressState", "ownTin", "ownBrn"] as const;
-const GENERAL_CHOICES = ["timezone", "baseCurrency", "defaultCurrency"] as const;
+const GENERAL_CHOICES = ["timezone", "dateFormat", "baseCurrency", "defaultCurrency"] as const;
 
 // The general settings page's form, with or without JavaScript. An empty choice means "leave as it is".
 function generalFromForm(form: FormData) {
@@ -117,7 +120,8 @@ function generalPatch(fields: GeneralFields): SettingsPatch {
 }
 
 // General settings are Admin and Owner (plan Q9): the short code, the structured address (plan Q11, Q21), the
-// timezone, the currencies, the SST/GST answer and the own TIN and BRN. Locale and date format: plan Q10 is answered (DECISIONS 2026-11-08); the editable date-format field is a follow-up PR.
+// timezone, the date format (plan Q10; the locale stays "en" and is not edited), the currencies, the SST/GST answer
+// and the own TIN and BRN.
 export const updateGeneralSettings = action({
   name: "settings.general.update",
   minRole: "admin",

@@ -1,4 +1,4 @@
-import { bpsToPercent, COUNTRY_DEFAULTS, isSupportedCountry, SETTINGS_CURRENCIES } from "@crm/core/settings";
+import { bpsToPercent, COUNTRY_DEFAULTS, DATE_FORMATS, isSupportedCountry, SETTINGS_CURRENCIES } from "@crm/core/settings";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSettings, type WorkspaceSettings } from "@/db/settings/workspace-settings";
@@ -42,6 +42,7 @@ function formValues(settings: WorkspaceSettings): GeneralValues | null {
     addressPostcode: optional(settings.addressPostcode),
     addressState: optional(settings.addressState),
     timezone: optional(settings.timezone),
+    dateFormat: optional(settings.dateFormat),
     baseCurrency: optional(settings.baseCurrency),
     defaultCurrency: optional(settings.defaultCurrency),
     taxRegistered: settings.taxRegistered,
@@ -72,6 +73,7 @@ export default async function GeneralSettingsPage() {
               action={updateGeneralSettings}
               values={values}
               timeZones={Intl.supportedValuesOf("timeZone")}
+              dateFormats={DATE_FORMATS}
               currencies={SETTINGS_CURRENCIES}
             />
           </>

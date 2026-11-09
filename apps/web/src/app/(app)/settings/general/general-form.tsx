@@ -18,6 +18,8 @@ import {
   GENERAL_BUSINESS_LEGEND,
   GENERAL_CHOICE_INVALID,
   GENERAL_COUNTRY,
+  GENERAL_DATE_FORMAT,
+  GENERAL_DATE_FORMAT_HINT,
   GENERAL_DEFAULT_CURRENCY,
   GENERAL_FAILED,
   GENERAL_FORBIDDEN,
@@ -51,6 +53,7 @@ export interface GeneralValues {
   addressPostcode?: string;
   addressState?: string;
   timezone?: string;
+  dateFormat?: string;
   baseCurrency?: string;
   defaultCurrency?: string;
   taxRegistered: boolean;
@@ -66,6 +69,7 @@ interface FormProps {
   action: (previous: SaveResult | null, form: FormData) => Promise<SaveResult>;
   values: GeneralValues;
   timeZones: readonly string[];
+  dateFormats: readonly string[];
   currencies: readonly string[];
 }
 
@@ -78,6 +82,7 @@ const FIELD_ERRORS: Record<string, string> = {
   addressPostcode: ONBOARDING_TEXT_INVALID,
   addressState: ONBOARDING_TEXT_INVALID,
   timezone: GENERAL_CHOICE_INVALID,
+  dateFormat: GENERAL_CHOICE_INVALID,
   baseCurrency: GENERAL_CHOICE_INVALID,
   defaultCurrency: GENERAL_CHOICE_INVALID,
 };
@@ -89,7 +94,7 @@ const REFUSALS: Partial<Record<string, string>> = {
   NOT_ONBOARDED: SETUP_PENDING,
 };
 
-function GeneralFields({ action, values, timeZones, currencies, unreachable }: FormProps & { unreachable: boolean }) {
+function GeneralFields({ action, values, timeZones, dateFormats, currencies, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
   const router = useRouter();
   const button = useRef<HTMLButtonElement>(null);
@@ -148,6 +153,7 @@ function GeneralFields({ action, values, timeZones, currencies, unreachable }: F
       <fieldset className="flex flex-col gap-6">
         <legend className="mb-1 text-lg font-semibold">{GENERAL_REGIONAL_LEGEND}</legend>
         {choice("timezone", "timezone", GENERAL_TIMEZONE, timeZones)}
+        {choice("dateFormat", "date-format", GENERAL_DATE_FORMAT, dateFormats, GENERAL_DATE_FORMAT_HINT)}
         {choice("baseCurrency", "base-currency", GENERAL_BASE_CURRENCY, currencies, NEW_DOCUMENTS_ONLY)}
         {choice("defaultCurrency", "default-currency", GENERAL_DEFAULT_CURRENCY, currencies)}
       </fieldset>
