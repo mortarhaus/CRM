@@ -53,7 +53,9 @@ describe("workspace_settings CHECKs (crm_app)", () => {
 
   it.each([
     ["a default tax on a workspace that is not tax-registered", sql`default_tax_name = 'Tax', default_tax_rate_bps = 800`],
-    ["a negative tax rate", sql`tax_registered = true, tax_registration_no = 'W10-1', default_tax_rate_bps = -1`],
+    ["a negative tax rate", sql`tax_registered = true, tax_registration_no = 'W10-1', default_tax_name = 'Tax', default_tax_rate_bps = -1`],
+    ["a default tax name with no rate", sql`tax_registered = true, tax_registration_no = 'W10-1', default_tax_name = 'Tax'`],
+    ["a default tax rate with no name", sql`tax_registered = true, tax_registration_no = 'W10-1', default_tax_rate_bps = 800`],
     ["a tax-registered workspace with no registration number", sql`tax_registered = true`],
     ["a rounding other than rate_group", sql`tax_rounding = 'line'`],
     ["an agreement pattern outside the two", sql`default_agreement_pattern = 'nda'`],

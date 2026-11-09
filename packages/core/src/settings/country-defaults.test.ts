@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COUNTRY_DEFAULTS, isSupportedCountry, SUPPORTED_COUNTRIES } from "./country-defaults";
+import { COUNTRY_DEFAULTS, isSupportedCountry, SETTINGS_CURRENCIES, SUPPORTED_COUNTRIES } from "./country-defaults";
 
 // Phase 2 plan Task 7: every value equals the spec text (Onboarding, spec lines 731-732) or Charlie's plan Q10 answer
 // (2026-11-08: SG pattern as MY, date format dd-mmm-yyyy for both, locale "en" for both).
@@ -43,4 +43,12 @@ describe("COUNTRY_DEFAULTS", () => {
 describe("isSupportedCountry", () => {
   it.each(["MY", "SG"])("accepts %s", (value) => expect(isSupportedCountry(value)).toBe(true));
   it.each(["my", "US", "", "MYS", "__proto__", "toString"])("refuses %j", (value) => expect(isSupportedCountry(value)).toBe(false));
+});
+
+// Phase 2 plan Task 9: until the money module (PR 7) brings an ISO 4217 list, a currency setting is one of the
+// supported countries' currencies.
+describe("SETTINGS_CURRENCIES", () => {
+  it("is exactly the currencies of the country defaults", () => {
+    expect([...SETTINGS_CURRENCIES].sort()).toEqual([...new Set(Object.values(COUNTRY_DEFAULTS).map((d) => d.currency))].sort());
+  });
 });

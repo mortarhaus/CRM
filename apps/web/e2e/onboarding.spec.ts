@@ -106,7 +106,7 @@ test("Staff of a workspace not yet set up see only that the owner has not finish
   await expect(page.getByRole("heading", { level: 1, name: SETUP_PENDING })).toBeVisible();
   await expect(workspaceSwitcher(page)).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Branding" })).toHaveCount(0);
+  for (const name of ["General", "Branding"]) await expect(page.getByRole("link", { name })).toHaveCount(0);
   await expectAccessible(page, "setup pending");
 
   // The onboarding page is the Owner's only.
