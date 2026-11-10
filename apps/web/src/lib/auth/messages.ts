@@ -93,7 +93,6 @@ export const GENERAL_ADDRESS_STATE = "State";
 export const GENERAL_ADDRESS_INVALID = `Use at most ${ADDRESS_LINE_MAX_LENGTH} characters, without special formatting characters.`;
 export const GENERAL_TIMEZONE = "Timezone";
 export const GENERAL_DATE_FORMAT = "Date format";
-export const GENERAL_DATE_FORMAT_HINT = "The month is written in English, for example 08-Nov-2026.";
 export const GENERAL_BASE_CURRENCY = "Base currency";
 export const GENERAL_DEFAULT_CURRENCY = "Default currency";
 export const GENERAL_CHOICE_INVALID = "Choose one from the list.";

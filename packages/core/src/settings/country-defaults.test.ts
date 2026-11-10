@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COUNTRY_DEFAULTS, DATE_FORMATS, isSupportedCountry, SETTINGS_CURRENCIES, SUPPORTED_COUNTRIES } from "./country-defaults";
+import { COUNTRY_DEFAULTS, DATE_FORMAT_EXAMPLES, DATE_FORMATS, isSupportedCountry, SETTINGS_CURRENCIES, SUPPORTED_COUNTRIES } from "./country-defaults";
 
 // Phase 2 plan Task 7: every value equals the spec text (Onboarding, spec lines 731-732) or Charlie's plan Q10 answer
 // (2026-11-08: SG pattern as MY, date format dd-mmm-yyyy for both, locale "en" for both).
@@ -59,5 +59,10 @@ describe("DATE_FORMATS", () => {
       expect(DATE_FORMATS as readonly (string | null)[]).toContain(COUNTRY_DEFAULTS[country].dateFormat);
     }
     expect(new Set(DATE_FORMATS).size).toBe(DATE_FORMATS.length);
+  });
+
+  it("has one distinct example per format", () => {
+    expect(Object.keys(DATE_FORMAT_EXAMPLES).sort()).toEqual([...DATE_FORMATS].sort());
+    expect(new Set(Object.values(DATE_FORMAT_EXAMPLES)).size).toBe(DATE_FORMATS.length);
   });
 });

@@ -2,7 +2,7 @@
 
 import { redirect, useRouter } from "next/navigation";
 import { type FormEvent, startTransition, useActionState, useEffect, useRef } from "react";
-import { SelectField, TextField } from "@/components/settings/settings-field";
+import { type SelectOption, SelectField, TextField } from "@/components/settings/settings-field";
 import { TAX_FIELD_ERRORS, TaxFields } from "@/components/settings/tax-fields";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,6 @@ import {
   GENERAL_CHOICE_INVALID,
   GENERAL_COUNTRY,
   GENERAL_DATE_FORMAT,
-  GENERAL_DATE_FORMAT_HINT,
   GENERAL_DEFAULT_CURRENCY,
   GENERAL_FAILED,
   GENERAL_FORBIDDEN,
@@ -69,7 +68,7 @@ interface FormProps {
   action: (previous: SaveResult | null, form: FormData) => Promise<SaveResult>;
   values: GeneralValues;
   timeZones: readonly string[];
-  dateFormats: readonly string[];
+  dateFormats: readonly SelectOption[];
   currencies: readonly string[];
 }
 
@@ -128,7 +127,7 @@ function GeneralFields({ action, values, timeZones, dateFormats, currencies, unr
   const text = (name: keyof GeneralValues, id: string, label: string, hint?: string) => (
     <TextField id={id} name={name} label={label} hint={hint} defaultValue={value(name)} error={fieldError(name)} />
   );
-  const choice = (name: keyof GeneralValues, id: string, label: string, options: readonly string[], hint?: string) => (
+  const choice = (name: keyof GeneralValues, id: string, label: string, options: readonly SelectOption[], hint?: string) => (
     <SelectField id={id} name={name} label={label} hint={hint} options={options} defaultValue={value(name)} error={fieldError(name)} />
   );
 
@@ -153,7 +152,7 @@ function GeneralFields({ action, values, timeZones, dateFormats, currencies, unr
       <fieldset className="flex flex-col gap-6">
         <legend className="mb-1 text-lg font-semibold">{GENERAL_REGIONAL_LEGEND}</legend>
         {choice("timezone", "timezone", GENERAL_TIMEZONE, timeZones)}
-        {choice("dateFormat", "date-format", GENERAL_DATE_FORMAT, dateFormats, GENERAL_DATE_FORMAT_HINT)}
+        {choice("dateFormat", "date-format", GENERAL_DATE_FORMAT, dateFormats)}
         {choice("baseCurrency", "base-currency", GENERAL_BASE_CURRENCY, currencies, NEW_DOCUMENTS_ONLY)}
         {choice("defaultCurrency", "default-currency", GENERAL_DEFAULT_CURRENCY, currencies)}
       </fieldset>

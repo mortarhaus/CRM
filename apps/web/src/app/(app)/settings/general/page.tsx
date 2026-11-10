@@ -1,4 +1,4 @@
-import { bpsToPercent, COUNTRY_DEFAULTS, DATE_FORMATS, isSupportedCountry, SETTINGS_CURRENCIES } from "@crm/core/settings";
+import { bpsToPercent, COUNTRY_DEFAULTS, DATE_FORMAT_EXAMPLES, DATE_FORMATS, isSupportedCountry, SETTINGS_CURRENCIES } from "@crm/core/settings";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSettings, type WorkspaceSettings } from "@/db/settings/workspace-settings";
@@ -73,7 +73,7 @@ export default async function GeneralSettingsPage() {
               action={updateGeneralSettings}
               values={values}
               timeZones={Intl.supportedValuesOf("timeZone")}
-              dateFormats={DATE_FORMATS}
+              dateFormats={DATE_FORMATS.map((value) => ({ value, label: DATE_FORMAT_EXAMPLES[value] }))}
               currencies={SETTINGS_CURRENCIES}
             />
           </>
