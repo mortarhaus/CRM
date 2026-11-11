@@ -6,6 +6,14 @@ x-db-urls: &db-urls
   DATABASE_URL: postgres://crm_app:crm-app-dev-only@postgres:5432/crm
   DATABASE_MIGRATOR_URL: postgres://crm_migrator:crm-migrator-dev-only@postgres:5432/crm
 
+# Dev-only MinIO credentials (root user, also used by the web container); production storage keys come from the
+# host's secret store (docs/runbooks/phase-2-storage.md).
+x-minio-root: &minio-root
+  MINIO_ROOT_USER: crm-minio-dev-only
+  MINIO_ROOT_PASSWORD: crm-minio-dev-only-password
+
+x-minio-image: &minio-image minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+
 x-app: &app
   image: crm-app:dev
   env_file:
@@ -62,6 +70,18 @@ services:
       # Dev only: no edge in front, and Next fills a missing X-Forwarded-For from the socket address. The port is
       # reachable only on 127.0.0.1, so a forged header only fools a local test (E2E sends one per test).
       TRUSTED_CLIENT_IP_HEADER: x-forwarded-for
+      # Object storage (web only; docs/runbooks/phase-2-storage.md): the compose MinIO and its private bucket.
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_REGION: us-east-1
+      STORAGE_BUCKET: crm-dev
+      STORAGE_ACCESS_KEY_ID: crm-minio-dev-only
+      STORAGE_SECRET_ACCESS_KEY: crm-minio-dev-only-password
+      STORAGE_FORCE_PATH_STYLE: "true"
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:3000:3000"
     tmpfs:
@@ -102,5 +122,35 @@ services:
       - "127.0.0.1:8025:8025"
       - "127.0.0.1:1025:1025"
 
+  # Dev object storage (S3 API) on 127.0.0.1:9100 for `pnpm dev`; the web container reaches it as minio:9000. The image
+  # is pinned by tag and index digest (UNI-14; docs/DECISIONS.md 2026-11-11).
+  minio:
+    image: *minio-image
+    container_name: crm-minio
+    command: ["server", "/data"]
+    environment: *minio-root
+    ports:
+      - "127.0.0.1:9100:9000"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Creates the private bucket once (no anonymous access), then exits. Safe to run again.
+  minio-init:
+    image: *minio-image
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - mc alias set crm http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null && mc mb --ignore-existing crm/crm-dev
+    environment: *minio-root
+    depends_on:
+      minio:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  miniodata:

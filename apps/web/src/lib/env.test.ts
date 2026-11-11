@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { MINIO_IMAGE } from "../test/minio";
 import {
   EnvError,
   migrateEnvFor,
@@ -8,6 +9,7 @@ import {
   parseJobsAdminEnv,
   parseMigrateEnv,
   parseWorkerEnv,
+  storageConfig,
   trustedClientIpHeader,
 } from "./env";
 
@@ -123,6 +125,62 @@ describe("parseEnv", () => {
     expect(parseEnv({ ...valid, NODE_ENV: "development", APP_URL: "http://localhost:3000" }).APP_URL).toBe(
       "http://localhost:3000",
     );
+  });
+});
+
+describe("storage settings", () => {
+  const minio = {
+    STORAGE_ENDPOINT: "http://minio:9000",
+    STORAGE_REGION: "us-east-1",
+    STORAGE_BUCKET: "crm-dev",
+    STORAGE_ACCESS_KEY_ID: "access-key-id-value",
+    STORAGE_SECRET_ACCESS_KEY: "secret-access-key-value",
+    STORAGE_FORCE_PATH_STYLE: "true",
+  };
+
+  it("is off (null) when no STORAGE_* value is set, and the app still starts", () => {
+    expect(storageConfig(parseEnv(valid))).toBeNull();
+    expect(storageConfig(parseEnv(production))).toBeNull();
+  });
+
+  it("gives the adapter settings when the values are set", () => {
+    expect(storageConfig(parseEnv({ ...valid, ...minio }))).toEqual({
+      endpoint: "http://minio:9000",
+      region: "us-east-1",
+      bucket: "crm-dev",
+      accessKeyId: "access-key-id-value",
+      secretAccessKey: "secret-access-key-value",
+      forcePathStyle: true,
+    });
+  });
+
+  it("takes AWS S3 itself without an endpoint, and path style off by default", () => {
+    const { STORAGE_ENDPOINT: _endpoint, STORAGE_FORCE_PATH_STYLE: _style, ...s3 } = minio;
+    expect(storageConfig(parseEnv({ ...valid, ...s3 }))).toMatchObject({ endpoint: undefined, forcePathStyle: false });
+  });
+
+  it.each(["STORAGE_REGION", "STORAGE_BUCKET", "STORAGE_ACCESS_KEY_ID", "STORAGE_SECRET_ACCESS_KEY"])(
+    "refuses a partial set without %s, naming it and echoing no value",
+    (name) => {
+      const message = messageOf(() => parseEnv({ ...valid, ...minio, [name]: undefined }));
+      expect(message).toContain(name);
+      expect(message).not.toContain("secret-access-key-value");
+      expect(message).not.toContain("access-key-id-value");
+    },
+  );
+
+  it("refuses a lone endpoint (a partial set)", () => {
+    expect(messageOf(() => parseEnv({ ...valid, STORAGE_ENDPOINT: "http://minio:9000" }))).toContain("STORAGE_BUCKET");
+  });
+
+  it.each([
+    ["STORAGE_ENDPOINT", "ftp://minio:9000"],
+    ["STORAGE_BUCKET", "Not_A_Bucket"],
+    ["STORAGE_FORCE_PATH_STYLE", "yes"],
+  ])("rejects an invalid %s without echoing it", (name, value) => {
+    const message = messageOf(() => parseEnv({ ...valid, ...minio, [name]: value }));
+    expect(message).toContain(name);
+    expect(message).not.toContain(value);
   });
 });
 
@@ -295,6 +353,23 @@ describe("compose.dev.yml", () => {
       expect(service(name), name).not.toMatch(/EMAIL_|SMTP_|RESEND_/);
     }
     expect(compose).not.toMatch(/RESEND_API_KEY/);
+  });
+
+  it("gives the storage settings to the web container only", () => {
+    expect(service("web")).toMatch(/STORAGE_ENDPOINT: http:\/\/minio:9000\n/);
+    for (const name of ["worker", "bootstrap", "postgres", "mailpit", "minio", "minio-init"]) {
+      expect(service(name), name).not.toMatch(/STORAGE_/);
+    }
+  });
+
+  it("pins the MinIO image by tag and digest, names its container crm-minio and keeps it on 127.0.0.1", () => {
+    expect(compose).toMatch(/&minio-image minio\/minio:RELEASE\.[0-9TZ-]+@sha256:[0-9a-f]{64}\n/);
+    expect(service("minio")).toMatch(/image: \*minio-image\n/);
+    expect(service("minio-init")).toMatch(/image: \*minio-image\n/);
+    expect(service("minio")).toMatch(/container_name: crm-minio\n/);
+    expect(service("minio")).toMatch(/- "127\.0\.0\.1:9100:9000"/);
+    // The contract test runs the same image.
+    expect(compose).toContain(`&minio-image ${MINIO_IMAGE}\n`);
   });
 
   it("pins the Mailpit image by tag and digest", () => {
