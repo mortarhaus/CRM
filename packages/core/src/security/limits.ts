@@ -47,3 +47,7 @@ export const EMAIL_ADDRESS_MAX_LENGTH = 254;
 export function characterCount(value: string): number {
   return [...value].length;
 }
+
+// Uploads (Phase 2 plan Q12; FILE-02). The logo is at most 2 MB (2 * 1024 * 1024 bytes), PNG or JPG only, checked by
+// magic bytes (Charlie, 2026-11-11; DECISIONS 2026-11-11).
+export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
