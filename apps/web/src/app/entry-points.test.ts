@@ -35,6 +35,14 @@ const ENTRY_POINTS: Record<string, { exports: string[]; coveredBy: string }> = {
       "(e) the redirect target limited to a same-origin path (returnPath); (f) classified here with these conditions " +
       "(lib/theme.test.ts, e2e/theme.spec.ts; Phase 2 plan Task 3).",
   },
+  "apps/web/src/app/(app)/files/logo/route.ts": {
+    exports: ["GET"],
+    coveredBy:
+      "Read-only: streams the active workspace's current logo to a signed-in member of it (requireWorkspaceMember, " +
+      "then withWorkspace and a match against workspace_settings.logo_key); 404 for anything else, including a " +
+      "member of another workspace (TEN-05). No mutating method; the upload is the uploadLogo server action " +
+      "(files/logo/route.test.ts, e2e/logo.spec.ts; Phase 2 plan Task 12).",
+  },
   "apps/web/src/proxy.ts": {
     exports: ["proxy"],
     coveredBy: "Sets headers only, reads no database (AUTH-11); security-headers.test.ts (plan Task 25). Not a mutation path.",
