@@ -57,7 +57,10 @@ export function TextField(props: FieldProps & { inputMode?: "text" | "decimal" }
   );
 }
 
-export function SelectField(props: FieldProps & { options: readonly string[] }) {
+// An option is its value, or a value with a different label (the form posts the value).
+export type SelectOption = string | { value: string; label: string };
+
+export function SelectField(props: FieldProps & { options: readonly SelectOption[] }) {
   const { id, name, hint, error, defaultValue, options } = props;
   return (
     <FieldFrame {...props}>
@@ -70,11 +73,14 @@ export function SelectField(props: FieldProps & { options: readonly string[] }) 
       >
         {/* Not set yet: posting the empty value leaves it as it is (the action reads "" as no change). */}
         {defaultValue === undefined && <option value="">{NOT_SET}</option>}
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {options.map((option) => {
+          const { value, label } = typeof option === "string" ? { value: option, label: option } : option;
+          return (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          );
+        })}
       </Select>
     </FieldFrame>
   );

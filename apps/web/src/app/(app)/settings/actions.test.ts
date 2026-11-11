@@ -36,6 +36,7 @@ async function settings() {
       brand_colour: string | null;
       short_code: string | null;
       timezone: string | null;
+      date_format: string | null;
       base_currency: string | null;
       default_currency: string | null;
       tax_registered: boolean;
@@ -44,7 +45,7 @@ async function settings() {
       default_tax_rate_bps: number | null;
       own_tin: string | null;
     }[]
-  >`select version, brand_colour, short_code, timezone, base_currency, default_currency, tax_registered, tax_registration_no,
+  >`select version, brand_colour, short_code, timezone, date_format, base_currency, default_currency, tax_registered, tax_registration_no,
       default_tax_name, default_tax_rate_bps, own_tin
     from workspace_settings where workspace_id = ${workspaceId}`;
   if (!row) throw new Error("no settings row");
@@ -221,6 +222,15 @@ describe("updateGeneralSettings", () => {
     expect(await settings()).toMatchObject({ timezone: "Asia/Singapore", base_currency: "SGD", default_currency: "SGD" });
   });
 
+  it("saves a date format from the list; it does not count for new documents only", async () => {
+    await signInAs("admin");
+    const { version } = await settings();
+    expect(await updateGeneralSettings({ expectedVersion: version, ...no, dateFormat: "yyyy-mm-dd" })).toMatchObject({
+      data: { newDocumentsOnly: false },
+    });
+    expect(await settings()).toMatchObject({ date_format: "yyyy-mm-dd" });
+  });
+
   it.each([
     ["a short code of 7", { ...no, shortCode: "ABCDEFG" }, ["shortCode"]],
     ["a control character", { ...no, addressLine1: "1 Jalan\u0000" }, ["addressLine1"]],
@@ -234,6 +244,7 @@ describe("updateGeneralSettings", () => {
     ["Yes with a negative rate", { ...yes, taxRate: "-1" }, ["taxRate"]],
     ["a default tax with No", { ...no, taxName: "Service Tax" }, [""]],
     ["a timezone Intl does not know", { ...no, timezone: "Mars/Olympus_Mons" }, ["timezone"]],
+    ["a date format not in the list", { ...no, dateFormat: "mm/dd/yyyy" }, ["dateFormat"]],
     ["a currency other than MYR and SGD", { ...no, baseCurrency: "USD" }, ["baseCurrency"]],
   ])("refuses %s with INVALID_INPUT and changes nothing", async (_case, input, fields) => {
     await signInAs("owner");

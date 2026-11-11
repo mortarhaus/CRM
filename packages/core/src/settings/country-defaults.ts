@@ -55,3 +55,14 @@ export function isSupportedCountry(value: string): value is Country {
 // supported countries' own (spec line 731). A test keeps it equal to COUNTRY_DEFAULTS.
 export const SETTINGS_CURRENCIES = ["MYR", "SGD"] as const;
 export type SettingsCurrency = (typeof SETTINGS_CURRENCIES)[number];
+
+// The date formats an owner may choose (plan Q10, Charlie 2026-11-08: a default per country, changeable). `mmm` is the
+// English three-letter month whatever the locale (08-Nov-2026). A test keeps every country default in this list.
+export const DATE_FORMATS = ["dd-mmm-yyyy", "dd/mm/yyyy", "yyyy-mm-dd"] as const;
+export type DateFormat = (typeof DATE_FORMATS)[number];
+// Shown beside each format in the settings select: the same date, 8 November 2026, written each way.
+export const DATE_FORMAT_EXAMPLES: Readonly<Record<DateFormat, string>> = {
+  "dd-mmm-yyyy": "08-Nov-2026",
+  "dd/mm/yyyy": "08/11/2026",
+  "yyyy-mm-dd": "2026-11-08",
+};
