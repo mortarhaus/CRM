@@ -155,7 +155,7 @@ describe("storage settings", () => {
   });
 
   it("takes AWS S3 itself without an endpoint, and path style off by default", () => {
-    const { STORAGE_ENDPOINT: _endpoint, STORAGE_FORCE_PATH_STYLE: _style, ...s3 } = minio;
+    const s3 = { ...minio, STORAGE_ENDPOINT: undefined, STORAGE_FORCE_PATH_STYLE: undefined };
     expect(storageConfig(parseEnv({ ...valid, ...s3 }))).toMatchObject({ endpoint: undefined, forcePathStyle: false });
   });
 

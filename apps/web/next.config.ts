@@ -1,6 +1,7 @@
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import type { NextConfig } from "next";
+import { LOGO_MAX_BYTES } from "@crm/core/security";
 import { SECURITY_HEADER_ROUTES } from "./src/lib/security-headers";
 
 const repoRoot = path.join(__dirname, "../..");
@@ -24,6 +25,13 @@ const config: NextConfig = {
   poweredByHeader: false,
   // The page CSP comes from src/proxy.ts (a nonce per request); docs/DECISIONS.md records where each header is set.
   headers: async () => SECURITY_HEADER_ROUTES,
+  experimental: {
+    serverActions: {
+      // The largest upload a server action takes (the logo, Phase 2 Task 12) plus room for the multipart framing
+      // and the other fields; Next's default is 1 MB. The action checks the file's own size and bytes again.
+      bodySizeLimit: LOGO_MAX_BYTES + 64 * 1024,
+    },
+  },
 };
 
 export default config;
