@@ -363,7 +363,7 @@ describe("compose.dev.yml", () => {
   });
 
   it("pins the MinIO image by tag and digest, names its container crm-minio and keeps it on 127.0.0.1", () => {
-    expect(compose).toMatch(/&minio-image minio\/minio:RELEASE\.[0-9TZ-]+@sha256:[0-9a-f]{64}\n/);
+    expect(compose).toMatch(/&minio-image pgsty\/minio:RELEASE\.[0-9TZ-]+@sha256:[0-9a-f]{64}\n/);
     expect(service("minio")).toMatch(/image: \*minio-image\n/);
     expect(service("minio-init")).toMatch(/image: \*minio-image\n/);
     expect(service("minio")).toMatch(/container_name: crm-minio\n/);

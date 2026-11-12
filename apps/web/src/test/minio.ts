@@ -3,9 +3,10 @@ import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import type { StorageConfig } from "../adapters/storage/types";
 
-// MinIO, pinned by tag and index digest like docker/compose.dev.yml (UNI-14; docs/DECISIONS.md 2026-11-11).
+// MinIO (the pgsty community fork; the official image is no longer published), pinned by tag and index digest like
+// docker/compose.dev.yml (UNI-14; docs/DECISIONS.md 2026-11-11).
 export const MINIO_IMAGE =
-  "minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e";
+  "pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372";
 
 // Fixed values for throwaway test containers only.
 const ROOT_USER = "crm-minio-test-only";

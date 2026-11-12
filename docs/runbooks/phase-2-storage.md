@@ -5,8 +5,8 @@ Scope: Phase 2 PR 4 (plan `docs/superpowers/plans/2026-11-04-phase-2-settings-on
 (`apps/web/src/lib/uploads/`), the logo upload on `/settings/branding` and the logo route `/files/logo`.
 AWS SDK v3 `3.1158.0`. Decisions: `docs/DECISIONS.md`, 2026-11-11.
 
-"Verified" means the test named was run on 2026-11-11 against MinIO `RELEASE.2025-09-07T16-13-09Z` (Testcontainers,
-and the `minio` compose service). Nothing here was run against AWS S3 or Cloudflare R2.
+"Verified" means the test named was run on 2026-11-12 against MinIO `pgsty/minio:RELEASE.2026-08-04T00-00-00Z`
+(Testcontainers, and the `minio` compose service). Nothing here was run against AWS S3 or Cloudflare R2.
 
 ## Settings
 
@@ -47,16 +47,18 @@ credentials, bucket `crm-test`) and remove it afterwards. A leftover one can be 
 `container_name: crm-minio` is fixed (plan Task 11), so only one compose project with MinIO can run on a machine at
 a time. A second checkout needs a compose override that renames it.
 
-### Image source (open, 2026-11-11)
+### Image
 
-The image is pinned as
-`minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e`
-(compose and `MINIO_IMAGE` in `apps/web/src/test/minio.ts`; a test keeps the two equal). MinIO no longer publishes
-the community image: on 2026-11-11 Docker Hub answered "not found" for `minio/minio` and `quay.io/minio/minio`
-asked for credentials. The digest was taken from a copy already on the build machine (`docker image inspect`: the
-image Id equals the digest; labels `release` and `version` `RELEASE.2025-09-07T16-13-09Z`, vendor MinIO Inc.).
-**A machine without that copy, including CI, cannot pull it.** Choosing another source is an owner decision
-(DECISIONS 2026-11-11).
+`pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372`
+(multi-arch index digest; compose and `MINIO_IMAGE` in `apps/web/src/test/minio.ts`, kept equal by a test in
+`env.test.ts`). MinIO no longer publishes the community image (`minio/minio` and `minio/mc` are gone from Docker
+Hub), so this is the `pgsty` community fork (https://github.com/pgsty/minio), chosen by the owner on 2026-11-12. It
+ships `minio` and `mc`, the upstream entrypoint, port 9000 and the `MINIO_ROOT_*` names. It is for dev and tests
+only; revisit it before the first real deployment.
+
+To move to a newer release: pick the newest `RELEASE.*` tag at least two weeks old on Docker Hub, read its index
+digest with `docker buildx imagetools inspect pgsty/minio:<tag>`, change both pins, and run
+`pnpm vitest run apps/web/src/adapters/storage/s3.contract.test.ts` and the image e2e.
 
 ## Objects
 
