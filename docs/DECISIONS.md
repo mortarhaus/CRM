@@ -2,6 +2,16 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-12 — CI: the image job is skipped for documentation-only pull requests (CI minutes, option a)
+- **Decision:** (1) A new job `changes` ("Changed files") runs `.github/scripts/code-changed.sh <base> <head>` on a pull request and outputs `code=true` or `false`. "Documentation only" = every changed file is under `docs/` or `agents/`, or is a Markdown file. The job "Image, Trivy, E2E" now `needs: [checks, changes]` and runs only when `code == 'true'`. (2) **Unsure means run:** a missing or unreadable diff, a push to `main` (no base is passed) and any change outside the docs set, including `.github/`, all give `true`. (3) The other three checks (Typecheck, lint, test; Dependency audit; Secret scan) still run on every PR. (4) **Option (b), a self-hosted runner on Charlie's Mac, is not built now.** Charlie: "a first but build b when it is needed". Build it when the minutes run short again; the plan is to point the image job at the runner and keep the Docker cleanup on it.
+- **Why:** PR #61 review R1 P2 and DECISIONS 2026-11-11: the image job takes about 50 minutes, and a two-file docs PR used all of it. The minutes ran out on the personal account (2026-10-21) and on `mortarhaus` (2026-11-11). This closes the "skip the image job on docs-only PRs" open item of 2026-10-21 and 2026-11-11.
+- **Trade-offs:** a docs-only PR no longer runs the Trivy scan, so a newly published base-image CVE shows up on the next code PR, not on a docs PR. The skipped job shows as "skipped" in the PR's checks; there is no branch protection, so nothing is blocked by it. A Markdown file inside `apps/` or `packages/` also counts as documentation.
+- **Alternatives rejected:** a `paths-ignore` filter on the whole workflow (it would also skip the secret scan and the audit for a docs PR); a third-party paths-filter action (a new dependency to pin and review, UNI-06; a ten-line script does the job and is testable).
+- **Scope / affects:** `.github/workflows/ci.yml`, `.github/scripts/code-changed.sh`. **Verified:** the script against real commits (PR #61's range gives `false`; PRs #56, #60 and #59 ranges give `true`; empty or unknown SHAs give `true`) and the workflow with actionlint (clean). **Not verified:** the skip itself in GitHub Actions: this PR changes `.github/`, so its own image job runs. The first docs-only PR after this merges is the proof.
+- **Versions:** none (actionlint run from `rhysd/actionlint:latest` locally, not pinned, not part of the repo).
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-11-12: option a now, b when needed).
+
 ## 2026-11-11 — Repository moved to the `mortarhaus-dev1` organization (Actions minutes used up again)
 - **Decision:** The repository moved from `https://github.com/mortarhaus/CRM` to `https://github.com/mortarhaus-dev1/CRM` (private; same branches, PRs and history; GitHub redirects the old URL). `agents/PROJECT.md` §4 names the new remote; every checkout's `origin` was changed to it.
 - **Why:** the `mortarhaus` organization's Actions minutes were used up, so the CI jobs on PR #60 failed in 3 seconds. The same fix as 2026-10-21: a transfer gives a new quota. Re-running the jobs after the move worked (all four green on `df25066`).
