@@ -127,5 +127,18 @@ Record the date, the R2 bucket region and the results in `docs/DECISIONS.md`.
 
 - Upload shows "We couldn't upload the logo. Try again.": the adapter threw a `StorageError` (operation and status
   only), which `action()` rethrows, so Next logs it as a server error. 403 is a key or permission problem; 404 a
-  missing bucket; a network error name, an endpoint problem.
-- Logo shows as a broken image: the object is missing from the bucket (the route answers 404).
+  missing bucket (or a misspelled `STORAGE_BUCKET`); a network error name, an endpoint problem.
+- Logo shows as a broken image and the server log has **no** storage error: the object is missing from the bucket
+  (the adapter answered `null` for `NoSuchKey`, and the route answers 404 with `Cache-Control: no-store`).
+- Logo shows as a broken image and the server log has `Storage get failed: 404` (or `403`, or a network error name):
+  the bucket is missing or misnamed, or the key or endpoint is wrong. The route lets the `StorageError` through, so
+  the request fails as a server error (500), not as an ordinary 404. Check `STORAGE_BUCKET` and the key first.
+
+How the adapter tells a missing object from a missing bucket (`apps/web/src/adapters/storage/s3.ts`, tested in
+`s3.contract.test.ts`):
+
+- `get`: only the `NoSuchKey` error code is "missing" (`null`). `NoSuchBucket` and any other 404 throw `StorageError`.
+- `head`: a HEAD answer has no body, so S3, R2 and MinIO return the same bare 404 (the SDK names it `NotFound`) for a
+  missing key and a missing bucket. The adapter then sends a GET for the same key and classifies its error code as
+  above; the second request happens only on a 404, and only needs `GetObject`. If the key appeared between the two
+  requests, `head` reports it without downloading the body.
