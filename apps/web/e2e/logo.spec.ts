@@ -60,6 +60,10 @@ async function upload(page: Page, name: string, mimeType: string, buffer: Buffer
 async function expectRendered(page: Page): Promise<void> {
   await expect(logo(page)).toBeVisible();
   await expect.poll(() => logo(page).evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth)).toBe(1);
+  // Explicit dimensions reserve the 192x96 preview box (FRONTEND_STANDARDS 3.7); a 1x1 logo is fitted inside it.
+  await expect(logo(page)).toHaveAttribute("width", "192");
+  await expect(logo(page)).toHaveAttribute("height", "96");
+  expect(await logo(page).boundingBox()).toMatchObject({ width: 192, height: 96 });
 }
 
 test("an uploaded PNG renders from the same-origin route, after a reload too, with no CSP violation", async ({ page }) => {

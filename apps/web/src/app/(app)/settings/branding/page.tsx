@@ -45,9 +45,16 @@ export default async function BrandingSettingsPage() {
                 {LOGO_HEADING}
               </h2>
               {branding.logoKey ? (
-                // Served by the same-origin route (files/logo), so img-src 'self' covers it; sized by classes only.
+                // Served by the same-origin route (files/logo), so img-src 'self' covers it. A fixed 192x96 preview box:
+                // width/height reserve it before the image loads (no layout shift) and object-contain fits any logo in it.
                 // eslint-disable-next-line @next/next/no-img-element -- a private, session-bound image: next/image's optimiser would fetch it without the session.
-                <img src={logoUrl(branding.logoKey)} alt={LOGO_ALT} className="max-h-24 max-w-48 self-start rounded-md border border-border bg-card object-contain p-2" />
+                <img
+                  src={logoUrl(branding.logoKey)}
+                  alt={LOGO_ALT}
+                  width={192}
+                  height={96}
+                  className="h-24 w-48 self-start rounded-md border border-border bg-card object-contain p-2"
+                />
               ) : (
                 <p className="text-sm text-muted-foreground">{LOGO_NONE}</p>
               )}
