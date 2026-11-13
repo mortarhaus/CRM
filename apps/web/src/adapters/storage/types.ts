@@ -29,8 +29,9 @@ export interface StorageAdapter {
   // Stores the bytes with this content type and Content-Disposition: attachment. With ifNoneMatch, the put is
   // conditional (If-None-Match: *): an existing key is left as it is and the result is { created: false }.
   put(key: string, body: Uint8Array, contentType: string, options?: { ifNoneMatch?: boolean }): Promise<{ created: boolean }>;
-  // Null when the key does not exist.
+  // Null only when the key does not exist (NoSuchKey). A missing bucket or any other failure throws StorageError.
   get(key: string): Promise<StoredObject | null>;
+  // As get, without the body. A HEAD cannot tell a missing key from a missing bucket, so a 404 is settled by a GET.
   head(key: string): Promise<ObjectHead | null>;
 }
 

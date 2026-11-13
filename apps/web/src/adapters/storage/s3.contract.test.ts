@@ -39,6 +39,15 @@ describe("S3 adapter against MinIO", () => {
     expect(await storage.head(key())).toBeNull();
   });
 
+  // Both answer 404 (a HEAD with no error code at all); only the missing key is an absence. A missing bucket is a
+  // configuration outage and must surface as StorageError (PR #62 review R1).
+  it("throws StorageError, not null, when the bucket does not exist (get and head)", async () => {
+    const noBucket = createS3Adapter({ ...minio.config, bucket: `crm-missing-${randomUUID().slice(0, 8)}` });
+    await expect(noBucket.get(key())).rejects.toMatchObject({ name: "StorageError", operation: "get", status: 404 });
+    await expect(noBucket.head(key())).rejects.toMatchObject({ name: "StorageError", operation: "head", status: 404 });
+    await expect(noBucket.head(key())).rejects.toBeInstanceOf(StorageError);
+  });
+
   it("a conditional put (If-None-Match: *) creates a new key, and never overwrites an existing one", async () => {
     const name = key();
     expect(await storage.put(name, bytes("first"), "image/png", { ifNoneMatch: true })).toEqual({ created: true });
