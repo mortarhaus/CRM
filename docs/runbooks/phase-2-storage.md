@@ -8,6 +8,10 @@ AWS SDK v3 `3.1158.0`. Decisions: `docs/DECISIONS.md`, 2026-11-11.
 "Verified" means the test named was run on 2026-11-12 against MinIO `pgsty/minio:RELEASE.2026-08-04T00-00-00Z`
 (Testcontainers, and the `minio` compose service). Nothing here was run against AWS S3 or Cloudflare R2.
 
+**Production provider: Cloudflare R2** (selected in the approved spec, Decisions → Hosting; changing it needs a
+separate spec revision). The adapter is S3-compatible, so MinIO stands in for it in dev and tests. Before the first
+real deployment, run the R2 verification below.
+
 ## Settings
 
 Web process only (the worker and the migrate/bootstrap steps do not read them).
@@ -68,7 +72,7 @@ digest with `docker buildx imagetools inspect pgsty/minio:<tag>`, change both pi
   and, with `ifNoneMatch`, `If-None-Match: *`.
 - **Conditional put (verified, MinIO):** a put with `If-None-Match: *` of an existing key answers 412 and leaves the
   object as it was; the adapter returns `{ created: false }` (`s3.contract.test.ts`). AWS S3 documents the same
-  behaviour; R2 is not verified.
+  behaviour; on R2 it is part of the pre-deployment R2 verification below.
 - **No delete.** The adapter has no delete method. Replacing a logo writes a new key and leaves the old object;
   orphans are removed by the Phase 9 purge, which adds its own delete method.
 - **Signed URLs:** `signedGetUrl(key, ttl)` with 1 ≤ ttl ≤ 600 seconds and `response-content-disposition=attachment`.
@@ -97,6 +101,18 @@ another workspace, signed out, an old or unknown id, storage off, or a stored ty
 `Cache-Control: no-store`. A hit streams the object with its stored type, `X-Content-Type-Options: nosniff`,
 `Content-Disposition: attachment` and `Cache-Control: private, max-age=3600`. The CSP `img-src 'self' blob: data:`
 is unchanged.
+
+## R2 verification (pre-deployment check)
+
+Not yet run. Before the first real deployment, against an R2 bucket with a bucket-only key:
+
+1. Conditional put: a put of an existing key with `If-None-Match: *` answers 412 and leaves the object unchanged
+   (run `s3.contract.test.ts` with its config pointed at R2, or the same calls by hand).
+2. Response headers: a GET of a stored object returns the stored `Content-Type` and `Content-Disposition: attachment`.
+3. Bucket errors: a GET and a HEAD of a missing key, and of a bucket that does not exist, give the results described
+   under "Failure signs".
+
+Record the date, the R2 bucket region and the results in `docs/DECISIONS.md`.
 
 ## Rotating the storage key
 
