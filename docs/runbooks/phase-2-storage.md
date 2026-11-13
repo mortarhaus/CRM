@@ -75,9 +75,12 @@ digest with `docker buildx imagetools inspect pgsty/minio:<tag>`, change both pi
   behaviour; on R2 it is part of the pre-deployment R2 verification below.
 - **No delete.** The adapter has no delete method. Replacing a logo writes a new key and leaves the old object;
   orphans are removed by the Phase 9 purge, which adds its own delete method.
-- **Signed URLs:** `signedGetUrl(key, ttl)` with 1 ≤ ttl ≤ 600 seconds and `response-content-disposition=attachment`.
-  Verified on MinIO: expires (403 after the ttl) and answers with `X-Content-Type-Options: nosniff`. S3 and R2 do
-  not add `nosniff` on their own; no page uses signed URLs yet, so whoever adds one must decide how nosniff is set.
+- **No signed URLs.** The adapter has no signed URL method (FILE-04): R2 and S3 do not add
+  `X-Content-Type-Options: nosniff` and a presigned GET cannot ask for it, so a direct link to the bucket could not
+  meet FILE-04. Every object is served through an app route that sets `nosniff`, `Content-Disposition: attachment`
+  and its own type (today only `/files/logo`). A future signed download needs a controlled same-origin or edge
+  response that sets expiry ≤ 10 minutes, `Content-Disposition: attachment` and `nosniff`, with a contract test, built
+  when it is first needed.
 
 ## Uploads
 

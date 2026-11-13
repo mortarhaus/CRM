@@ -5,10 +5,9 @@ import {
   S3Client,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { SIGNED_URL_MAX_TTL_SECONDS, type StorageAdapter, type StorageConfig, StorageError } from "./types";
+import { type StorageAdapter, type StorageConfig, StorageError } from "./types";
 
-// Every stored object is a download, never a page (FILE-04): the provider answers a GET, presigned or not, with this.
+// Every stored object is a download, never a page (FILE-04): stored with this, so a direct GET answers with it too.
 const ATTACHMENT = "attachment";
 
 const statusOf = (error: S3ServiceException) => error.$metadata.httpStatusCode ?? error.name;
@@ -80,21 +79,6 @@ export function createS3Adapter(config: StorageConfig): StorageAdapter {
       } catch (error) {
         if (isMissing(error)) return null;
         fail("head", error);
-      }
-    },
-
-    async signedGetUrl(key, ttlSeconds) {
-      if (!Number.isInteger(ttlSeconds) || ttlSeconds < 1 || ttlSeconds > SIGNED_URL_MAX_TTL_SECONDS) {
-        throw new RangeError(`ttlSeconds must be an integer from 1 to ${SIGNED_URL_MAX_TTL_SECONDS}`);
-      }
-      try {
-        return await getSignedUrl(
-          client,
-          new GetObjectCommand({ Bucket, Key: key, ResponseContentDisposition: ATTACHMENT }),
-          { expiresIn: ttlSeconds },
-        );
-      } catch (error) {
-        fail("sign", error);
       }
     },
   };

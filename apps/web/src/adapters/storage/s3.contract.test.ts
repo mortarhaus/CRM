@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { setTimeout as sleep } from "node:timers/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startMinio, type TestMinio } from "../../test/minio";
 import { createS3Adapter } from "./s3";
-import { SIGNED_URL_MAX_TTL_SECONDS, type StorageAdapter, StorageError } from "./types";
+import { type StorageAdapter, StorageError } from "./types";
 
 // Phase 2 plan Task 11: the adapter contract against MinIO (the S3 vs MinIO test deferred from Phase 1, line 1536).
 let minio: TestMinio;
@@ -54,34 +53,6 @@ describe("S3 adapter against MinIO", () => {
     await storage.put(name, bytes("first"), "image/png");
     await storage.put(name, bytes("second"), "image/png");
     expect(await read((await storage.get(name))?.body ?? new ReadableStream())).toBe("second");
-  });
-
-  it("a signed URL downloads with Content-Disposition: attachment and nosniff", async () => {
-    const name = key();
-    await storage.put(name, bytes("<html><script>alert(1)</script>"), "image/png");
-    const response = await fetch(await storage.signedGetUrl(name, 60));
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-disposition")).toBe("attachment");
-    expect(response.headers.get("content-type")).toBe("image/png");
-    // MinIO sets nosniff on every response; S3 and R2 do not (docs/runbooks/phase-2-storage.md).
-    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
-    expect(await response.text()).toBe("<html><script>alert(1)</script>");
-  });
-
-  it("a signed URL stops working once it expires", async () => {
-    const name = key();
-    await storage.put(name, bytes("short-lived"), "image/png");
-    const url = await storage.signedGetUrl(name, 1);
-    await sleep(2_500);
-    const response = await fetch(url);
-    expect(response.status).toBe(403);
-    await response.body?.cancel();
-  });
-
-  it(`refuses a signed URL ttl outside 1 to ${SIGNED_URL_MAX_TTL_SECONDS} seconds (FILE-04)`, async () => {
-    await expect(storage.signedGetUrl(key(), SIGNED_URL_MAX_TTL_SECONDS + 1)).rejects.toThrow(RangeError);
-    await expect(storage.signedGetUrl(key(), 0)).rejects.toThrow(RangeError);
-    await expect(storage.signedGetUrl(key(), 1.5)).rejects.toThrow(RangeError);
   });
 
   it("a provider failure names the operation and status only, never the key or the credentials (UNI-09)", async () => {
