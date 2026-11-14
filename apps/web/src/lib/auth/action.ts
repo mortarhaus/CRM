@@ -13,8 +13,19 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 
 // RATE_LIMITED, STALE_VERSION and NOT_ONBOARDED are thrown by a handler (an action's own limit, e.g. the test email; a
 // row changed since the caller read its version, e.g. the settings; a settings write before the Owner has onboarded
-// the workspace); the others by the checks below.
-type Refusal = "UNAUTHENTICATED" | "NO_WORKSPACE" | "FORBIDDEN" | "RATE_LIMITED" | "STALE_VERSION" | "NOT_ONBOARDED";
+// the workspace); so are the upload refusals (an empty, too large or not allowed file, by its bytes; storage not
+// configured); the others by the checks below.
+type Refusal =
+  | "UNAUTHENTICATED"
+  | "NO_WORKSPACE"
+  | "FORBIDDEN"
+  | "RATE_LIMITED"
+  | "STALE_VERSION"
+  | "NOT_ONBOARDED"
+  | "UPLOAD_EMPTY"
+  | "UPLOAD_TOO_LARGE"
+  | "UPLOAD_TYPE_NOT_ALLOWED"
+  | "STORAGE_UNAVAILABLE";
 
 export type ActionResult<O> =
   | { ok: true; status: "DONE" | "REPLAYED"; data: O }

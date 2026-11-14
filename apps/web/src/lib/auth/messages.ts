@@ -42,6 +42,21 @@ export const BRANDING_STALE = "Someone else changed the branding after this page
 export const BRANDING_FORBIDDEN = "Only an Admin or Owner can change the branding.";
 export const BRANDING_FAILED = "We couldn't save the colour. Try again.";
 
+// /settings/branding, the logo (plan Task 12; builder copy; the limit is the owner's, 2026-11-11).
+export const LOGO_HEADING = "Logo";
+export const LOGO_LABEL = "Logo file";
+export const LOGO_ALT = "Your workspace logo";
+export const LOGO_HINT = "A PNG or JPG file, up to 2 MB.";
+export const LOGO_NONE = "No logo uploaded yet.";
+export const UPLOAD_LOGO = "Upload logo";
+export const UPLOADING_LOGO = "Uploading…";
+export const LOGO_SAVED = "Logo uploaded.";
+export const LOGO_EMPTY = "Choose a PNG or JPG file to upload.";
+export const LOGO_TOO_LARGE = "That file is larger than 2 MB. Choose a smaller PNG or JPG.";
+export const LOGO_TYPE_NOT_ALLOWED = "That file isn't a PNG or JPG image. Choose a PNG or JPG file.";
+export const LOGO_UNAVAILABLE = "Logo uploads are not set up on this server yet.";
+export const LOGO_FAILED = "We couldn't upload the logo. Try again.";
+
 // /onboarding (plan Task 8; the SST/GST question is the spec's, line 732; the rest is builder copy).
 export const ONBOARDING_TITLE = "Set up your workspace";
 export const COUNTRY_NAMES: Record<Country, string> = { MY: "Malaysia", SG: "Singapore" };

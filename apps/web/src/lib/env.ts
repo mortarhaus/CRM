@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { StorageConfig } from "../adapters/storage/types";
 import { isHttpsUrl, isLoopbackUrl } from "./origin";
 
 const postgresUrl = z.url().refine((value) => /^postgres(ql)?:\/\//.test(value), {
@@ -27,12 +28,40 @@ function withAppUrlRule<T extends z.infer<typeof webFields>>(schema: z.ZodType<T
 export const TRUSTED_CLIENT_IP_HEADERS = ["cf-connecting-ip", "x-forwarded-for", "none"] as const;
 export type TrustedClientIpHeader = (typeof TRUSTED_CLIENT_IP_HEADERS)[number];
 
+// Object storage (Phase 2 plan Task 10; docs/runbooks/phase-2-storage.md): S3, R2 or MinIO. Web only for now (the
+// logo upload and its serve route). All four required values are set together or not at all: none means storage is
+// off (uploads are refused, nothing is served) and the app still starts; a partial set stops it at start.
+// STORAGE_ENDPOINT is unset for AWS S3 itself. The two keys are secrets and never logged (UNI-09).
+const storageFields = {
+  STORAGE_ENDPOINT: z
+    .url()
+    .refine((value) => /^https?:\/\//.test(value), { error: "must be an http:// or https:// URL" })
+    .optional(),
+  STORAGE_REGION: z.string().min(1).optional(),
+  STORAGE_BUCKET: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, { error: "must be an S3 bucket name (3-63 lower-case letters, digits, dots or hyphens)" })
+    .optional(),
+  STORAGE_ACCESS_KEY_ID: z.string().min(1).optional(),
+  STORAGE_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  STORAGE_FORCE_PATH_STYLE: z.enum(["true", "false"], { error: "must be true or false" }).optional(),
+};
+const STORAGE_REQUIRED = ["STORAGE_REGION", "STORAGE_BUCKET", "STORAGE_ACCESS_KEY_ID", "STORAGE_SECRET_ACCESS_KEY"] as const;
+const STORAGE_ALL = [...STORAGE_REQUIRED, "STORAGE_ENDPOINT", "STORAGE_FORCE_PATH_STYLE"] as const;
+
 const envSchema = withAppUrlRule(
-  webFields.extend({ TRUSTED_CLIENT_IP_HEADER: z.enum(TRUSTED_CLIENT_IP_HEADERS).optional() }),
-).refine((env) => env.NODE_ENV !== "production" || env.TRUSTED_CLIENT_IP_HEADER !== undefined, {
-  path: ["TRUSTED_CLIENT_IP_HEADER"],
-  error: "must be set in production (cf-connecting-ip, x-forwarded-for or none)",
-});
+  webFields.extend({ TRUSTED_CLIENT_IP_HEADER: z.enum(TRUSTED_CLIENT_IP_HEADERS).optional(), ...storageFields }),
+)
+  .refine((env) => env.NODE_ENV !== "production" || env.TRUSTED_CLIENT_IP_HEADER !== undefined, {
+    path: ["TRUSTED_CLIENT_IP_HEADER"],
+    error: "must be set in production (cf-connecting-ip, x-forwarded-for or none)",
+  })
+  .superRefine((env, context) => {
+    if (!STORAGE_ALL.some((name) => env[name] !== undefined)) return;
+    for (const name of STORAGE_REQUIRED) {
+      if (env[name] === undefined) context.addIssue({ code: "custom", path: [name], message: "must be set when any STORAGE_* value is set" });
+    }
+  });
 // Email is sent only by the worker (plan Task 26), so these are worker-only: the web container never gets them, and
 // RESEND_API_KEY lives only in the worker's environment. EMAIL_FROM is one address with a display name, on one line.
 export const EMAIL_PROVIDERS = ["smtp", "resend"] as const;
@@ -125,6 +154,20 @@ export function migrateEnvFor(role: ContainerRole | undefined, source: Record<st
 
 export function parseBootstrapEnv(source: Record<string, string | undefined>): BootstrapEnv {
   return parseWith(bootstrapEnvSchema, source);
+}
+
+// The storage adapter's settings, or null when storage is not configured (see storageFields).
+export function storageConfig(env: Env): StorageConfig | null {
+  const { STORAGE_REGION: region, STORAGE_BUCKET: bucket, STORAGE_ACCESS_KEY_ID: accessKeyId, STORAGE_SECRET_ACCESS_KEY: secretAccessKey } = env;
+  if (region === undefined || bucket === undefined || accessKeyId === undefined || secretAccessKey === undefined) return null;
+  return {
+    endpoint: env.STORAGE_ENDPOINT,
+    region,
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    forcePathStyle: env.STORAGE_FORCE_PATH_STYLE === "true",
+  };
 }
 
 export function trustedClientIpHeader(env: Env): TrustedClientIpHeader {

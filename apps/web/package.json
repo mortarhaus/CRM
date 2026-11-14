@@ -20,6 +20,7 @@
     "jobs:retry": "tsx --env-file=../../.env scripts/retry-job.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1158.0",
     "@crm/core": "workspace:*",
     "@next/env": "16.4.2",
     "@node-rs/argon2": "2.2.1",
