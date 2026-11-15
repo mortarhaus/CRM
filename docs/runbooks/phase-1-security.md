@@ -165,7 +165,7 @@ container only**. The web container must not get them, and `RESEND_API_KEY` abov
 | Variable | Value | When |
 |---|---|---|
 | `EMAIL_PROVIDER` | `smtp` or `resend` | always |
-| `EMAIL_FROM` | a display name and one address, `Name <address>` | always. Dev: `CRM Dev <dev@localhost>`. Production (SaaS): to be set by Charlie (ASK 7) |
+| `EMAIL_FROM` | a display name and one address, `Name <address>` | always. Dev: `CRM Dev <dev@localhost>`. Production (SaaS): the address is `no-reply@mortarhaus.com` (DECISIONS 2026-11-15, ASK 7); the display name is not decided yet (Charlie), so the value is `Name <no-reply@mortarhaus.com>` with that name still to be chosen |
 | `SMTP_URL` | `smtp://` or `smtps://` URL, credentials in the URL if the server needs them | `EMAIL_PROVIDER=smtp` |
 | `RESEND_API_KEY` | the Resend API key | `EMAIL_PROVIDER=resend` |
 
@@ -185,8 +185,11 @@ reads only `DATABASE_WORKER_URL`, so it needs no email setting.
 - **Rotating `RESEND_API_KEY`:** create a new key in Resend, put it in the host's secret store for the worker
   (UNI-08; never in `.env` or the repository), restart `worker`, send a test email, then revoke the old key in
   Resend.
-- **Sending domain (production):** the domain of `EMAIL_FROM` needs SPF, DKIM and DMARC records for the chosen
-  provider. The address and the owner of those DNS records: to be set by Charlie (ASK 7).
+- **Sending domain (production):** the provider is Resend and the sending address is `no-reply@mortarhaus.com`; DNS is
+  on Cloudflare and Charlie sets the SPF, DKIM and DMARC records for `mortarhaus.com` (DECISIONS 2026-11-15, ASK 7).
+  **Gate:** do not set `EMAIL_PROVIDER=resend` in production, and do not send a real message, until those three
+  records exist and Resend shows the domain as verified. Still pending: the display name, and the exact record values
+  (Resend gives them when the domain is added; the Phase 2 notification-email PR lists them here).
 - **Test email wording** (Charlie, ASK 8 = A, 2026-11-01): subject "Test email from CRM", body "This is a test
   email sent from your CRM workspace settings. If you received it, email delivery works."
   (`apps/web/src/emails/test-email.tsx`).
