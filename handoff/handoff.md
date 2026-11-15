@@ -1,4 +1,4 @@
-# Handoff — 2026-11-07 · branch main · HEAD 3db1fcc
+# Handoff — 2026-11-15 · main 107163b · PR 65 open (fix/boss-test-flake, head a4bee55, CI green)
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,60 +6,69 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 8, hash `733cc0e9…`) · Active PR number: none (PR #56 merged)
-- Working folder: main checkout. Untracked `.playwright-mcp/`, `docker/sync-export.sh`, `docker/sync-import.sh` are not mine.
-
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 8, approved hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`) · Active PR number: 65
+- Working folder: `.agent/worktrees/build-fix-boss-test-flake` (branch `fix/boss-test-flake`)
 
 ## 1. Current PR / branch
-- None. PR #56 (Phase 2 PR 3) merged 2026-11-07T02:55:15Z, merge commit `3db1fcca646f5f484994a390d6bb5b963d2dbd46`; `main` = `3db1fcc`. Log, review (R1, R2 Revision required; R3 Approved) and receipt are on agent-logs.
-- Merged worktrees still on disk (remove when Charlie agrees): `build-feat-p2-country-onboarding` (holds a dev `.env`), `build-feat-p2-branding`, `build-feat-p1-events`, `build-feat-p1-rate-limits`, `build-fix-audit-better-auth`.
-
+- Branch: `fix/boss-test-flake` · Base: main (`107163b`, PR 64 merge `107163b`)
+- Status: in review (opened 2026-11-15; waiting for Charlie to run `review 65`; Bob's checkout `review-65-a4bee55c` exists, no PR-65 review file yet)
+- Link: https://github.com/mortarhaus/CRM/pull/65 · one commit `a4bee55` (test fix + DECISIONS entry 2026-11-15)
 
 ## 2. Milestones
-- Done: Phase 0; Phase 1 (plan PRs 1-8) and its `setup` reconcile (#50). All logged.
-- Done, Phase 2 so far: design direction (#51), Phase 2 plan `docs/superpowers/plans/2026-11-04-phase-2-settings-onboarding.md` (#52, 8 PRs), PR 1 UI foundation (#53), PR 2a `workspace_settings` columns and settings data layer (#54), PR 2b branding page (#55). All logged (`merged 55` found its log already pushed).
-- In progress: none.
-- Pending: Phase 2 PR 3 (country defaults and onboarding; new core module `settings` = stop-and-ask), then PRs 4-8 (storage and logo; step-up/bank/QR/notifications/owner email; numbering; money core and catalog; email templates).
+- Done: Phase 0; Phase 1 (plan PRs 1-8) and its reconcile; Phase 2 PRs 1, 2a, 2b, 3 (settings, country defaults, onboarding, date format), 4 (storage and logo, #62). Repo moved to `mortarhaus/CRM` (#64), CI-minute fix (#63, docs-only skip now observed), standing rule: repo public while a PR needs CI, private after merge. All logged (agent-logs up to `df62723`, PR 64).
+- In progress: PR 65 (flake fix).
+- Pending: spec line 730 revision (MY `dd/mm/yyyy` to `dd-mmm-yyyy`) via `review spec` + `setup`, before Phase 2 closes (before PR 8 merges); Phase 2 PRs 5-8 (step-up/bank/QR/notifications/owner email; numbering; money core and catalog; email templates).
 
 ## 3. Git state
 ```
-main = origin/main 1db8371 (clean apart from the untracked files below)
+## main...origin/main  (main = 107163b, equal to origin/main 107163b)
+?? .playwright-mcp/
+?? .pnpm-store/
+?? docker/sync-export.sh
+?? docker/sync-import.sh
 ```
 Uncommitted files — fingerprint every staged, modified or untracked path when writing this handoff:
 | Path | Status | Content hash (`git hash-object <path>`, or `deleted`) |
 |---|---|---|
 | `.playwright-mcp/` | untracked, not mine | directory |
+| `.pnpm-store/` | untracked, appeared 2026-11-15 20:08, origin unknown (likely a pnpm run); not mine to delete without asking | directory |
 | `docker/sync-export.sh` | untracked, not mine | `51dcde23b372ecaaf041cea716ec3f95fa70226a` |
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
-## 4. Just finished
-2026-11-07 `merged 56` done: verified (PR state MERGED, commit reachable from `origin/main`, receipt 97 s before merge, no gate breach), log written and pushed to agent-logs. Main fast-forwarded. Phase 2 PRs 1, 2a, 2b, 3 done.
+PR 65 worktree is clean at `a4bee55` (origin/main..HEAD: `a4bee55 fix: boss.test.ts waits for the held transaction before sending`).
 
+## 4. Just finished
+2026-11-15: PR 62 merged (`8a1e95c`) and logged; PR 64 (remote, public-during-PR rule, ASK 7/ASK 9 decisions) merged (`107163b`) and logged; repo set private again. Three merged worktrees and branches removed (Charlie: "yes remove"). PR 65 built by an Opus subagent: root cause of the `boss.test.ts:118` 30 s timeout is a race in the test (`release` assigned inside the `auth.run` work callback; `boss.send` could finish before BEGIN and the callback ran). **Verified:** with all CPU cores busy, 3 of 20 runs failed before the fix and 40 of 40 passed after; typecheck, lint, 7 jobs files (105 tests), full `pnpm test` 3 times (1185 passed, 1 skipped); CI run 43703589788 on `a4bee55`: all five jobs pass, image job ran (51m27s). **Only inferred:** that the four CI failures (runs 43022811530, 43152940277, 43201947632, 43677922007) hung on this exact await; if the timeout recurs after merge, reopen the DECISIONS entry. Repo is PUBLIC while PR 65 is open.
 
 ## 5. Next step (file-level)
-Charlie says `build` for the next Phase 2 PR: Task 9 settings page (with the Bob P3: refuse settings writes before onboarding or handle tax set earlier) or PR 4 (stop-and-ask: new storage module). Q10 (SG values) still open. Charlie to choose on the no-JS render-redirect 409.
-
+Charlie runs `review 65`. If Revision required: `fix` on `fix/boss-test-flake` (`apps/web/src/jobs/boss.test.ts` lines 130-146, PR body, DECISIONS 2026-11-15). If Approved: `approved 65`, Charlie merges, `merged 65` (write `log/2026-11-15_PR65_*.md`, then `gh repo edit mortarhaus/CRM --visibility private --accept-visibility-change-consequences` if no other PR is open). Then: spec line 730 revision (edit the spec on a branch, `review spec`, `setup` reconcile), then Phase 2 PR 5 (`EMAIL_FROM` = `CRM <no-reply@mortarhaus.com>`; `require_2fa` enforcement with step-up; DECISIONS/runbook record the display name).
 
 ## 6. Open ASK items, blockers, and owner answers
-1. ASK 7 (production `EMAIL_FROM`, SPF/DKIM/DMARC owner) open for Charlie.
-2. ASK 9 (`require_2fa` timing; builder proposal Phase 2) open.
-3. Charlie to confirm the `RATE_LIMITED` wording and numbers (5 per user, 20 per workspace per hour).
-4. Charlie still owes (from the PR 55 log): greeting and "New" in the page header at every width; Urbanist font source; Q10, Q17, Q18, Q23 values; Q24/Q26 readings; confirm the outdated-browser notice wording if not already given.
-5. Stage 3 database provider is still open (chosen at first sale). No hosting revision is owed.
-6. Carried (Charlie's naming rule: Docker containers are `crm` / `crm-<something>`, in memory): rotate dev AUTH_SECRET, refresh local `.env`, repo visibility, untracked files in main checkout, optional P3s from the PR 49 log, old merged worktrees `build-feat-p1-events`, `build-feat-p1-rate-limits`, `build-fix-audit-better-auth`, `build-feat-p2-branding` (remove when Charlie agrees).
-7. Optional P3s: emit a plain `--accent` before the `light-dark()` rule in `lib/brand.ts`; guard for an action wired into `useActionState` without `fromForm`; PR 8 makes `email_bcc_self`/`auto_send_default` `default false not null`.
+- Open:
+  1. Charlie to confirm the `RATE_LIMITED` wording and numbers (5 per user, 20 per workspace per hour).
+  2. Bob's P3 (PR 61): policy for the no-JS render-time-redirect 409 (handle or accept).
+  3. Charlie still owes (from the PR 55 log): greeting and "New" in the page header at every width; Urbanist font source; Q10 (done), Q17, Q18, Q23 values; Q24/Q26 readings; outdated-browser notice wording if not given.
+  4. Stage 3 database provider open (chosen at first sale); no hosting revision owed. Production email DNS (SPF/DKIM/DMARC on `mortarhaus.com` via Cloudflare, Resend domain verified) is Charlie's task before the first real send.
+  5. Carried: rotate dev AUTH_SECRET, refresh local `.env`, untracked files in the main checkout, optional P3s from the PR 49 log; old merged worktrees still on disk (`build-docs-new-remote`, `build-feat-p1-events`, `build-feat-p1-rate-limits`, `build-feat-p2-branding`, `build-feat-p2-country-onboarding`, `build-feat-p2-date-format`, `build-feat-p2-q10-defaults`, `build-feat-p2-settings-general`, `build-fix-audit-better-auth`, `build-fix-image-apk-upgrade`, `review-62-1c48a228`): ask Charlie before removing.
+  6. Possible future: self-hosted Mac runner (option b of DECISIONS 2026-11-12), "when needed"; revisit the pgsty MinIO fork and R2 verification before the first real deployment.
+  7. Optional P3s: emit a plain `--accent` before the `light-dark()` rule in `lib/brand.ts`; guard for an action wired into `useActionState` without `fromForm`; PR 8 makes `email_bcc_self`/`auto_send_default` `default false not null`.
+- Answered this session (question → answer):
+  - ASK 9 `require_2fa` timing → accepted as planned (column exists; enforcement in PR 5 with step-up) (Charlie, 2026-11-15).
+  - ASK 7 email → Resend, DNS on Cloudflare, Charlie sets SPF/DKIM/DMARC; sender `no-reply@mortarhaus.com`, display name `CRM` (2026-11-15).
+  - CI minutes → repo public while a PR needs checking, private after merge; remote back at `mortarhaus/CRM` (2026-11-14).
+  - R2 vs S3 → the approved spec fixes Cloudflare R2; the docs say R2; reopening needs a separate spec revision (PR 62 R1).
 
 ## 7. Open review findings (P0/P1) and verdict
-- None. PR 55 R2 Approved with conditions, merged.
+- Review file: none yet for PR 65 (`.agent/reviews/PR-65.md` not written) · Verdict: pending. PR 62 and 64 closed (Approved).
 
 ## 8. Decisions made this session, not yet in the decisions log
-- None this session. (The 2026-11-04 design direction is in DECISIONS via PR #51.)
+- `EMAIL_FROM` display name `CRM` (Charlie, 2026-11-15): record in DECISIONS/runbook in Phase 2 PR 5.
 
 ## 9. Files touched but not committed
-- None.
+- None (see section 3 for untracked files that are not mine).
 
 ## 10. Model for the next session
-Opus 5.5 for PR 3 (new core module, migrations, RLS and settings are the deep tier). Sonnet 5 only for mechanical edits.
+Opus 5.5 for the spec revision and PR 5 (auth step-up, email, security). Sonnet 5 is fine for status checks, `merged` logs and mechanical doc edits.
 
 
 - 2026-10-15 (fix, Bob PR #27 R1): review archived (ae70237). Runbook P2 + PR body P3 fixed in 088d013, pushed; CI re-running. Next: Charlie runs `review 27` when CI is green.
