@@ -127,9 +127,23 @@ describe("the send-only instance and the auth transactions", () => {
       // Rolled back, yet the job is there: it went through pg-boss's own pool.
       expect(row?.state).toBe("created");
 
-      // The one slot held by a waiting transaction: pg-boss still sends at once.
+      // The one slot held by a waiting transaction: pg-boss still sends at once. The send starts only once the
+      // transaction is open and its work is waiting, so the slot and its connection are really held, and `release`
+      // exists before anything calls it (a send that beat the transaction's BEGIN used to leave it waiting forever).
       let release = () => {};
-      const held = auth.run(null, () => new Promise<void>((resolve) => (release = resolve)), () => true);
+      const released = new Promise<void>((resolve) => (release = resolve));
+      let holding = () => {};
+      const isHolding = new Promise<void>((resolve) => (holding = resolve));
+      const held = auth.run(
+        null,
+        () => {
+          holding();
+          return released;
+        },
+        () => true,
+      );
+      // `held` settles first only if the transaction failed to open; its error then fails the test at once.
+      await Promise.race([isHolding, held]);
       const started = Date.now();
       expect(await boss.send("email.send", { workspaceId: crypto.randomUUID() })).toBeTruthy();
       expect(Date.now() - started).toBeLessThan(2_000);

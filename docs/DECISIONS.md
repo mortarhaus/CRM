@@ -2,6 +2,16 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-15 — `boss.test.ts` intermittent 30 s timeout: a race in the test, not a wait in pg-boss (closes the 2026-11-12 open item)
+- **Decision:** the test "sends inside a held auth transaction…" (`apps/web/src/jobs/boss.test.ts`) now waits until the held transaction's work has started before it sends, and builds the `released` promise before calling `auth.run`. No product code changes; the 2 s bound and the 30 s timeout are unchanged.
+- **Why:** root cause. The test assigned `release` inside the transaction's work callback, which `auth.run` calls only after `BEGIN` and `SET LOCAL lock_timeout`, two round trips on the postgres.js pool. The test then called `boss.send` straight away, which is one insert on pg-boss's already warm `pg` pool. The two raced by about 0.1 to 0.2 ms. When the send won, `release()` called the placeholder no-op, the held transaction's promise never resolved, and `await held` waited until the 30 s timeout. pg-boss `send` itself always returned in 1.4 to 15 ms. **Evidence:** with temporary timing in the test, running this file alone 25 times unloaded gave no failures. Running it 20 times with every CPU busy (`yes` on each core, standing in for the full suite's parallel Testcontainers files) gave 3 timeouts, and each one was exactly a run where `release()` was called before the work had started (logged `workStarted=NOT_YET`). After the fix, the same loaded loop passed 40 of 40.
+- **Trade-offs:** none for the product. The test is now stronger: the send happens while the transaction is open and holds its connection, which the comment always claimed.
+- **Alternatives rejected:** raising the timeout (the hang is permanent, so it would only fail later); a retry or a sleep before the send (it would only make the race rarer).
+- **Scope / affects:** `apps/web/src/jobs/boss.test.ts` only.
+- **Versions:** none (pg-boss 12.35.0, postgres 3.4.9, unchanged).
+- **Exception to a rule?** no
+- **Decided by:** builder, no owner decision needed.
+
 ## 2026-11-15 — Phase 2: email through Resend from `no-reply@mortarhaus.com`; `require_2fa` enforced in PR 5 (ASK 7, ASK 9)
 - **Decision:** (1) **ASK 7:** system email is sent through Resend with DNS on Cloudflare (as the spec's hosting section already says). The sender is `no-reply@mortarhaus.com` (`EMAIL_FROM`, a setting, not a literal in code). The owner sets up SPF, DKIM and DMARC for `mortarhaus.com` in Cloudflare before the first real send; the Phase 2 PR that adds notification email lists the exact records in its runbook. (2) **ASK 9:** accepted as the Phase 2 plan recommends: the `require_2fa` column exists since PR 2 (default false); its enforcement is built in Phase 2 PR 5 together with step-up.
 - **Why:** Phase 2 plan §7 Q19 (ASK 9) and the open ASK 7 in the handoff; PR 5 (notifications, owner email, step-up) needs both.
