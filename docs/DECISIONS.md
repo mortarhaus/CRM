@@ -2,6 +2,26 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-15 — Phase 2: email through Resend from `no-reply@mortarhaus.com`; `require_2fa` enforced in PR 5 (ASK 7, ASK 9)
+- **Decision:** (1) **ASK 7:** system email is sent through Resend with DNS on Cloudflare (as the spec's hosting section already says). The sender is `no-reply@mortarhaus.com` (`EMAIL_FROM`, a setting, not a literal in code). The owner sets up SPF, DKIM and DMARC for `mortarhaus.com` in Cloudflare before the first real send; the Phase 2 PR that adds notification email lists the exact records in its runbook. (2) **ASK 9:** accepted as the Phase 2 plan recommends: the `require_2fa` column exists since PR 2 (default false); its enforcement is built in Phase 2 PR 5 together with step-up.
+- **Why:** Phase 2 plan §7 Q19 (ASK 9) and the open ASK 7 in the handoff; PR 5 (notifications, owner email, step-up) needs both.
+- **Trade-offs:** a `no-reply` sender means replies are not read; workspace-level reply-to is the separate `email_reply_to` setting. Until DNS is set, real sending is off; tests and dev use the existing Mailpit path.
+- **Alternatives rejected:** none raised.
+- **Scope / affects:** Phase 2 PR 5 (email adapter, `EMAIL_FROM`, `require_2fa` enforcement), its runbook. No code in this change.
+- **Versions:** none.
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-11-15): "yes accept the plan for 2fa and email use no-reply is fine", then "use @mortarhaus.com"; earlier "3 yes can. use resend and cloudflare and 2fa is ok".
+
+## 2026-11-14 — Hosting of CI: the repository returns to `mortarhaus/CRM` and is public while a pull request needs checks
+- **Decision:** (1) The remote is `https://github.com/mortarhaus/CRM` again (it was `mortarhaus-dev1` from 2026-11-11 to 2026-11-13; `agents/PROJECT.md` §4 updated). (2) The repository is **private by default**. When a pull request needs CI (a new PR, or a re-run after a fix) the builder makes it **public** (`gh repo edit mortarhaus/CRM --visibility public --accept-visibility-change-consequences`), and makes it **private again in `merged <n>`**, unless another PR is still open, in which case it stays public until that one merges. Each change is reported in one line. Public repositories run Actions without charge, so the private-repo minutes quota is not hit. (3) PR #62 ran its checks this way (billing failure on the organisation; run 43467901105).
+- **Why:** Actions minutes ran out on the personal account (2026-10-21) and on `mortarhaus` (2026-11-11); the "Image, Trivy, E2E" job takes about 50 minutes. Charlie: "make the repo public when PR needs checking" and "private it back after the PR is merged".
+- **Trade-offs:** while a PR is open, the source, the full git history, the specs and this log are public; anyone can clone or fork the repository in that time, and making it private again does not recall copies. The owner accepted this. A docs-only PR skips the image job (2026-11-12 entry), so going public for it saves little; the rule still applies unless the owner says otherwise. No history-wide secret scan has been run for the first public window (the CI secret scan covers the changes of each PR).
+- **Alternatives rejected:** a self-hosted runner on the owner's Mac (option b of 2026-11-12; build when needed); paying for more minutes.
+- **Scope / affects:** `agents/PROJECT.md` §4 (Remote); the builder's `build`, `fix` and `merged` steps; the repository's visibility.
+- **Versions:** none.
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-11-14).
+
 ## 2026-11-12 — CI: the image job is skipped for documentation-only pull requests (CI minutes, option a)
 - **Decision:** (1) A new job `changes` ("Changed files") runs `.github/scripts/code-changed.sh <base> <head>` on a pull request and outputs `code=true` or `false`. "Documentation only" = every changed file is under `docs/` or `agents/`, or is a Markdown file. The job "Image, Trivy, E2E" now `needs: [checks, changes]` and runs only when `code == 'true'`. (2) **Unsure means run:** a missing or unreadable diff, a push to `main` (no base is passed) and any change outside the docs set, including `.github/`, all give `true`. (3) The other three checks (Typecheck, lint, test; Dependency audit; Secret scan) still run on every PR. (4) **Option (b), a self-hosted runner on Charlie's Mac, is not built now.** Charlie: "a first but build b when it is needed". Build it when the minutes run short again; the plan is to point the image job at the runner and keep the Docker cleanup on it.
 - **Why:** PR #61 review R1 P2 and DECISIONS 2026-11-11: the image job takes about 50 minutes, and a two-file docs PR used all of it. The minutes ran out on the personal account (2026-10-21) and on `mortarhaus` (2026-11-11). This closes the "skip the image job on docs-only PRs" open item of 2026-10-21 and 2026-11-11.
