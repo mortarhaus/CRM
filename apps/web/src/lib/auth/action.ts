@@ -3,6 +3,7 @@ import { IDEMPOTENCY_KEY_EXPIRY_SECONDS, IDEMPOTENCY_KEY_MAX_LENGTH } from "@crm
 import { sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import type { z } from "zod";
+import { requiresTwoFactor } from "../../db/settings/workspace-settings";
 import { findMembership, healWorkspaceSettings, type WorkspaceRole } from "../../db/system";
 import { type Tx, withWorkspace } from "../../db/workspace";
 import { getCurrentSession } from "./session";
@@ -14,7 +15,9 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 // RATE_LIMITED, STALE_VERSION and NOT_ONBOARDED are thrown by a handler (an action's own limit, e.g. the test email; a
 // row changed since the caller read its version, e.g. the settings; a settings write before the Owner has onboarded
 // the workspace); so are the upload refusals (an empty, too large or not allowed file, by its bytes; storage not
-// configured); the others by the checks below.
+// configured); the others by the checks below. TWO_FACTOR_REQUIRED (the user has no 2FA: enrol first) comes from the
+// require_2fa check below or from step-up; STEP_UP_REQUIRED (no step-up of this session in the last
+// STEP_UP_WINDOW_SECONDS) from requireStepUp; WRONG_CODE from verifyStepUp (step-up.ts).
 type Refusal =
   | "UNAUTHENTICATED"
   | "NO_WORKSPACE"
@@ -25,7 +28,10 @@ type Refusal =
   | "UPLOAD_EMPTY"
   | "UPLOAD_TOO_LARGE"
   | "UPLOAD_TYPE_NOT_ALLOWED"
-  | "STORAGE_UNAVAILABLE";
+  | "STORAGE_UNAVAILABLE"
+  | "TWO_FACTOR_REQUIRED"
+  | "STEP_UP_REQUIRED"
+  | "WRONG_CODE";
 
 export type ActionResult<O> =
   | { ok: true; status: "DONE" | "REPLAYED"; data: O }
@@ -37,6 +43,8 @@ export type ActionResult<O> =
 export interface ActionContext {
   tx: Tx;
   userId: string;
+  // The Better Auth session the request came with: step-up is bound to it (step-up.ts).
+  sessionId: string;
   workspaceId: string;
   role: Role;
 }
@@ -52,8 +60,18 @@ const RANK: Record<Role, number> = { staff: 1, admin: 2, owner: 3 };
 
 // The workspace a request acts in is the session's active workspace and nothing else (spec Tenancy, TEN-11); the
 // role is read from member for that workspace, so a stale active workspace has no role. A missing
-// workspace_settings row is healed here (Task 7, plan Risk 6).
-export async function requireWorkspaceMember(minRole: Role): Promise<{ userId: string; workspaceId: string; role: Role }> {
+// workspace_settings row is healed here (Task 7, plan Risk 6). In a workspace with require_2fa, an Admin or Owner
+// without 2FA is refused with TWO_FACTOR_REQUIRED whatever the minimum role (spec "Authentication and sessions":
+// "`require_2fa` per workspace for owner/admin"; ASK 9, DECISIONS 2026-11-15); a page sends them to enrol.
+export interface WorkspaceMember {
+  userId: string;
+  sessionId: string;
+  twoFactorEnabled: boolean;
+  workspaceId: string;
+  role: Role;
+}
+
+export async function requireWorkspaceMember(minRole: Role): Promise<WorkspaceMember> {
   const current = await getCurrentSession();
   if (!current) throw new ActionRefusedError("UNAUTHENTICATED");
   const workspaceId = current.session.activeOrganizationId;
@@ -61,7 +79,11 @@ export async function requireWorkspaceMember(minRole: Role): Promise<{ userId: s
   const membership = await findMembership(current.user.id, workspaceId);
   if (!membership || RANK[membership.role] < RANK[minRole]) throw new ActionRefusedError("FORBIDDEN");
   await healWorkspaceSettings(workspaceId);
-  return { userId: current.user.id, workspaceId, role: membership.role };
+  const twoFactorEnabled = current.user.twoFactorEnabled === true;
+  if (RANK[membership.role] >= RANK.admin && !twoFactorEnabled && (await withWorkspace(workspaceId, requiresTwoFactor))) {
+    throw new ActionRefusedError("TWO_FACTOR_REQUIRED");
+  }
+  return { userId: current.user.id, sessionId: current.session.id, twoFactorEnabled, workspaceId, role: membership.role };
 }
 
 // A plain object (an object literal, Zod's object and record output, or one with no prototype). Any other object
@@ -121,7 +143,8 @@ async function claimKey(tx: Tx, name: string, key: string, hash: string): Promis
 
 // The one wrapper for every mutating server action (spec "Validation"; AUTH-01). The order is fixed: (1) session,
 // (2) the session's active workspace, (3) role, (4) Zod, (5) idempotency, (6) the handler, in the same transaction
-// as the claimed key, then its response is stored. No input value is read before step 4. A handler that throws
+// as the claimed key, then its response is stored. An action's beforeTransaction runs between steps 4 and 5, outside
+// the transaction. No input value is read before step 4. A handler that throws
 // ActionRefusedError rolls the transaction back, claimed key included, and the refusal is the result.
 export function action<I, O extends Json>(spec: {
   name: string;
@@ -141,9 +164,13 @@ export function action<I, O extends Json>(spec: {
   // rendered from the result, not from what was typed, so anything not echoed comes back empty. Only values that are
   // neither secret nor personal data; strings only, read from the form as posted.
   echo?: (form: FormData) => Record<string, string>;
+  // Work that must not run inside the workspace transaction, after step 4 and before step 5: a call that takes a
+  // connection of its own from the same pool (step-up's code check posts to Better Auth, whose request runs in its
+  // own transaction), or a unit taken on the limiter's pool. It may refuse with ActionRefusedError.
+  beforeTransaction?: (member: WorkspaceMember, input: I) => Promise<void>;
 }): (raw: unknown, idempotencyKey?: string | FormData) => Promise<ActionResult<O>> {
   return async (raw, keyOrForm) => {
-    let member: Awaited<ReturnType<typeof requireWorkspaceMember>>;
+    let member: WorkspaceMember;
     try {
       member = await requireWorkspaceMember(spec.minRole);
     } catch (error) {
@@ -159,9 +186,18 @@ export function action<I, O extends Json>(spec: {
     }
     if (spec.idempotent && !validKey(idempotencyKey)) return { ok: false, status: "INVALID_INPUT", fields: ["idempotencyKey"] };
     const input = parsed.data;
+    if (spec.beforeTransaction) {
+      try {
+        await spec.beforeTransaction(member, input);
+      } catch (error) {
+        if (error instanceof ActionRefusedError) return { ok: false, status: error.status };
+        throw error;
+      }
+    }
 
     const result = await withWorkspace(member.workspaceId, async (tx): Promise<ActionResult<O>> => {
-      const ctx = { tx, ...member };
+      const { userId, sessionId, workspaceId, role } = member;
+      const ctx: ActionContext = { tx, userId, sessionId, workspaceId, role };
       if (!spec.idempotent || idempotencyKey === undefined) return { ok: true, status: "DONE", data: await spec.handler(ctx, input) };
       const claim = await claimKey(tx, spec.name, idempotencyKey, requestHash(input));
       if (claim.kind === "replay") return { ok: true, status: "REPLAYED", data: claim.response as O };

@@ -20,6 +20,8 @@ async function loadSettings(): Promise<WorkspaceSettings | null> {
     if (!(error instanceof ActionRefusedError)) throw error;
     if (error.status === "UNAUTHENTICATED") redirect("/sign-in");
     if (error.status === "NO_WORKSPACE") redirect("/workspaces");
+    // An Admin or Owner without 2FA in a workspace that requires it (require_2fa) enrols first.
+    if (error.status === "TWO_FACTOR_REQUIRED") redirect("/settings/security");
     return null;
   }
 }
