@@ -2,6 +2,16 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-20 — Spec v4.7 revision 9 approved: the Malaysia default date format is `dd-mmm-yyyy`
+- **Decision:** Charlie approved spec v4.7 revision 9 at hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca` on 2026-11-20. It changes one onboarding default: for Malaysia, `workspace_settings` date format `dd-mmm-yyyy` (`mmm` is the English three-letter month whatever the locale, e.g. 08-Nov-2026) in place of `dd/mm/yyyy`. It is a default the workspace can change; workspaces onboarded earlier keep their stored value. The SG part of the spec line is unchanged. The same revision marks revision 8 approved and merged (PR #36, `36b5592`).
+- **Why:** Charlie's decision of 2026-11-08 (Phase 2 plan Q10, "yes correct", with "Before Phase 2 closes" for the spec edit, see the 2026-11-08 and 2026-11-09 entries). The shipped Phase 2 PR 3 code, tests and plan already used `dd-mmm-yyyy`; only the spec line still said `dd/mm/yyyy`.
+- **Trade-offs:** none. The spec file still calls revision 9 a draft after the merge; editing it would change the approved hash, so the next spec PR fixes that label.
+- **Alternatives rejected:** none raised. Adding the SG date format, locale and invoice pattern from the 2026-11-08 decision to the spec line was left out; Bob reviewed revision 9 without them.
+- **Scope / affects:** the spec (PR #66, merged `b926fd6`, 2026-11-19T16:58:42Z); `agents/PROJECT.md` §1, §2, §11 and `CLAUDE.md` (the `setup` reconcile).
+- **Versions:** none.
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-11-20): "approve" (spec revision 9, in the Andy session); approved by Bob's spec review Round 28 and PR review Round 1.
+
 ## 2026-11-15 — `boss.test.ts` intermittent 30 s timeout: a race in the test, not a wait in pg-boss (closes the 2026-11-12 open item)
 - **Decision:** the test "sends inside a held auth transaction…" (`apps/web/src/jobs/boss.test.ts`) now waits until the held transaction's work has started before it sends, and builds the `released` promise before calling `auth.run`. No product code changes; the 2 s bound and the 30 s timeout are unchanged.
 - **Why:** root cause. The test assigned `release` inside the transaction's work callback, which `auth.run` calls only after `BEGIN` and `SET LOCAL lock_timeout`, two round trips on the postgres.js pool. The test then called `boss.send` straight away, which is one insert on pg-boss's already warm `pg` pool. The two raced by about 0.1 to 0.2 ms. When the send won, `release()` called the placeholder no-op, the held transaction's promise never resolved, and `await held` waited until the 30 s timeout. pg-boss `send` itself always returned in 1.4 to 15 ms. **Evidence:** with temporary timing in the test, running this file alone 25 times unloaded gave no failures. Running it 20 times with every CPU busy (`yes` on each core, standing in for the full suite's parallel Testcontainers files) gave 3 timeouts, and each one was exactly a run where `release()` was called before the work had started (logged `workStarted=NOT_YET`). After the fix, the same loaded loop passed 40 of 40.
