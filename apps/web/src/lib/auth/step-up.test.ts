@@ -248,7 +248,7 @@ describe("verifyStepUp", () => {
     expect(await highRisk({})).toEqual({ ok: false, status: "STEP_UP_REQUIRED" });
   });
 
-  it("refuses one code twice: in the same session, in another session, and in another workspace", async () => {
+  it("refuses one code twice: in the same session and in another session of the user", async () => {
     const party = await newParty("replay");
     const code = codeAt(party.totp);
     signedInAs(party.first);
