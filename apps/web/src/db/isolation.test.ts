@@ -6,7 +6,7 @@ import { holdsCommand, tenantTables } from "../test/catalog";
 import { sqlState, startDatabase, type TestDatabase } from "../test/postgres";
 import { createDb, type DbHandle } from "./client";
 import { EXPECTED_PRIVILEGES } from "./privileges";
-import { auditLog, domainEvent, idempotencyKey, notification, organization, workspaceSettings } from "./schema";
+import { auditLog, domainEvent, idempotencyKey, notification, organization, stepUp, workspaceSettings } from "./schema";
 import { runInWorkspace, type Tx } from "./workspace";
 
 // TEN-08: every tenant table gets read and write isolation tests over two workspaces, as crm_app.
@@ -67,6 +67,16 @@ const TENANT_FIXTURES: Record<string, TenantFixture> = {
     },
     async update(tx, workspaceId) {
       const result = await tx.update(notification).set({ readAt: new Date() }).where(eq(notification.workspaceId, workspaceId));
+      return result.count;
+    },
+  },
+  // A session's step-up (Phase 2 plan Task 13): crm_app overwrites verified_at and deletes none.
+  step_up: {
+    async seed(tx, workspaceId) {
+      await tx.insert(stepUp).values({ workspaceId, sessionId: randomUUID(), verifiedAt: new Date() });
+    },
+    async update(tx, workspaceId) {
+      const result = await tx.update(stepUp).set({ verifiedAt: new Date() }).where(eq(stepUp.workspaceId, workspaceId));
       return result.count;
     },
   },
