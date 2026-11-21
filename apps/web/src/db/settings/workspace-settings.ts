@@ -46,6 +46,16 @@ export async function getSettings(tx: Tx, options: { forUpdate?: boolean } = {})
   return row;
 }
 
+// Whether the workspace requires 2FA of its Admins and Owners (spec "Authentication and sessions"; ASK 9). False when
+// the row is still to be healed (the column's default).
+export async function requiresTwoFactor(tx: Tx): Promise<boolean> {
+  const [row] = await tx
+    .select({ require2fa: workspaceSettings.require2fa })
+    .from(workspaceSettings)
+    .where(eq(workspaceSettings.workspaceId, workspaceId()));
+  return row?.require2fa ?? false;
+}
+
 // What the app layout reads on every page: the colour it renders, and whether the workspace has been through
 // onboarding (a country is set). Both null when the row is still to be healed (the layout must not fail where
 // getSettings would throw); a missing row counts as not onboarded.

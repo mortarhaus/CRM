@@ -234,7 +234,8 @@ describe("parseWorkerEnv", () => {
     );
   });
 
-  it.each(["CRM <crm@mail.example.test>", "CRM Dev <dev@localhost>"])("accepts EMAIL_FROM %s", (from) => {
+  // The production SaaS sender (DECISIONS 2026-11-15 and 2026-11-20) and the dev one.
+  it.each(["CRM <no-reply@mortarhaus.com>", "CRM <crm@mail.example.test>", "CRM Dev <dev@localhost>"])("accepts EMAIL_FROM %s", (from) => {
     expect(parseWorkerEnv({ ...worker, EMAIL_FROM: from }).EMAIL_FROM).toBe(from);
   });
 

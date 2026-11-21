@@ -264,9 +264,16 @@ describe("action(): workspace and role", () => {
     expect(steps).toEqual(["session", "membership"]);
   });
 
-  it("requireWorkspaceMember() returns the user, the session's workspace and the stored role", async () => {
+  it("requireWorkspaceMember() returns the user, the session, the session's workspace and the stored role", async () => {
     const member = await requireWorkspaceMember("admin");
-    expect(member).toEqual({ userId: owner.userId, workspaceId: owner.workspaceId, role: "owner" });
+    const [current] = await admin<{ id: string }[]>`select id from session where user_id = ${owner.userId}`;
+    expect(member).toEqual({
+      userId: owner.userId,
+      sessionId: current?.id,
+      twoFactorEnabled: false,
+      workspaceId: owner.workspaceId,
+      role: "owner",
+    });
     await setRole(owner, "staff");
     await expect(requireWorkspaceMember("admin")).rejects.toMatchObject({ status: "FORBIDDEN" });
   });
@@ -506,5 +513,41 @@ describe("action(): order", () => {
     const run = action({ name: "test.order", minRole: "staff", input, idempotent: true, handler });
     expect((await run({ note: "x" }, randomUUID())).status).toBe("DONE");
     expect(steps).toEqual(["session", "membership", "zod", "idempotency", "handler", "store"]);
+  });
+
+  it("runs beforeTransaction after Zod and before the transaction's idempotency step, with the member and input", async () => {
+    const { handler } = recordingHandler();
+    const input = z.object({ note: z.string() });
+    const parse = input.safeParse.bind(input);
+    vi.spyOn(input, "safeParse").mockImplementation((value) => {
+      steps.push("zod");
+      return parse(value);
+    });
+    const seen: { userId: string; workspaceId: string; input: unknown }[] = [];
+    const beforeTransaction = async (member: { userId: string; workspaceId: string }, value: unknown) => {
+      steps.push("before");
+      seen.push({ userId: member.userId, workspaceId: member.workspaceId, input: value });
+    };
+    const run = action({ name: "test.before", minRole: "staff", input, idempotent: true, handler, beforeTransaction });
+    expect((await run({ note: "x" }, randomUUID())).status).toBe("DONE");
+    expect(steps).toEqual(["session", "membership", "zod", "before", "idempotency", "handler", "store"]);
+    expect(seen).toEqual([{ userId: owner.userId, workspaceId: owner.workspaceId, input: { note: "x" } }]);
+  });
+
+  it("returns a refusal thrown by beforeTransaction, and opens no transaction and runs no handler", async () => {
+    const { handler } = recordingHandler();
+    const run = action({
+      name: "test.before",
+      minRole: "staff",
+      input: noteInput,
+      idempotent: true,
+      handler,
+      beforeTransaction: async () => {
+        throw new ActionRefusedError("RATE_LIMITED");
+      },
+    });
+    expect(await run({ note: "x" }, randomUUID())).toEqual({ ok: false, status: "RATE_LIMITED" });
+    expect(handler).not.toHaveBeenCalled();
+    expect(queries.filter((query) => /idempotency_key/.test(query))).toEqual([]);
   });
 });

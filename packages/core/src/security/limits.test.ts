@@ -15,6 +15,9 @@ import {
   SIGN_IN_ACCOUNT_FAILURE_LIMIT,
   SIGN_IN_IP_LIMIT,
   SIGN_UP_IP_LIMIT,
+  STEP_UP_CODE_REUSE_SECONDS,
+  STEP_UP_VERIFY_USER_LIMIT,
+  STEP_UP_WINDOW_SECONDS,
   TEST_EMAIL_USER_LIMIT,
   TEST_EMAIL_WORKSPACE_LIMIT,
   TWO_FACTOR_VERIFY_IP_LIMIT,
@@ -40,6 +43,12 @@ describe("fixed security values", () => {
 
   it("keeps the short code at 2 to 6 characters (Phase 2 plan Q21, Charlie 2026-11-04)", () => {
     expect([SHORT_CODE_MIN_LENGTH, SHORT_CODE_MAX_LENGTH]).toEqual([2, 6]);
+  });
+
+  it("keeps step-up at the spec's 5 minutes, per-user checks at the 2FA verify row, and code reuse past 90 s", () => {
+    expect(STEP_UP_WINDOW_SECONDS).toBe(300);
+    expect(STEP_UP_VERIFY_USER_LIMIT).toEqual({ windowSeconds: 60, max: 10 });
+    expect(STEP_UP_CODE_REUSE_SECONDS).toBeGreaterThan(3 * 30);
   });
 });
 
