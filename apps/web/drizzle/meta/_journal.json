@@ -211,6 +211,20 @@
       "when": 1795109421980,
       "tag": "0029_rls_step_up",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1795355148107,
+      "tag": "0030_bank_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795355154202,
+      "tag": "0031_bank_details_update_grants",
+      "breakpoints": true
     }
   ]
 }

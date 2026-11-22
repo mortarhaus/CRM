@@ -62,3 +62,6 @@ export const STEP_UP_CODE_REUSE_SECONDS = 4 * 30;
 // Uploads (Phase 2 plan Q12; FILE-02). The logo is at most 2 MB (2 * 1024 * 1024 bytes), PNG or JPG only, checked by
 // magic bytes (Charlie, 2026-11-11; DECISIONS 2026-11-11).
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+// The payment QR (DuitNow/PayNow), PNG or JPG by magic bytes. Builder proposal pending Charlie (PR 5b ASK): the logo's
+// limit, which any phone screenshot of a bank's QR fits.
+export const PAYMENT_QR_MAX_BYTES = LOGO_MAX_BYTES;

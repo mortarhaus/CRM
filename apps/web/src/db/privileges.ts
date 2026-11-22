@@ -11,7 +11,7 @@ const table = (name: string, ...privileges: string[]) =>
 const columns = (name: string, privilege: string, ...names: string[]) =>
   names.map((column) => `column:${qualified(name)}.${column}:${privilege}`);
 
-// Every workspace_settings column crm_app may UPDATE (migration 0025).
+// Every workspace_settings column crm_app may UPDATE (migrations 0025 and 0031).
 const WORKSPACE_SETTINGS_UPDATE_COLUMNS = [
   "short_code",
   "logo_key",
@@ -40,6 +40,12 @@ const WORKSPACE_SETTINGS_UPDATE_COLUMNS = [
   "auto_send_default",
   "default_agreement_pattern",
   "require_2fa",
+  "bank_name",
+  "bank_account_holder",
+  "bank_account_number",
+  "bank_swift_code",
+  "duitnow_qr_key",
+  "bank_details_changed_at",
   "version",
   "updated_at",
 ];

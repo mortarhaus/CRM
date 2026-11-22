@@ -6,7 +6,7 @@ import { consumeUnit, giveBackUnit } from "../../db/system";
 import type { Tx } from "../../db/workspace";
 import { recordAudit } from "../audit";
 import { getEnv } from "../env";
-import { ActionRefusedError, action, type WorkspaceMember } from "./action";
+import { type ActionContext, ActionRefusedError, action, type WorkspaceMember } from "./action";
 import { postToAuth } from "./forward";
 
 // Step-up (spec "Authorization": a fresh TOTP within the last 5 minutes for high-risk actions; AUTH-09; Phase 2 plan
@@ -67,15 +67,16 @@ async function checkCode(member: WorkspaceMember, { code }: { code: string }): P
   await giveBackUnit(userKey, unit.windowStart);
 }
 
-// Not a server action itself: the step-up prompt exposes it from its page's actions file (settings/payment). Any member
-// may step up; the high-risk action decides who may act.
-export const verifyStepUp = action({
+// The step-up action's definition. A page with a step-up prompt exposes it from its own actions file as
+// action({ ...STEP_UP_ACTION, fromForm }) (the AUTH-01 lint wants action() there; settings/payment). Any member may
+// step up; the high-risk action decides who may act.
+export const STEP_UP_ACTION = {
   name: "auth.stepUp",
   minRole: "staff",
   input: z.strictObject({ code: z.string().regex(/^\d{6}$/) }),
   idempotent: false,
   beforeTransaction: checkCode,
-  handler: async ({ tx, userId, sessionId }) => {
+  handler: async ({ tx, userId, sessionId }: ActionContext) => {
     await tx.execute(sql`
       insert into step_up (workspace_id, session_id, verified_at)
       values (${CURRENT_WORKSPACE}, ${sessionId}, now())
@@ -83,4 +84,6 @@ export const verifyStepUp = action({
     await recordAudit(tx, { actorUserId: userId, action: "auth.step_up", targetType: "session", targetId: sessionId });
     return { verified: true };
   },
-});
+} as const;
+
+export const verifyStepUp = action(STEP_UP_ACTION);
