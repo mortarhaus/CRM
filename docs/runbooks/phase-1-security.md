@@ -23,7 +23,7 @@ when it ends.
 | two-factor verify | `/two-factor/verify-totp`, `/two-factor/verify-backup-code` | 10 per 60 s | `ba:two-factor-verify:<ip>` |
 | password check | `/change-password`, `/two-factor/enable`, `/two-factor/disable`, `/two-factor/generate-backup-codes` | 10 per 900 s | `ba:password-check:<ip>` |
 | default | every other enabled `/api/auth/*` path | 100 per 60 s | `ba:default:<ip>` |
-| step-up user | `verifyStepUp` (Phase 2 PR 5a), every check, besides the two-factor verify row it also spends | 10 per 60 s | `step-up:user:<user id>` |
+| step-up user | `verifyStepUp` (Phase 2 PR 5a), failures only: every check takes a unit and an accepted code gives it back (as the sign-in account row); besides the two-factor verify row it also spends | 5 per 900 s | `step-up:user:<user id>` |
 | step-up code | `verifyStepUp`, an accepted code | 1 per 120 s | `step-up:code:<user id>:<HMAC of the code>` |
 
 - `<ip>` is the trusted client IP (next section); an IPv6 address is keyed by its /64.
@@ -103,11 +103,13 @@ could be used once more, by a user who must sign in again anyway. The IP counter
   `/two-factor/verify-totp` with the user's session (it issues no new session) and records the check in the tenant
   table `step_up` (one row per workspace and session; rows of ended sessions stay until a later retention sweep).
   A user without 2FA gets `TWO_FACTOR_REQUIRED` and enrols at `/settings/security`. An accepted code is refused
-  for any later step-up of the same user for 120 s (`STEP_UP_CODE_REUSE_SECONDS`). The prompt page is PR 5b.
+  for any later step-up of the same user for 120 s (`STEP_UP_CODE_REUSE_SECONDS`). A Better Auth 5xx is an error, not
+  `WRONG_CODE`, and keeps its unit spent. The prompt is on `/settings/payment` (PR 5b), above the bank details and QR
+  forms, which are Owner only and need step-up.
 - **`require_2fa`** (per workspace, default false): when true, an Admin or Owner without 2FA is refused
   `TWO_FACTOR_REQUIRED` by every action and admin settings page, and the pages send them to `/settings/security`.
   Staff are not affected, and nobody is signed out: the check runs on each request. No page sets the flag yet
-  (who may set it is open, DECISIONS 2026-11-20).
+  (Charlie 2026-11-22: only the Owner may switch it on, with step-up; the toggle is a later PR).
 
 ## Better Auth paths
 
