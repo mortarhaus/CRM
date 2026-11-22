@@ -25,7 +25,9 @@ interface PromptProps {
   action: (previous: StepUpResult | null, form: FormData) => Promise<StepUpResult>;
 }
 
-const INPUT_ID = "step-up-code";
+// Exported so a form refused for step-up can move focus here once the prompt is shown.
+export const STEP_UP_INPUT_ID = "step-up-code";
+const INPUT_ID = STEP_UP_INPUT_ID;
 const ERROR_ID = "step-up-error";
 const HINT_ID = "step-up-hint";
 

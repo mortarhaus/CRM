@@ -1,7 +1,7 @@
 "use client";
 
-import { redirect, useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef } from "react";
+import { redirect } from "next/navigation";
+import { type FormEvent, startTransition, useActionState, useState } from "react";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +22,9 @@ import {
   BANK_SWIFT_INVALID,
   ONBOARDING_INVALID,
   PAYMENT_FORBIDDEN,
-  STEP_UP_NEEDED,
 } from "@/lib/auth/messages";
+import { stepUpRefusal } from "./save-follow-up";
+import { useSaveFollowUp } from "./use-save-follow-up";
 
 export type SaveResult = ActionResult<{ version: number }>;
 
@@ -39,10 +40,11 @@ interface FormProps {
   action: (previous: SaveResult | null, form: FormData) => Promise<SaveResult>;
   version: number;
   saved: BankDetails;
+  // The page showed "Confirmed" (step-up fresh when it was rendered).
+  steppedUp: boolean;
 }
 
 const MESSAGES: Partial<Record<Exclude<SaveResult, { ok: true }>["status"], string>> = {
-  STEP_UP_REQUIRED: STEP_UP_NEEDED,
   STALE_VERSION: BANK_STALE,
   FORBIDDEN: PAYMENT_FORBIDDEN,
 };
@@ -56,25 +58,33 @@ const FIELDS = [
 
 const ERROR_ID = "bank-details-error";
 
-function BankFields({ action, version, saved, unreachable }: FormProps & { unreachable: boolean }) {
+function BankFields({ action, version, saved, steppedUp, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
-  const router = useRouter();
-  const button = useRef<HTMLButtonElement>(null);
-
-  // Saved: the page is rendered again with the stored values. Focus goes back to the button (A11Y-01).
-  useEffect(() => {
-    if (result?.ok) router.refresh();
-    if (result !== null || unreachable) button.current?.focus();
-  }, [result, unreachable, router]);
+  const [confirmedAtSubmit, setConfirmedAtSubmit] = useState(false);
+  const button = useSaveFollowUp(result, unreachable);
 
   if (result?.ok === false && result.status === "UNAUTHENTICATED") redirect("/sign-in");
   const invalid = new Set(result?.ok === false && result.status === "INVALID_INPUT" ? result.fields : []);
-  const refused = result?.ok === false && result.status !== "INVALID_INPUT" ? (MESSAGES[result.status] ?? BANK_FAILED) : null;
+  const refused =
+    result?.ok === false && result.status === "STEP_UP_REQUIRED"
+      ? stepUpRefusal(confirmedAtSubmit)
+      : result?.ok === false && result.status !== "INVALID_INPUT"
+        ? (MESSAGES[result.status] ?? BANK_FAILED)
+        : null;
   const error = refused ?? (invalid.size > 0 ? ONBOARDING_INVALID : unreachable ? BANK_FAILED : null);
   const currentVersion = result?.ok ? Math.max(result.data.version, version) : version;
 
+  // React resets a form after its action; dispatching here instead keeps what was typed when the save is refused
+  // (and across the refresh that brings the step-up prompt back). Without JavaScript the form posts as usual.
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setConfirmedAtSubmit(steppedUp);
+    startTransition(() => formAction(form));
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} onSubmit={onSubmit} className="flex flex-col gap-4">
       <input type="hidden" name="expectedVersion" value={currentVersion} />
       {FIELDS.map((field) => (
         <div key={field.name} className="flex max-w-sm flex-col gap-2">

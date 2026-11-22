@@ -135,6 +135,7 @@ export const STEP_UP_CONFIRMED = `Confirmed. You can make changes on this page f
 export const STEP_UP_RATE_LIMITED = `Too many wrong codes. Try again in ${STEP_UP_VERIFY_USER_FAILURE_LIMIT.windowSeconds / 60} minutes.`;
 export const STEP_UP_FAILED = "We couldn't check the code. Try again.";
 export const STEP_UP_NEEDED = "Confirm with a code from your authenticator app first, then save again.";
+export const STEP_UP_EXPIRED = "Your confirmation expired. Enter a new code from your authenticator app, then save again.";
 export const STEP_UP_ENROL = "Turn on two-factor authentication before you change these details.";
 export const STEP_UP_ENROL_LINK = "Go to Security settings";
 

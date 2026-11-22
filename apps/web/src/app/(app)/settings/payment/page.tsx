@@ -89,6 +89,7 @@ export default async function PaymentSettingsPage() {
                 bankAccountNumber: settings.bankAccountNumber,
                 bankSwiftCode: settings.bankSwiftCode,
               }}
+              steppedUp={steppedUp}
             />
             <section aria-labelledby="qr-heading" className="flex flex-col gap-4 border-t border-border pt-6">
               <h2 id="qr-heading" className="text-lg font-semibold">
@@ -107,7 +108,7 @@ export default async function PaymentSettingsPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">{PAYMENT_QR_NONE}</p>
               )}
-              <PaymentQrForm action={uploadPaymentQr} version={settings.version} name={qrName} />
+              <PaymentQrForm action={uploadPaymentQr} version={settings.version} name={qrName} steppedUp={steppedUp} />
             </section>
           </>
         )}

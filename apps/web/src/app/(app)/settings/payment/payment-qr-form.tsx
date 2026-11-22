@@ -1,8 +1,8 @@
 "use client";
 
 import { PAYMENT_QR_MAX_BYTES } from "@crm/core/security";
-import { redirect, useRouter } from "next/navigation";
-import { type FormEvent, useActionState, useEffect, useRef, useState } from "react";
+import { redirect } from "next/navigation";
+import { type FormEvent, useActionState, useState } from "react";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,9 +20,10 @@ import {
   PAYMENT_QR_UPLOAD,
   PAYMENT_QR_UPLOADING,
   paymentQrLabel,
-  STEP_UP_NEEDED,
 } from "@/lib/auth/messages";
 import type { SaveResult } from "./bank-details-form";
+import { stepUpRefusal } from "./save-follow-up";
+import { useSaveFollowUp } from "./use-save-follow-up";
 
 interface FormProps {
   // uploadPaymentQr: called as (previous state, form data); it reads the file and the version from the form.
@@ -30,6 +31,8 @@ interface FormProps {
   version: number;
   // DuitNow QR or PayNow QR, by the workspace country.
   name: string;
+  // The page showed "Confirmed" (step-up fresh when it was rendered).
+  steppedUp: boolean;
 }
 
 const ERROR_ID = "qr-error";
@@ -41,26 +44,25 @@ const MESSAGES: Partial<Record<Exclude<SaveResult, { ok: true }>["status"], stri
   UPLOAD_TOO_LARGE: PAYMENT_QR_TOO_LARGE,
   UPLOAD_TYPE_NOT_ALLOWED: PAYMENT_QR_TYPE_NOT_ALLOWED,
   STORAGE_UNAVAILABLE: PAYMENT_QR_UNAVAILABLE,
-  STEP_UP_REQUIRED: STEP_UP_NEEDED,
   STALE_VERSION: BANK_STALE,
   FORBIDDEN: PAYMENT_FORBIDDEN,
 };
 
 // As the logo form (settings/branding): a file over the limit is refused here before it is sent; the server checks
 // the size, the bytes and step-up again.
-function QrFields({ action, version, name, unreachable }: FormProps & { unreachable: boolean }) {
+function QrFields({ action, version, name, steppedUp, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
   const [tooLarge, setTooLarge] = useState(false);
-  const router = useRouter();
-  const button = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (result?.ok) router.refresh();
-    if (result !== null || unreachable) button.current?.focus();
-  }, [result, unreachable, router]);
+  const [confirmedAtSubmit, setConfirmedAtSubmit] = useState(false);
+  const button = useSaveFollowUp(result, unreachable);
 
   if (result?.ok === false && result.status === "UNAUTHENTICATED") redirect("/sign-in");
-  const refused = result?.ok === false ? (MESSAGES[result.status] ?? PAYMENT_QR_FAILED) : null;
+  const refused =
+    result?.ok === false
+      ? result.status === "STEP_UP_REQUIRED"
+        ? stepUpRefusal(confirmedAtSubmit)
+        : (MESSAGES[result.status] ?? PAYMENT_QR_FAILED)
+      : null;
   const error = tooLarge ? PAYMENT_QR_TOO_LARGE : (refused ?? (unreachable ? PAYMENT_QR_FAILED : null));
   const currentVersion = result?.ok ? Math.max(result.data.version, version) : version;
 
@@ -68,6 +70,7 @@ function QrFields({ action, version, name, unreachable }: FormProps & { unreacha
     const qr = new FormData(event.currentTarget).get("qr");
     const over = qr instanceof File && qr.size > PAYMENT_QR_MAX_BYTES;
     setTooLarge(over);
+    setConfirmedAtSubmit(steppedUp);
     if (over) {
       event.preventDefault();
       button.current?.focus();
