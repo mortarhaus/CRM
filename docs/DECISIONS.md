@@ -25,6 +25,17 @@
 - **Versions:** none.
 - **Exception to a rule?** no (the QR key uses the existing FILE-03 exception of 2026-10-03)
 
+## 2026-11-22 — Upgrade Next.js from 16.4.2 to 16.4.6 (ten moderate advisories, GHSA-vvgp-ww4w-46vf and others) (UNI-13, UNI-14)
+- **Decision:** `next`, `@next/env` (`apps/web`) and `@next/eslint-plugin-next` (root) move from 16.4.2 to 16.4.6, exact pins. The lockfile moves only the Next.js packages and the `better-auth` / `auth` entries that resolve their `next` peer to the same version.
+- **Why:** Bob's PR #68 review (P3): `pnpm audit --prod` listed ten moderate advisories under `next` (vulnerable `>=16.4.0 <=16.4.4`, patched `>=16.4.5`), and `next build` printed a known-vulnerability notice and stopped every other build. Bob advised the upgrade before Phase 2 PR 5b, so the first step-up screen does not ship on a flagged version. 16.4.6 (published 2026-11-09) is the newest patch on the line. After the change `pnpm audit --prod` reports three moderate advisories, none in Next.js (`esbuild` through `drizzle-kit`, and `@vitest/mocker` 5.0.2, both only reached through `better-auth`'s dev tooling); `pnpm audit --audit-level high` is unchanged.
+- **Trade-offs:** none known. `pnpm build` passed twice in a row (the alternating stop is gone).
+- **Alternatives rejected:** waiting until after PR 5b (the step-up screen would ship on a flagged version); an audit ignore (a patched version exists).
+- **Scope / affects:** `apps/web/package.json`, `package.json`, `pnpm-lock.yaml`; rules UNI-13, UNI-14. No application code.
+- **Versions:** next 16.4.6, @next/env 16.4.6, @next/eslint-plugin-next 16.4.6 (all were 16.4.2); pnpm 11.6.0; Node 24.21.0.
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-11-22, in the Andy session, answering "8. ok" to the offer of a separate Next.js upgrade PR before PR 5b); builder chose 16.4.6 as the newest patch.
+
+
 ## 2026-11-20 — Phase 2 PR 5a: production `EMAIL_FROM` display name is `CRM`
 - **Decision:** the production SaaS sender is `CRM <no-reply@mortarhaus.com>`: display name `CRM`, address from the 2026-11-15 entry (ASK 7). It stays a setting (`EMAIL_FROM`, worker only), not a literal in code. No adapter or env change was needed: the existing `EMAIL_FROM` check in `apps/web/src/lib/env.ts` (`Name <address>`, one line) already accepts it, and `env.test.ts` now names this exact value among the accepted ones. The runbook (`docs/runbooks/phase-1-security.md`, email section) records the value and drops "display name" from its pending items.
 - **Why:** the open half of ASK 7 (Phase 1 plan item 7: "address and display name"); the runbook still said the name was undecided.
