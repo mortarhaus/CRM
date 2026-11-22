@@ -23,7 +23,8 @@
 - **Alternatives rejected:** jsonb `bank_details` (no per-field CHECK or grant); a hash of the account number in the audit (Q26: no hash).
 - **Scope / affects:** `apps/web/src/lib/auth/step-up.ts`, `packages/core/src/security/limits.ts`, `apps/web/src/app/(app)/settings/payment/*`, `apps/web/src/app/(app)/files/payment-qr/route.ts`, `apps/web/src/db/settings/*`, `apps/web/src/db/system/workspaces.ts`, migrations 0030 and 0031, the runbook step-up row.
 - **Versions:** none.
-- **Exception to a rule?** no (the QR key uses the existing FILE-03 exception of 2026-10-03)
+- **Exception to a rule?** The QR key uses the existing FILE-03 exception of 2026-10-03. The audit entry deviates from spec line 803 ("last 4 digits + SHA-256"): Charlie decided last 4 only (Q26), so the next spec PR must drop the SHA-256 (recorded in `agents/PROJECT.md` §11).
+- **Decided by:** owner (Charlie, 2026-11-22, in the PR 5b brief, quoted above); builder: columns instead of jsonb, `BANK_NOTICE_DAYS` deferred, `PAYMENT_QR_MAX_BYTES` = logo limit as a proposal pending Charlie.
 
 ## 2026-11-22 — Upgrade Next.js from 16.4.2 to 16.4.6 (ten moderate advisories, GHSA-vvgp-ww4w-46vf and others) (UNI-13, UNI-14)
 - **Decision:** `next`, `@next/env` (`apps/web`) and `@next/eslint-plugin-next` (root) move from 16.4.2 to 16.4.6, exact pins. The lockfile moves only the Next.js packages and the `better-auth` / `auth` entries that resolve their `next` peer to the same version.

@@ -76,7 +76,7 @@ The header must hold **exactly one** valid address. A list (`a, b`), a malformed
 `none` gives the placeholder `192.0.2.1` (TEST-NET-1), shared by every such request: the IP limits then hold
 for the whole deployment at once (fail closed), and the process logs `{"level":"warn","msg":"client ip fallback"}`.
 
-**Next.js fills a missing `X-Forwarded-For`.** Next 16.4.2 sets `X-Forwarded-For` to the socket peer when the
+**Next.js fills a missing `X-Forwarded-For`.** Next 16.4.x (checked on 16.4.6) sets `X-Forwarded-For` to the socket peer when the
 request has none (`next/dist/server/base-server.js:567`). With `x-forwarded-for` configured and an edge that
 does not set it, the key is the **edge's** address, not the placeholder, and no warning is logged: every client
 shares the edge's counters. Checked in `rate-limit.test.ts` (the key is 127.0.0.1 there).

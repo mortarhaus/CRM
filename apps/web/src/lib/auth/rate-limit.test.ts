@@ -309,7 +309,7 @@ describe.each(TRUSTED_HEADERS)("behind an edge that sets %s", (trustedHeader) =>
   it(
     "fallback: with the header malformed (or, under cf-connecting-ip, missing), every request shares the placeholder key",
     async () => {
-      // Under x-forwarded-for, Next 16.4.2 fills a missing header with the socket peer (server/base-server.js:567),
+      // Under x-forwarded-for, Next 16.4.x (checked on 16.4.6) fills a missing header with the socket peer (next/dist/server/base-server.js:604),
       // which is the edge itself: the next test.
       const modes: EdgeMode[] = trustedHeader === "x-forwarded-for" ? ["malformed"] : ["omit", "malformed"];
       for (let i = 0; i < SIGN_IN_IP_LIMIT.max; i += 1) {
