@@ -23,7 +23,7 @@ import {
 } from "@/lib/auth/messages";
 import type { SaveResult } from "./bank-details-form";
 import { stepUpRefusal } from "./save-follow-up";
-import { useSaveFollowUp } from "./use-save-follow-up";
+import { useSaveFollowUp, useStepUpRefusal } from "./use-save-follow-up";
 
 interface FormProps {
   // uploadPaymentQr: called as (previous state, form data); it reads the file and the version from the form.
@@ -55,13 +55,13 @@ function QrFields({ action, version, name, steppedUp, unreachable }: FormProps &
   const [tooLarge, setTooLarge] = useState(false);
   const [confirmedAtSubmit, setConfirmedAtSubmit] = useState(false);
   const button = useSaveFollowUp(result, unreachable);
+  const stepUpRefused = useStepUpRefusal(result, steppedUp);
 
   if (result?.ok === false && result.status === "UNAUTHENTICATED") redirect("/sign-in");
-  const refused =
-    result?.ok === false
-      ? result.status === "STEP_UP_REQUIRED"
-        ? stepUpRefusal(confirmedAtSubmit)
-        : (MESSAGES[result.status] ?? PAYMENT_QR_FAILED)
+  const refused = stepUpRefused
+    ? stepUpRefusal(confirmedAtSubmit)
+    : result?.ok === false && result.status !== "STEP_UP_REQUIRED"
+      ? (MESSAGES[result.status] ?? PAYMENT_QR_FAILED)
       : null;
   const error = tooLarge ? PAYMENT_QR_TOO_LARGE : (refused ?? (unreachable ? PAYMENT_QR_FAILED : null));
   const currentVersion = result?.ok ? Math.max(result.data.version, version) : version;
