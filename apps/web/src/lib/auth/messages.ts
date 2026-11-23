@@ -1,6 +1,7 @@
 import {
   ADDRESS_LINE_MAX_LENGTH,
   NAME_MAX_LENGTH,
+  NUMBER_SEQ_MAX_WIDTH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   PAYMENT_QR_MAX_BYTES,
@@ -9,6 +10,7 @@ import {
   STEP_UP_WINDOW_SECONDS,
   WORKSPACE_NAME_MAX_LENGTH,
 } from "@crm/core/security";
+import type { PatternError, ResetRule } from "@crm/core/numbering";
 import type { Country } from "@crm/core/settings";
 import type { LimitErrorCode } from "./input-limits";
 
@@ -124,6 +126,56 @@ export const GENERAL_SAVED_NEW_DOCUMENTS = "Settings saved. The change to the ba
 export const GENERAL_STALE = "Someone else changed these settings after this page loaded. Reload the page, then save again.";
 export const GENERAL_FORBIDDEN = "Only an Admin or Owner can change these settings.";
 export const GENERAL_FAILED = "We couldn't save the settings. Try again.";
+
+// /settings/numbering (plan Task 19; builder copy, except "applies to new documents only", spec "Numbering").
+export const NUMBERING_TITLE = "Document numbering";
+export const NUMBERING_INTRO = "How invoice numbers are built. An invoice gets its number when it is issued, never as a draft.";
+export const NUMBERING_PATTERN = "Invoice number pattern";
+export const NUMBERING_PATTERN_HINT =
+  "Use {CODE} for the short code, {YYYY} or {YY} for the year, {MM} for the month and {SEQ:4} for the counter (4 digits), with any text between.";
+export const NUMBERING_RESET = "Start the counter again at 1";
+export const NUMBERING_RESET_HINT = "On the first day of each period, in the workspace timezone.";
+export const RESET_RULE_LABELS: Readonly<Record<ResetRule, string>> = {
+  never: "Never",
+  yearly: "Every year",
+  monthly: "Every month",
+};
+export const NUMBERING_PREVIEW = "Next invoice number";
+export const NUMBERING_NO_PREVIEW = "No preview";
+export const NUMBERING_NO_CODE = "Set a short code in General settings to use {CODE}.";
+export const NUMBERING_INVALID = "Check the pattern and the reset rule.";
+export const NUMBERING_SAVE = "Save numbering";
+export const NUMBERING_SAVING = "Saving…";
+export const NUMBERING_SAVED = "Numbering saved. The change applies to new documents only.";
+export const NUMBERING_STALE = "Someone else changed the numbering after this page loaded. Reload the page, then save again.";
+export const NUMBERING_FORBIDDEN = "Only an Admin or Owner can change document numbering.";
+export const NUMBERING_FAILED = "We couldn't save the numbering. Try again.";
+
+// Why a typed pattern is refused (parsePatternFor), in the words the field shows.
+export function patternErrorMessage(error: PatternError): string {
+  switch (error.code) {
+    case "EMPTY":
+      return "Enter a pattern.";
+    case "TOO_LONG":
+      return `Use at most ${error.max} characters.`;
+    case "UNKNOWN_TOKEN":
+      return `${error.token} is not a token. Use {CODE}, {YYYY}, {YY}, {MM} or {SEQ:n}.`;
+    case "UNMATCHED_BRACE":
+      return "Each { needs a closing }.";
+    case "SEQ_WIDTH":
+      return `In {SEQ:n}, n is a number from 1 to ${NUMBER_SEQ_MAX_WIDTH}.`;
+    case "INVALID_CHARACTER":
+      return "Remove the special formatting characters.";
+    case "NO_SEQ":
+      return "Add the counter, {SEQ:n}.";
+    case "MULTIPLE_SEQ":
+      return "Use the counter, {SEQ:n}, only once.";
+    case "PERIOD_MISSING":
+      return error.resetRule === "yearly"
+        ? "A counter that starts again every year needs {YYYY} or {YY}, or numbers would repeat."
+        : "A counter that starts again every month needs the year and {MM}, or numbers would repeat.";
+  }
+}
 
 // Step-up (plan Task 13; builder copy). The minutes follow the limits.
 export const STEP_UP_HEADING = "Confirm it's you";
