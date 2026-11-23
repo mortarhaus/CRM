@@ -316,6 +316,7 @@ errors in `apps/web` (TEN-09). `crm_migrator` and `crm_worker` have no policy on
 | `idempotency_key` | SELECT, INSERT, DELETE, UPDATE (`response` only) | `idempotency_key_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update`, `_app_delete` | migrations 0013 (table) and 0014 (RLS, grants) |
 | `domain_event` | SELECT, INSERT (append-only, TEN-03) | `domain_event_workspace` (RESTRICTIVE), `_app_select`, `_app_insert` | migrations 0019 (table) and 0020 (RLS, grants) |
 | `notification` | SELECT, INSERT, UPDATE (`read_at` only) | `notification_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update` | migrations 0019 (table) and 0020 (RLS, grants) |
+| `doc_sequence` | SELECT, INSERT, UPDATE (`pattern`, `reset_rule`, `counter`, `last_reset_period`, `version`, `updated_at`); no DELETE, so a counter is never removed and a number never given twice; nothing for `crm_purge` | `doc_sequence_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update` | migrations 0033 (table) and 0034 (RLS, grants) |
 
 Every new workspace gets its `workspace_settings` row from Better Auth's `afterCreateOrganization` hook
 (`apps/web/src/db/system/workspaces.ts`, `ensureWorkspaceSettings`). It is a second write after Better

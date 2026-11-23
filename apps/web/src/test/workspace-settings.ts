@@ -28,9 +28,6 @@ export type OnboardedSettings = {
   default_tax_rate_bps: number | null;
 };
 
-// The settings row of the user's one workspace, for E2E (Phase 2 plan Task 8). The workspace is found through
-// `member` as crm_migrator (a system table, no RLS); the row is read as crm_app under that workspace's setting, since
-// workspace_settings forces RLS and has no policy for the migrator.
 export type SeededSequence = {
   doc_type: string;
   pattern: string;
@@ -38,7 +35,8 @@ export type SeededSequence = {
   counter: number;
 };
 
-// The document counters of the user's one workspace, for E2E (Phase 2 plan Task 18: onboarding seeds the invoice's).
+// The document counters of the user's one workspace, for E2E (Phase 2 plan Task 18: onboarding seeds the invoice's),
+// read the same way as readWorkspaceSettings below (doc_sequence forces RLS too).
 export async function readDocSequences(email: string): Promise<SeededSequence[]> {
   const migrator = postgres(envValue("DATABASE_MIGRATOR_URL"), { max: 1, onnotice: () => {} });
   const app = createDb(envValue("DATABASE_URL"), { max: 1 });
@@ -55,6 +53,9 @@ export async function readDocSequences(email: string): Promise<SeededSequence[]>
   }
 }
 
+// The settings row of the user's one workspace, for E2E (Phase 2 plan Task 8). The workspace is found through
+// `member` as crm_migrator (a system table, no RLS); the row is read as crm_app under that workspace's setting, since
+// workspace_settings forces RLS and has no policy for the migrator.
 export async function readWorkspaceSettings(email: string): Promise<OnboardedSettings> {
   const migrator = postgres(envValue("DATABASE_MIGRATOR_URL"), { max: 1, onnotice: () => {} });
   const app = createDb(envValue("DATABASE_URL"), { max: 1 });
