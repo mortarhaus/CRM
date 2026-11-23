@@ -2,6 +2,17 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+
+## 2026-11-23 — CI: the "Image, Trivy, E2E" job timeout goes from 60 to 90 minutes (UNI-13)
+- **Decision:** `timeout-minutes` of the `image` job in `.github/workflows/ci.yml` is 90 (was 60). Nothing else in the workflow changes.
+- **Why:** on PR #71 (run 45095688151) every step passed and the `E2E against the image` step was cancelled by the 60-minute job limit at test 216 of the serial run (one worker, three projects: chromium, tablet-768, mobile-320). PR #68's run took 49 minutes for 212 tests; PR #71 adds 5 tests per project (the bank-details spec, about 2.5 minutes per project), which pushed the total past 60. No test failed.
+- **Trade-offs:** a longer worst case for a hung job; the repo is public while a PR needs CI, so the minutes are free. The run will keep growing as Phase 2 adds specs.
+- **Alternatives rejected:** sharding the three Playwright projects into parallel jobs (a larger CI change, worth its own PR when the run nears the new limit); skipping the new spec at some widths (loses the 320 px checks Bob requires, FE-70).
+- **Scope / affects:** `.github/workflows/ci.yml` only.
+- **Versions:** none.
+- **Exception to a rule?** no
+- **Decided by:** builder (Andy), on Charlie's report "ci image cancelled" (2026-11-23); owner may prefer sharding.
+
 ## 2026-11-23 — Phase 2 PR 5c: owner email on a bank-details or QR change; QR size and shape confirmed
 - **Owner answers (Charlie):**
   - Q18 email wording (2026-11-22, accepting the builder's draft: "yes edit the email template or ask you to change it if needed"): subject "Payment details changed on {{workspace_name}}"; body "Hi {{owner_name}}, The payment details for {{workspace_name}} were changed on {{changed_at}} by {{changed_by}}. What changed: {{what_changed}}. For your safety this email never shows account numbers. If you didn't expect this change, open Settings, then Payment, and review it now."
