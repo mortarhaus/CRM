@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createEmailAdapter, type EmailAdapter } from "../adapters/email";
 import { openDatabase } from "../db/system";
 import { withWorkspace } from "../db/workspace";
-import { MAILPIT_IMAGE, searchMessages } from "../test/mailpit";
+import { getMessage, MAILPIT_IMAGE, type MailpitMessageBody, searchMessages } from "../test/mailpit";
 import { startDatabase, type TestDatabase } from "../test/postgres";
 import { startWorker, type WorkerHandle } from "../worker/start";
 import { bankDetailsEmailHandler } from "./bank-details-email";
@@ -83,13 +83,12 @@ async function jobState(id: string): Promise<string | undefined> {
 const completed = (id: string) =>
   waitFor("job completed", async () => ((await jobState(id)) === "completed" ? true : undefined));
 
-async function messageOf(to: string): Promise<{ Subject: string; Text: string; HTML: string }> {
+async function messageOf(to: string): Promise<MailpitMessageBody> {
   const [found] = await waitFor("message in Mailpit", async () => {
     const messages = await searchMessages(to, mailpitUrl);
     return messages.length > 0 ? messages : undefined;
   });
-  const response = await fetch(`${mailpitUrl}/api/v1/message/${found?.ID ?? ""}`);
-  return (await response.json()) as { Subject: string; Text: string; HTML: string };
+  return getMessage(found?.ID ?? "", mailpitUrl);
 }
 
 beforeAll(async () => {
