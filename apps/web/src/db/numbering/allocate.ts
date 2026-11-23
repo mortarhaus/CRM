@@ -1,0 +1,67 @@
+import { formatNumber, nextSequence, parsePattern } from "@crm/core/numbering";
+import { and, eq, sql } from "drizzle-orm";
+import { docSequence, workspaceSettings } from "../schema";
+import { currentWorkspaceId, NoWorkspaceError, type Tx } from "../workspace";
+import { type DocSequence, type DocType, findSequence, NoSequenceError, resetRuleOf } from "./sequence";
+
+export class NumberingNotReadyError extends Error {
+  constructor(reason: string) {
+    super(`numbering is not ready: ${reason}`);
+    this.name = "NumberingNotReadyError";
+  }
+}
+
+// What a number needs besides the counter: the short code ({CODE}) and the workspace time zone (period tokens,
+// REC-08), read in the same transaction. No lock: the allocator's lock is the doc_sequence row only.
+async function workspaceInputs(tx: Tx): Promise<{ code: string | null; timeZone: string }> {
+  const id = currentWorkspaceId();
+  if (id === undefined) throw new NoWorkspaceError();
+  const [row] = await tx
+    .select({ code: workspaceSettings.shortCode, timeZone: workspaceSettings.timezone })
+    .from(workspaceSettings)
+    .where(eq(workspaceSettings.workspaceId, id));
+  if (!row?.timeZone) throw new NumberingNotReadyError("the workspace has no time zone (not onboarded)");
+  return { code: row.code, timeZone: row.timeZone };
+}
+
+// The number the row gives next at `at`, and the counter state that goes with it. The one path for the preview and
+// the allocator: the same nextSequence and the same formatNumber (plan Risk 4). formatNumber throws MissingCodeError
+// when the pattern uses {CODE} and the workspace has no short code.
+async function nextNumber(tx: Tx, row: DocSequence, at: Date): Promise<{ number: string; seq: number; period: string }> {
+  const parsed = parsePattern(row.pattern);
+  if (!parsed.ok) throw new NumberingNotReadyError(`the stored pattern is refused (${parsed.error.code})`);
+  const { code, timeZone } = await workspaceInputs(tx);
+  const { seq, period } = nextSequence(
+    { resetRule: resetRuleOf(row), counter: row.counter, lastResetPeriod: row.lastResetPeriod },
+    at,
+    timeZone,
+  );
+  return { number: formatNumber(parsed.pattern, { code, seq, at, timeZone }), seq, period };
+}
+
+// Takes the next number (spec "Numbering"; REC-06, REC-07). Called only inside the transaction that issues or sends
+// the document (Phase 4 onward; in Phase 2 only by tests): the row lock (SELECT … FOR UPDATE on this one
+// doc_sequence row) serialises concurrent issues of the same type in the same workspace and nothing else, and is held
+// until that transaction ends. The counter moves in the same transaction, so a rollback gives the number back and
+// leaves no gap. The counter starts again at 1 when the period of `at` (workspace time zone) differs from the stored
+// one.
+export async function allocateNumber(tx: Tx, docType: DocType, at: Date): Promise<string> {
+  const row = await findSequence(tx, docType, { forUpdate: true });
+  if (!row) throw new NoSequenceError(docType);
+  const next = await nextNumber(tx, row, at);
+  const updated = await tx
+    .update(docSequence)
+    .set({ counter: next.seq, lastResetPeriod: next.period, updatedAt: sql`now()` })
+    .where(and(eq(docSequence.workspaceId, row.workspaceId), eq(docSequence.docType, docType)))
+    .returning({ counter: docSequence.counter });
+  if (updated.length !== 1) throw new Error("doc_sequence row not updated");
+  return next.number;
+}
+
+// The number allocateNumber would give at `at` if nothing else issues first (counter + 1, or 1 in a new period).
+// No lock and no write: a preview never takes or holds a number.
+export async function previewNumber(tx: Tx, docType: DocType, at: Date): Promise<string> {
+  const row = await findSequence(tx, docType);
+  if (!row) throw new NoSequenceError(docType);
+  return (await nextNumber(tx, row, at)).number;
+}

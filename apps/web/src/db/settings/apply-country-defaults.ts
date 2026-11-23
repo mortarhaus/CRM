@@ -1,4 +1,5 @@
 import { COUNTRY_DEFAULTS, type Country } from "@crm/core/settings";
+import { ensureInvoiceSequence } from "../numbering/sequence";
 import type { Tx } from "../workspace";
 import { getSettings, type SettingsPatch, updateSettings, type WorkspaceSettings } from "./workspace-settings";
 
@@ -25,7 +26,7 @@ export class AlreadyOnboardedError extends Error {
 // Onboarding (Phase 2 plan Task 8): runs once, while the workspace has no country, in the caller's withWorkspace
 // transaction (action(), Owner). Each value fills only a field that is still empty, so an existing setting is never
 // overwritten, and a country default that is unresolved (null) is not written at all. Versioned and audited
-// through updateSettings.
+// through updateSettings. The invoice counter is seeded with the country's pattern and reset rule (plan Task 18).
 export async function applyCountryDefaults(
   tx: Tx,
   answer: OnboardingAnswer,
@@ -53,5 +54,7 @@ export async function applyCountryDefaults(
     fill("defaultTaxName", answer.tax.taxName);
     fill("defaultTaxRateBps", answer.tax.taxRateBps);
   }
-  return updateSettings(tx, patch, expectedVersion, actorUserId, "workspace_settings.onboarded");
+  const updated = await updateSettings(tx, patch, expectedVersion, actorUserId, "workspace_settings.onboarded");
+  await ensureInvoiceSequence(tx, answer.country, actorUserId);
+  return updated;
 }
