@@ -1,10 +1,12 @@
-import { Building2, Mail, Palette, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { Building2, Landmark, Mail, Palette, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { NavItem, type NavItemProps } from "./nav-item";
 
 const ICON = "size-5";
 
 interface NavLinksProps {
   showAdminSettings: boolean;
+  // Bank details: Owner only (spec line 798).
+  showOwnerSettings?: boolean;
   layout: NavItemProps["layout"];
   // The phone tab bar: four 4.5rem items do not fit at 320px, so General and Branding are reached through the menu
   // drawer there.
@@ -14,8 +16,8 @@ interface NavLinksProps {
 
 // The destinations that exist today, shared by the rail, the phone tab bar and the menu drawer (UNI-05: nothing
 // from a later phase). Email, General and Branding settings are Admin and Owner only (AUTH-03); each page and action checks
-// the role.
-export function NavLinks({ showAdminSettings, layout, quick = false, className }: NavLinksProps) {
+// the role. Bank details are Owner only.
+export function NavLinks({ showAdminSettings, showOwnerSettings = false, layout, quick = false, className }: NavLinksProps) {
   return (
     <ul className={className}>
       <li>
@@ -52,6 +54,11 @@ export function NavLinks({ showAdminSettings, layout, quick = false, className }
             layout={layout}
             icon={<Palette aria-hidden className={ICON} />}
           />
+        </li>
+      )}
+      {showOwnerSettings && !quick && (
+        <li>
+          <NavItem href="/settings/payment" label="Bank" layout={layout} icon={<Landmark aria-hidden className={ICON} />} />
         </li>
       )}
     </ul>

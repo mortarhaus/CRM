@@ -25,7 +25,12 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => undefined, getAll: () => [], set: setCookie }),
 }));
 vi.mock("../../db/index", () => ({ getDb: () => handle, getLimiterDb: () => limiter }));
-vi.mock("./server", () => ({ getAuth: () => auth, getAuthHandler: () => (request: Request) => auth.handler(request) }));
+// authFault: the status Better Auth's handler answers with instead of running (an outage), or null.
+let authFault: number | null = null;
+vi.mock("./server", () => ({
+  getAuth: () => auth,
+  getAuthHandler: () => (request: Request) => (authFault === null ? auth.handler(request) : new Response("{}", { status: authFault })),
+}));
 vi.mock("../env", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   getEnv: () => ({ APP_URL: ORIGIN, TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for", AUTH_SECRET: SECRET }),
@@ -157,6 +162,7 @@ beforeEach(async () => {
   // Every test starts with fresh counters, Better Auth's per-IP rows included.
   await admin`delete from rate_limit`;
   setCookie.mockClear();
+  authFault = null;
 });
 
 describe("requireStepUp", () => {
@@ -266,11 +272,11 @@ describe("verifyStepUp", () => {
     for (const { key } of keys) expect(key).not.toContain(code);
   });
 
-  it("gives RATE_LIMITED on the 11th check of one user in 60 s, even from a new IP address each time", async () => {
+  it("gives RATE_LIMITED after 5 failures of one user in 15 minutes, even from a new IP address each time", async () => {
     const party = await newParty("limit");
     if (!party.totp) throw new Error("no TOTP");
     const wrong = wrongTotpCode(party.totp);
-    for (let attempt = 1; attempt <= 10; attempt += 1) {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
       signedInAs(party.first, `203.0.113.${attempt}`);
       expect(await verifyStepUp({ code: wrong })).toEqual({ ok: false, status: "WRONG_CODE" });
     }
@@ -280,6 +286,29 @@ describe("verifyStepUp", () => {
     signedInAs(party.second, "198.51.100.1");
     expect(await verifyStepUp({ code: codeAt(party.totp) })).toEqual({ ok: false, status: "RATE_LIMITED" });
     expect(await admin`select 1 from step_up where workspace_id = ${party.workspaceId}`).toHaveLength(0);
+  });
+
+  it("counts failures only: an accepted code gives its unit back", async () => {
+    const party = await newParty("failures");
+    if (!party.totp) throw new Error("no TOTP");
+    const wrong = wrongTotpCode(party.totp);
+    signedInAs(party.first);
+    for (let attempt = 1; attempt <= 4; attempt += 1) expect((await verifyStepUp({ code: wrong })).status).toBe("WRONG_CODE");
+    expect((await verifyStepUp({ code: codeAt(party.totp) })).ok).toBe(true);
+    // The fifth failure is still checked; only the sixth check is refused.
+    expect(await verifyStepUp({ code: wrong })).toEqual({ ok: false, status: "WRONG_CODE" });
+    expect(await verifyStepUp({ code: codeAt(party.totp, 1) })).toEqual({ ok: false, status: "RATE_LIMITED" });
+    const [row] = await admin<{ count: number; window_seconds: number }[]>`
+      select count, window_seconds from rate_limit where key = ${`step-up:user:${party.userId}`}`;
+    expect(row).toEqual({ count: 5, window_seconds: 900 });
+  });
+
+  it("throws, never WRONG_CODE, when Better Auth answers with a server error, and records nothing", async () => {
+    const party = await newParty("outage");
+    signedInAs(party.first);
+    authFault = 503;
+    await expect(verifyStepUp({ code: codeAt(party.totp) })).rejects.toThrow("Step-up code check failed: 503");
+    expect(await admin`select 1 from step_up where session_id = ${party.first.id}`).toHaveLength(0);
   });
 
   it("gives RATE_LIMITED when Better Auth's two-factor-verify row for the IP is spent", async () => {

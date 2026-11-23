@@ -50,9 +50,10 @@ export function characterCount(value: string): number {
 
 // Step-up (spec "Authorization": a fresh TOTP within the last 5 minutes for high-risk actions; Phase 2 plan Task 13).
 export const STEP_UP_WINDOW_SECONDS = 5 * 60;
-// Builder proposal (DECISIONS 2026-11-20): a step-up code check is also counted per user, with the 2FA verify row's
-// numbers, so a held session cannot spread guesses over many IP addresses.
-export const STEP_UP_VERIFY_USER_LIMIT: RateLimit = TWO_FACTOR_VERIFY_IP_LIMIT;
+// Step-up code checks per user, failures only (Charlie 2026-11-22, Bob PR #68 P2; DECISIONS 2026-11-22): the sign-in
+// account cap's numbers, so a held session cannot spread guesses over many IP addresses; an accepted code gives its
+// unit back.
+export const STEP_UP_VERIFY_USER_FAILURE_LIMIT: RateLimit = { windowSeconds: 15 * 60, max: 5 };
 // A code accepted for step-up is refused again for this long, for every session of the user. Better Auth 1.7.14 checks
 // a TOTP of 30 s steps with a window of one step either side (@better-auth/utils otp verifyTOTP), so one code is valid
 // for at most 3 steps (90 s); one more step covers clock skew between the app and the database.
@@ -61,3 +62,6 @@ export const STEP_UP_CODE_REUSE_SECONDS = 4 * 30;
 // Uploads (Phase 2 plan Q12; FILE-02). The logo is at most 2 MB (2 * 1024 * 1024 bytes), PNG or JPG only, checked by
 // magic bytes (Charlie, 2026-11-11; DECISIONS 2026-11-11).
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+// The payment QR (DuitNow/PayNow), PNG or JPG by magic bytes. Builder proposal pending Charlie (PR 5b ASK): the logo's
+// limit, which any phone screenshot of a bank's QR fits.
+export const PAYMENT_QR_MAX_BYTES = LOGO_MAX_BYTES;

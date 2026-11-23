@@ -2,6 +2,30 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-22 — Phase 2 PR 5b: bank details and payment QR (Owner, step-up); step-up limit counts failures only
+- **Owner answers (Charlie, 2026-11-22), quoted from the PR 5b brief:**
+  - Q17 bank fields: "bank name, account holder name, account number (these three required); DuitNow ID/QR and SWIFT code optional. Singapore: same, PayNow QR optional. Other countries: same basics plus optional QR."
+  - Step-up per-user limit (Bob PR #68 P2): "count FAILURES only, 5 per 15 minutes per user. Use consumeUnit, then giveBackUnit (with the returned windowStart) once the code is accepted, as the sign-in account counter does. Keep Better Auth's per-IP row and the one-use marker."
+  - Bob PR #68 P3: "a Better Auth 5xx must not be reported as WRONG_CODE."
+  - Q26: "the audit entry stores the LAST 4 digits of the account number only, no hash; the QR is stored as its key (spec line 799)."
+  - require_2fa: "only the Owner may switch it on, and doing so needs step-up."
+  - Bank details and QR: "Owner only, with step-up (spec lines 788, 798)." The QR is content-addressed (the 2026-10-03 FILE-03 exception). No owner email in 5b (PR 5c).
+- **Decision:**
+  - `STEP_UP_VERIFY_USER_FAILURE_LIMIT` = 5 per 900 s, failures only (`giveBackUnit` after the one-use marker is granted); supersedes the 10 per 60 s of the 2026-11-20 step-up entry. A Better Auth 5xx throws (the page shows its generic error) and keeps the unit spent; a 429 is `RATE_LIMITED`.
+  - Bank details are six columns of `workspace_settings` (`bank_name`, `bank_account_holder`, `bank_account_number`, `bank_swift_code`, `duitnow_qr_key`, `bank_details_changed_at`; migrations 0030 and 0031, per-column UPDATE grants), not the plan's `bank_details` jsonb: CHECKs (all three required fields set or none; SWIFT ISO 9362; QR key `ws/<workspace>/duitnow/<sha256>.(png|jpg)`), per-column grants and the existing settings audit work per column.
+  - Audit (`workspace_settings.bank_details_updated`): the account number as `{"last4": ...}`, the holder as `[pii]`, the QR as its key. A save that changes nothing writes no audit and no notification.
+  - Each change gives every Owner of the workspace an in-app `notification` row (`bank_details_changed`, target the workspace settings) in the same transaction (plan Task 15).
+  - The QR is served by `/files/payment-qr` to the Owner only (404 otherwise, as the logo route); a replaced QR stays in storage.
+  - The `require_2fa` toggle is not in this PR (the plan does not assign it); only the decision above is recorded.
+  - `BANK_NOTICE_DAYS` (plan Task 14) is not added: nothing reads it until Phase 4 printing (PROJECT.md §9, UNI-05).
+- **Why:** owner answers above; Bob PR #68 P2 and P3.
+- **Trade-offs:** columns instead of jsonb mean a migration for any new bank field. `PAYMENT_QR_MAX_BYTES` equals the logo limit as a builder proposal, pending Charlie.
+- **Alternatives rejected:** jsonb `bank_details` (no per-field CHECK or grant); a hash of the account number in the audit (Q26: no hash).
+- **Scope / affects:** `apps/web/src/lib/auth/step-up.ts`, `packages/core/src/security/limits.ts`, `apps/web/src/app/(app)/settings/payment/*`, `apps/web/src/app/(app)/files/payment-qr/route.ts`, `apps/web/src/db/settings/*`, `apps/web/src/db/system/workspaces.ts`, migrations 0030 and 0031, the runbook step-up row.
+- **Versions:** none.
+- **Exception to a rule?** The QR key uses the existing FILE-03 exception of 2026-10-03. The audit entry deviates from spec line 803 ("last 4 digits + SHA-256"): Charlie decided last 4 only (Q26), so the next spec PR must drop the SHA-256 (recorded in `agents/PROJECT.md` §11).
+- **Decided by:** owner (Charlie, 2026-11-22, in the PR 5b brief, quoted above); builder: columns instead of jsonb, `BANK_NOTICE_DAYS` deferred, `PAYMENT_QR_MAX_BYTES` = logo limit as a proposal pending Charlie.
+
 ## 2026-11-22 — Upgrade Next.js from 16.4.2 to 16.4.6 (ten moderate advisories, GHSA-vvgp-ww4w-46vf and others) (UNI-13, UNI-14)
 - **Decision:** `next`, `@next/env` (`apps/web`) and `@next/eslint-plugin-next` (root) move from 16.4.2 to 16.4.6, exact pins. The lockfile moves only the Next.js packages and the `better-auth` / `auth` entries that resolve their `next` peer to the same version.
 - **Why:** Bob's PR #68 review (P3): `pnpm audit --prod` listed ten moderate advisories under `next` (vulnerable `>=16.4.0 <=16.4.4`, patched `>=16.4.5`), and `next build` printed a known-vulnerability notice and stopped every other build. Bob advised the upgrade before Phase 2 PR 5b, so the first step-up screen does not ship on a flagged version. 16.4.6 (published 2026-11-09) is the newest patch on the line. After the change `pnpm audit --prod` reports three moderate advisories, none in Next.js (`esbuild` through `drizzle-kit`, and `@vitest/mocker` 5.0.2, both only reached through `better-auth`'s dev tooling); `pnpm audit --audit-level high` is unchanged.
@@ -11,6 +35,7 @@
 - **Versions:** next 16.4.6, @next/env 16.4.6, @next/eslint-plugin-next 16.4.6 (all were 16.4.2); pnpm 11.6.0; Node 24.21.0.
 - **Exception to a rule?** no
 - **Decided by:** owner (Charlie, 2026-11-22, in the Andy session, answering "8. ok" to the offer of a separate Next.js upgrade PR before PR 5b); builder chose 16.4.6 as the newest patch.
+
 
 ## 2026-11-20 — Phase 2 PR 5a: production `EMAIL_FROM` display name is `CRM`
 - **Decision:** the production SaaS sender is `CRM <no-reply@mortarhaus.com>`: display name `CRM`, address from the 2026-11-15 entry (ASK 7). It stays a setting (`EMAIL_FROM`, worker only), not a literal in code. No adapter or env change was needed: the existing `EMAIL_FROM` check in `apps/web/src/lib/env.ts` (`Name <address>`, one line) already accepts it, and `env.test.ts` now names this exact value among the accepted ones. The runbook (`docs/runbooks/phase-1-security.md`, email section) records the value and drops "display name" from its pending items.

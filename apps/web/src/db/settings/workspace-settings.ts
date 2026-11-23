@@ -21,7 +21,15 @@ const PII_COLUMNS = [
   "own_brn",
   "email_from_name",
   "email_reply_to",
+  "bank_account_holder",
 ] as const;
+
+// The bank account number is audited as its last 4 characters only, never in full and never hashed (spec line 799;
+// plan Q26, Charlie 2026-11-22: "last 4 digits of the account number only, no hash").
+const AUDIT_MASKS: Partial<Record<string, (value: unknown) => unknown>> = {
+  bank_account_number: (value) => (typeof value === "string" ? { last4: value.slice(-4) } : value),
+};
+const audited = (column: string, value: unknown) => AUDIT_MASKS[column]?.(value) ?? value;
 
 const COLUMNS = getTableColumns(workspaceSettings);
 
@@ -69,13 +77,16 @@ export async function findShellSettings(tx: Tx): Promise<{ brandColour: string |
 
 // Optimistic concurrency: the patch applies only to the version the caller read, which becomes version + 1. The row
 // is locked first, so the audit's before is the row the update replaces. Only changed fields are written to the audit
-// entry, under their column names, with PII_COLUMNS redacted. An unchanged patch writes nothing.
+// entry, under their column names, with AUDIT_MASKS applied and PII_COLUMNS redacted. An unchanged patch writes nothing.
 export async function updateSettings(
   tx: Tx,
   patch: SettingsPatch,
   expectedVersion: number,
   actorUserId: string,
-  auditAction: "workspace_settings.updated" | "workspace_settings.onboarded" = "workspace_settings.updated",
+  auditAction:
+    | "workspace_settings.updated"
+    | "workspace_settings.onboarded"
+    | "workspace_settings.bank_details_updated" = "workspace_settings.updated",
 ): Promise<WorkspaceSettings> {
   const current = await getSettings(tx, { forUpdate: true });
   if (current.version !== expectedVersion) throw new StaleSettingsError();
@@ -92,7 +103,7 @@ export async function updateSettings(
   if (!updated) throw new StaleSettingsError();
 
   const snapshot = (row: WorkspaceSettings) =>
-    Object.fromEntries([...changed, "version" as const].map((key) => [COLUMNS[key].name, row[key]]));
+    Object.fromEntries([...changed, "version" as const].map((key) => [COLUMNS[key].name, audited(COLUMNS[key].name, row[key])]));
   await recordAudit(tx, {
     actorUserId,
     action: auditAction,

@@ -34,6 +34,7 @@ export {
   findMembership,
   getMembership,
   healWorkspaceSettings,
+  listOwnerIds,
   listWorkspaceIds,
   WORKSPACE_ROLES,
   type WorkspaceRole,

@@ -43,6 +43,14 @@ const ENTRY_POINTS: Record<string, { exports: string[]; coveredBy: string }> = {
       "member of another workspace (TEN-05). No mutating method; the upload is the uploadLogo server action " +
       "(files/logo/route.test.ts, e2e/logo.spec.ts; Phase 2 plan Task 12).",
   },
+  "apps/web/src/app/(app)/files/payment-qr/route.ts": {
+    exports: ["GET"],
+    coveredBy:
+      "Read-only: streams the active workspace's current payment QR to its Owner (requireWorkspaceMember('owner'), " +
+      "then withWorkspace and a match against workspace_settings.duitnow_qr_key); 404 for anything else, including " +
+      "an Admin and another workspace's Owner (TEN-05). No mutating method; the upload is the uploadPaymentQr server " +
+      "action (settings/payment/actions.test.ts; Phase 2 plan Task 14).",
+  },
   "apps/web/src/proxy.ts": {
     exports: ["proxy"],
     coveredBy: "Sets headers only, reads no database (AUTH-11); security-headers.test.ts (plan Task 25). Not a mutation path.",

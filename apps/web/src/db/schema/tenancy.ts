@@ -12,8 +12,8 @@ import { organization } from "./auth";
 // A stored text value is 1 to max code points; an empty value is stored as null.
 const bounded = (column: AnyColumn, max: number): SQL => sql`char_length(${column}) between 1 and ${sql.raw(String(max))}`;
 
-// One row per workspace, under RLS (spec Tenancy). The spec line-460 columns except bank details, duitnow_qr_key
-// (Phase 2 PR 5) and proposal cover options (Phase 6, plan Q24). Every column is nullable or defaulted, so a row made
+// One row per workspace, under RLS (spec Tenancy). The spec line-460 columns except proposal cover options (Phase 6,
+// plan Q24). Every column is nullable or defaulted, so a row made
 // before Phase 2 stays valid (UNI-15); defaults are only the spec's own. Business values are applied by the country
 // defaults at onboarding (Phase 2 PR 3), never here.
 export const workspaceSettings = pgTable(
@@ -51,6 +51,16 @@ export const workspaceSettings = pgTable(
     autoSendDefault: boolean("auto_send_default"),
     defaultAgreementPattern: text("default_agreement_pattern").notNull().default("service_agreement"),
     require2fa: boolean("require_2fa").notNull().default(false),
+    // Bank details (Phase 2 PR 5b; plan Q17, Charlie 2026-11-22): bank name, account holder and account number are
+    // set together or not at all; the SWIFT code and the payment QR are optional. Owner only, with step-up.
+    bankName: text("bank_name"),
+    bankAccountHolder: text("bank_account_holder"),
+    bankAccountNumber: text("bank_account_number"),
+    bankSwiftCode: text("bank_swift_code"),
+    // The payment QR (DuitNow in MY, PayNow in SG), content-addressed and never deleted (spec line 847).
+    duitnowQrKey: text("duitnow_qr_key"),
+    // The last change to the bank details or the QR: invoices print "Bank details updated on {date}" (Phase 4).
+    bankDetailsChangedAt: timestamp("bank_details_changed_at", { withTimezone: true }),
     version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -105,6 +115,20 @@ export const workspaceSettings = pgTable(
     check("workspace_settings_tax_rounding_check", sql`${table.taxRounding} = 'rate_group'`),
     check("workspace_settings_email_from_name_check", bounded(table.emailFromName, SETTINGS_TEXT_MAX_LENGTH)),
     check("workspace_settings_email_reply_to_check", bounded(table.emailReplyTo, EMAIL_ADDRESS_MAX_LENGTH)),
+    check("workspace_settings_bank_name_check", bounded(table.bankName, SETTINGS_TEXT_MAX_LENGTH)),
+    check("workspace_settings_bank_account_holder_check", bounded(table.bankAccountHolder, SETTINGS_TEXT_MAX_LENGTH)),
+    check("workspace_settings_bank_account_number_check", bounded(table.bankAccountNumber, SETTINGS_TEXT_MAX_LENGTH)),
+    check(
+      "workspace_settings_bank_details_check",
+      sql`(${table.bankName} is null) = (${table.bankAccountHolder} is null) and (${table.bankName} is null) = (${table.bankAccountNumber} is null)`,
+    ),
+    // ISO 9362 BIC: 8 or 11 characters, upper case.
+    check("workspace_settings_bank_swift_code_check", sql`${table.bankSwiftCode} ~ '^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$'`),
+    // The FILE-03 exception (PROJECT.md §9): ws/{workspace_id}/duitnow/{sha256}.{png|jpg}, in this workspace's prefix.
+    check(
+      "workspace_settings_duitnow_qr_key_check",
+      sql`${table.duitnowQrKey} ~ ('^ws/' || ${table.workspaceId}::text || '/duitnow/[0-9a-f]{64}\\.(png|jpg)$')`,
+    ),
     check(
       "workspace_settings_default_agreement_pattern_check",
       sql`${table.defaultAgreementPattern} in ('service_agreement', 'msa_sow')`,

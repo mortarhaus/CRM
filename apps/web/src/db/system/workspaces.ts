@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Database } from "../client";
 import { getDb } from "../index";
 import { member, organization, workspaceSettings } from "../schema";
-import { runInWorkspace } from "../workspace";
+import { runInWorkspace, type Tx } from "../workspace";
 
 export const WORKSPACE_ROLES = ["owner", "admin", "staff"] as const;
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
@@ -54,6 +54,17 @@ export async function healWorkspaceSettings(workspaceId: string): Promise<void> 
     tx.select({ workspaceId: workspaceSettings.workspaceId }).from(workspaceSettings).limit(1),
   );
   if (present.length === 0) await ensureWorkspaceSettings(db, workspaceId);
+}
+
+// The Owners of a workspace (spec "Authorization": a bank-details change notifies all owners), read from member by
+// organization_id, in the caller's transaction so the list matches the change it is written with.
+export async function listOwnerIds(db: Database | Tx, workspaceId: string): Promise<string[]> {
+  const rows = await db
+    .select({ userId: member.userId })
+    .from(member)
+    .where(and(eq(member.organizationId, workspaceId), eq(member.role, "owner")))
+    .orderBy(member.userId);
+  return rows.map((row) => row.userId);
 }
 
 // Every workspace id, for the worker's per-workspace jobs (idempotency.cleanup): each then runs in withWorkspace.

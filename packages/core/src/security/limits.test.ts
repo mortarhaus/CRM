@@ -16,7 +16,7 @@ import {
   SIGN_IN_IP_LIMIT,
   SIGN_UP_IP_LIMIT,
   STEP_UP_CODE_REUSE_SECONDS,
-  STEP_UP_VERIFY_USER_LIMIT,
+  STEP_UP_VERIFY_USER_FAILURE_LIMIT,
   STEP_UP_WINDOW_SECONDS,
   TEST_EMAIL_USER_LIMIT,
   TEST_EMAIL_WORKSPACE_LIMIT,
@@ -45,9 +45,9 @@ describe("fixed security values", () => {
     expect([SHORT_CODE_MIN_LENGTH, SHORT_CODE_MAX_LENGTH]).toEqual([2, 6]);
   });
 
-  it("keeps step-up at the spec's 5 minutes, per-user checks at the 2FA verify row, and code reuse past 90 s", () => {
+  it("keeps step-up at the spec's 5 minutes, per-user failures at 5 per 15 minutes (Charlie 2026-11-22), and code reuse past 90 s", () => {
     expect(STEP_UP_WINDOW_SECONDS).toBe(300);
-    expect(STEP_UP_VERIFY_USER_LIMIT).toEqual({ windowSeconds: 60, max: 10 });
+    expect(STEP_UP_VERIFY_USER_FAILURE_LIMIT).toEqual({ windowSeconds: 900, max: 5 });
     expect(STEP_UP_CODE_REUSE_SECONDS).toBeGreaterThan(3 * 30);
   });
 });

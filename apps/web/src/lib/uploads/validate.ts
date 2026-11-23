@@ -17,14 +17,14 @@ const MAGIC: Record<UploadType, readonly number[]> = {
   pdf: [0x25, 0x50, 0x44, 0x46],
 };
 
-export type UploadCheck =
-  | { ok: true; type: UploadType; contentType: string }
+export type UploadCheck<T extends UploadType = UploadType> =
+  | { ok: true; type: T; contentType: string }
   | { ok: false; reason: "EMPTY" | "TOO_LARGE" | "TYPE_NOT_ALLOWED" };
 
 const startsWith = (bytes: Uint8Array, magic: readonly number[]) =>
   bytes.length >= magic.length && magic.every((byte, index) => bytes[index] === byte);
 
-export function validateUpload(bytes: Uint8Array, options: { allowed: readonly UploadType[]; maxBytes: number }): UploadCheck {
+export function validateUpload<T extends UploadType>(bytes: Uint8Array, options: { allowed: readonly T[]; maxBytes: number }): UploadCheck<T> {
   if (bytes.length === 0) return { ok: false, reason: "EMPTY" };
   if (bytes.length > options.maxBytes) return { ok: false, reason: "TOO_LARGE" };
   const type = options.allowed.find((candidate) => startsWith(bytes, MAGIC[candidate]));
