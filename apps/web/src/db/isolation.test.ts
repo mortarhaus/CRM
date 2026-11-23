@@ -6,7 +6,7 @@ import { holdsCommand, tenantTables } from "../test/catalog";
 import { sqlState, startDatabase, type TestDatabase } from "../test/postgres";
 import { createDb, type DbHandle } from "./client";
 import { EXPECTED_PRIVILEGES } from "./privileges";
-import { auditLog, domainEvent, idempotencyKey, notification, organization, stepUp, workspaceSettings } from "./schema";
+import { auditLog, docSequence, domainEvent, idempotencyKey, notification, organization, stepUp, workspaceSettings } from "./schema";
 import { runInWorkspace, type Tx } from "./workspace";
 
 // TEN-08: every tenant table gets read and write isolation tests over two workspaces, as crm_app.
@@ -23,6 +23,19 @@ const TENANT_FIXTURES: Record<string, TenantFixture> = {
   audit_log: {
     async seed(tx, workspaceId) {
       await tx.insert(auditLog).values({ workspaceId, action: "isolation.seed", targetType: "fixture" });
+    },
+  },
+  // A document counter (Phase 2 plan Task 18): crm_app moves the counter and deletes none.
+  doc_sequence: {
+    async seed(tx, workspaceId) {
+      await tx.insert(docSequence).values({ workspaceId, docType: "invoice", pattern: "INV-{SEQ:4}", resetRule: "never" });
+    },
+    async update(tx, workspaceId) {
+      const result = await tx
+        .update(docSequence)
+        .set({ counter: sql`${docSequence.counter} + 1` })
+        .where(eq(docSequence.workspaceId, workspaceId));
+      return result.count;
     },
   },
   // Append-only event history (TEN-03): no UPDATE or DELETE for crm_app.
