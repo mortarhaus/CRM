@@ -77,7 +77,7 @@ The header must hold **exactly one** valid address. A list (`a, b`), a malformed
 for the whole deployment at once (fail closed), and the process logs `{"level":"warn","msg":"client ip fallback"}`.
 
 **Next.js fills a missing `X-Forwarded-For`.** Next 16.4.x (checked on 16.4.6) sets `X-Forwarded-For` to the socket peer when the
-request has none (`next/dist/server/base-server.js:567`). With `x-forwarded-for` configured and an edge that
+request has none (`next/dist/server/base-server.js:604`). With `x-forwarded-for` configured and an edge that
 does not set it, the key is the **edge's** address, not the placeholder, and no warning is logged: every client
 shares the edge's counters. Checked in `rate-limit.test.ts` (the key is 127.0.0.1 there).
 
@@ -210,6 +210,20 @@ reads only `DATABASE_WORKER_URL`, so it needs no email setting.
   **Gate:** do not set `EMAIL_PROVIDER=resend` in production, and do not send a real message, until those three
   records exist and Resend shows the domain as verified. Still pending: the exact record values
   (Resend gives them when the domain is added; the Phase 2 notification-email PR lists them here).
+- **Owner email on a bank-details or payment QR change** (Phase 2 PR 5c, plan Task 16): the payment settings action
+  enqueues one `email.bank_details_changed` job per Owner in the change's transaction (migration 0032 creates the
+  queue and `email.bank_details_changed.dead`; retries 5, first delay 30 s, backoff, as `email.send`). Job data is
+  `{ workspaceId, changeId, userId }` (the change is its audit entry; no bank value, name or address), and the job id
+  is derived from the change and the Owner, so the same change never makes two jobs for one Owner. The worker reads
+  the names and the address when it sends, so it needs no new setting. A recipient who is no longer an Owner, or has
+  no address, is skipped: the job completes and the worker logs `{"level":"info","msg":"owner email skipped",
+  "queue":"email.bank_details_changed","reason":"not_owner"|"no_address"|"no_workspace"}` (no id, no address). A
+  change it cannot find fails the job (retries, then the dead-letter queue; redrive with `jobs:retry -- --queue
+  email.bank_details_changed --id <dead-letter job id>`). Wording (Charlie, Q18, 2026-11-22): subject "Payment
+  details changed on {{workspace_name}}"; the body names the change time in the workspace's time zone and date
+  format, who made it and what kind changed (bank details and/or the DuitNow/PayNow QR), and never shows an account
+  number, the holder name or the QR (`apps/web/src/emails/bank-details-changed.tsx`, the one place the text lives
+  until the PR 8 email templates take it over).
 - **Test email wording** (Charlie, ASK 8 = A, 2026-11-01): subject "Test email from CRM", body "This is a test
   email sent from your CRM workspace settings. If you received it, email delivery works."
   (`apps/web/src/emails/test-email.tsx`).
