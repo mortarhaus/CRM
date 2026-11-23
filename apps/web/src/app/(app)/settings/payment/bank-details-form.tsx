@@ -24,7 +24,7 @@ import {
   PAYMENT_FORBIDDEN,
 } from "@/lib/auth/messages";
 import { stepUpRefusal } from "./save-follow-up";
-import { useSaveFollowUp } from "./use-save-follow-up";
+import { useSaveFollowUp, useStepUpRefusal } from "./use-save-follow-up";
 
 export type SaveResult = ActionResult<{ version: number }>;
 
@@ -62,15 +62,15 @@ function BankFields({ action, version, saved, steppedUp, unreachable }: FormProp
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
   const [confirmedAtSubmit, setConfirmedAtSubmit] = useState(false);
   const button = useSaveFollowUp(result, unreachable);
+  const stepUpRefused = useStepUpRefusal(result, steppedUp);
 
   if (result?.ok === false && result.status === "UNAUTHENTICATED") redirect("/sign-in");
   const invalid = new Set(result?.ok === false && result.status === "INVALID_INPUT" ? result.fields : []);
-  const refused =
-    result?.ok === false && result.status === "STEP_UP_REQUIRED"
-      ? stepUpRefusal(confirmedAtSubmit)
-      : result?.ok === false && result.status !== "INVALID_INPUT"
-        ? (MESSAGES[result.status] ?? BANK_FAILED)
-        : null;
+  const refused = stepUpRefused
+    ? stepUpRefusal(confirmedAtSubmit)
+    : result?.ok === false && result.status !== "INVALID_INPUT" && result.status !== "STEP_UP_REQUIRED"
+      ? (MESSAGES[result.status] ?? BANK_FAILED)
+      : null;
   const error = refused ?? (invalid.size > 0 ? ONBOARDING_INVALID : unreachable ? BANK_FAILED : null);
   const currentVersion = result?.ok ? Math.max(result.data.version, version) : version;
 

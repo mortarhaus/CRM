@@ -33,6 +33,9 @@ const audited = (column: string, value: unknown) => AUDIT_MASKS[column]?.(value)
 
 const COLUMNS = getTableColumns(workspaceSettings);
 
+// The audit action of a bank-details or payment QR change; the owner email job reads the entry by its id.
+export const BANK_DETAILS_AUDIT_ACTION = "workspace_settings.bank_details_updated";
+
 export class StaleSettingsError extends Error {
   constructor() {
     super("workspace_settings changed since it was read");
@@ -77,7 +80,8 @@ export async function findShellSettings(tx: Tx): Promise<{ brandColour: string |
 
 // Optimistic concurrency: the patch applies only to the version the caller read, which becomes version + 1. The row
 // is locked first, so the audit's before is the row the update replaces. Only changed fields are written to the audit
-// entry, under their column names, with AUDIT_MASKS applied and PII_COLUMNS redacted. An unchanged patch writes nothing.
+// entry, under their column names, with AUDIT_MASKS applied and PII_COLUMNS redacted, under auditId when given. An
+// unchanged patch writes nothing.
 export async function updateSettings(
   tx: Tx,
   patch: SettingsPatch,
@@ -86,7 +90,8 @@ export async function updateSettings(
   auditAction:
     | "workspace_settings.updated"
     | "workspace_settings.onboarded"
-    | "workspace_settings.bank_details_updated" = "workspace_settings.updated",
+    | typeof BANK_DETAILS_AUDIT_ACTION = "workspace_settings.updated",
+  auditId?: string,
 ): Promise<WorkspaceSettings> {
   const current = await getSettings(tx, { forUpdate: true });
   if (current.version !== expectedVersion) throw new StaleSettingsError();
@@ -105,6 +110,7 @@ export async function updateSettings(
   const snapshot = (row: WorkspaceSettings) =>
     Object.fromEntries([...changed, "version" as const].map((key) => [COLUMNS[key].name, audited(COLUMNS[key].name, row[key])]));
   await recordAudit(tx, {
+    ...(auditId ? { id: auditId } : {}),
     actorUserId,
     action: auditAction,
     targetType: "workspace_settings",

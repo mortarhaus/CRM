@@ -67,6 +67,18 @@ export async function listOwnerIds(db: Database | Tx, workspaceId: string): Prom
   return rows.map((row) => row.userId);
 }
 
+// The workspace's name (organization.name), for the owner email on a bank-details change (plan Task 16). An id that
+// is not a uuid, or no such workspace, is null.
+export async function getWorkspaceName(workspaceId: string): Promise<string | null> {
+  if (!z.uuid().safeParse(workspaceId).success) return null;
+  const [row] = await getDb()
+    .db.select({ name: organization.name })
+    .from(organization)
+    .where(eq(organization.id, workspaceId))
+    .limit(1);
+  return row?.name ?? null;
+}
+
 // Every workspace id, for the worker's per-workspace jobs (idempotency.cleanup): each then runs in withWorkspace.
 export async function listWorkspaceIds(db: Database = getDb().db): Promise<string[]> {
   const rows = await db.select({ id: organization.id }).from(organization).orderBy(organization.id);

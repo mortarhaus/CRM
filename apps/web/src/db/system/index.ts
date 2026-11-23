@@ -17,7 +17,7 @@ export { type AuthTransactions, createAuthTransactions } from "./auth-transactio
 export { ensureBillingAccount } from "./billing";
 export { PGBOSS_SCHEMA_VERSION, pingDatabase, pingQueue } from "./health";
 export { revokeOwnSession } from "./sessions";
-export { getUserEmail } from "./users";
+export { getUserContact, getUserEmail } from "./users";
 export {
   cleanupExpired,
   cleanupExpiredCounters,
@@ -33,6 +33,7 @@ export {
   ensureWorkspaceSettings,
   findMembership,
   getMembership,
+  getWorkspaceName,
   healWorkspaceSettings,
   listOwnerIds,
   listWorkspaceIds,

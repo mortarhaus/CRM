@@ -14,6 +14,19 @@ export function mailpitUrl(): string {
   return process.env.MAILPIT_URL ?? "http://localhost:8025";
 }
 
+export interface MailpitMessageBody {
+  Subject: string;
+  Text: string;
+  HTML: string;
+}
+
+// One message's subject and bodies (`GET /api/v1/message/{id}`).
+export async function getMessage(id: string, base: string = mailpitUrl()): Promise<MailpitMessageBody> {
+  const response = await fetch(`${base}/api/v1/message/${encodeURIComponent(id)}`);
+  if (!response.ok) throw new Error(`Mailpit message answered ${response.status}`);
+  return (await response.json()) as MailpitMessageBody;
+}
+
 // The messages Mailpit holds for one recipient (`GET /api/v1/search`).
 export async function searchMessages(to: string, base: string = mailpitUrl()): Promise<MailpitMessage[]> {
   const query = new URLSearchParams({ query: `to:"${to}"` });

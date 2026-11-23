@@ -334,7 +334,8 @@ runs `select set_config('app.workspace_id', '<workspace uuid>', true)`. Never `S
 
 pg-boss 12.35.0 lives in schema `pgboss`, installed and upgraded only by `crm_migrator` in migrations (0015
 install, 0016 the Phase 1 queues and the `crm_app` grants, 0017 the internal cron queue, 0018 the `crm_worker`
-grants). Neither app instance migrates, creates the schema or creates a queue; queue options (`notify`
+grants, 0032 the owner email queue `email.bank_details_changed` and its dead-letter queue; the grants are on the
+`pgboss` tables, so a new queue needs none). Neither app instance migrates, creates the schema or creates a queue; queue options (`notify`
 included, off on every queue) change only in a migration.
 
 Method (plan Settled item 2, Task 17): the instance runs with the production switches (`apps/web/src/jobs/options.ts`)
@@ -393,7 +394,7 @@ queue options, `notify` included, and the schema version change only in migratio
 ### Retrying a failed job (`jobs:retry`)
 
 A job whose retries are exhausted is `failed` in its own queue, and a copy lands in the queue's dead-letter queue
-(`email.send.dead`, `domain_event.dead`) in state `created`. No worker works the dead-letter queues. pg-boss deletes
+(`email.send.dead`, `email.bank_details_changed.dead`, `domain_event.dead`) in state `created`. No worker works the dead-letter queues. pg-boss deletes
 the failed original after the queue's `deleteAfterSeconds` (7 days by default). The copy is never fetched, so
 maintenance deletes it when its `retentionSeconds` ends (14 days by default; migration 0016 sets no retention on the
 `.dead` queues): **redrive within 14 days of the failure**, or the job is gone. To run the job again once the cause is fixed, **redrive the copy**: pass the **original queue** and

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { type EventName, type EventPayload, MINOR_UNITS_PATTERN } from "@crm/core/events";
 import { sql } from "drizzle-orm";
 import { fromDrizzle } from "pg-boss";
@@ -57,9 +58,23 @@ async function send(tx: Tx, queue: QueueName, data: JobData, id?: string): Promi
   return boss.send(queue, data, { db: fromDrizzle(tx, sql), ...(id ? { id } : {}) });
 }
 
-// A job that is not a domain event (email.send), in the caller's transaction.
-export function enqueueJob(tx: Tx, queue: Exclude<QueueName, "domain_event">, data: JobData): Promise<string | null> {
-  return send(tx, queue, data);
+// A job that is not a domain event (email.send), in the caller's transaction. With an id (stableJobId), a repeated
+// send of the same job creates one job and answers null.
+export function enqueueJob(
+  tx: Tx,
+  queue: Exclude<QueueName, "domain_event">,
+  data: JobData,
+  options: { id?: string } = {},
+): Promise<string | null> {
+  return send(tx, queue, data, options.id);
+}
+
+// A job id that is the same for the same IDs: a SHA-256 of them, written as an RFC 9562 version 8 UUID (pg-boss job
+// ids are uuids).
+export function stableJobId(...ids: readonly string[]): string {
+  const hex = createHash("sha256").update(ids.join(":")).digest("hex");
+  const variant = ((Number.parseInt(hex.charAt(16), 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 // One domain_event row and its job, whose id is the event id, so a repeated send creates one job. The workspace is

@@ -10,4 +10,5 @@ export {
   type SettingsCurrency,
   SUPPORTED_COUNTRIES,
 } from "./country-defaults";
+export { formatDateTime } from "./date-time";
 export { bpsToPercent, percentToBps } from "./tax-rate";

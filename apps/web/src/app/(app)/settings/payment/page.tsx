@@ -96,15 +96,17 @@ export default async function PaymentSettingsPage() {
                 {qrName}
               </h2>
               {settings.duitnowQrKey ? (
-                // Same-origin route (files/payment-qr), so img-src 'self' covers it; a fixed square box, no layout shift.
-                // eslint-disable-next-line @next/next/no-img-element -- a private, session-bound image: next/image's optimiser would fetch it without the session.
-                <img
-                  src={paymentQrUrl(settings.duitnowQrKey)}
-                  alt={paymentQrAlt(qrName)}
-                  width={160}
-                  height={160}
-                  className="size-40 self-start rounded-md border border-border bg-card object-contain p-2"
-                />
+                // Same-origin route (files/payment-qr), so img-src 'self' covers it. Any shape is accepted (Charlie
+                // 2026-11-23): the frame fits the image's own proportions, at most 160 px high and the column wide. The
+                // slot's fixed height keeps the content below in place while the image loads (no layout shift).
+                <div className="flex h-40 items-start">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- a private, session-bound image: next/image's optimiser would fetch it without the session. */}
+                  <img
+                    src={paymentQrUrl(settings.duitnowQrKey)}
+                    alt={paymentQrAlt(qrName)}
+                    className="h-auto max-h-full w-auto max-w-full rounded-md border border-border bg-card p-2"
+                  />
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">{PAYMENT_QR_NONE}</p>
               )}

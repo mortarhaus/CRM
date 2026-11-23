@@ -32,6 +32,7 @@ vi.mock("@/adapters/storage", async (original) => ({
 }));
 
 const { confirmStepUp, saveBankDetails, uploadPaymentQr } = await import("./actions");
+const { stableJobId } = await import("@/jobs/enqueue");
 const { GET } = await import("../../files/payment-qr/route");
 
 let database: TestDatabase;
@@ -80,6 +81,10 @@ async function settings(workspace = workspaceId) {
 const bankAudits = (workspace = workspaceId) => admin<{ actor_user_id: string; before: unknown; after: unknown }[]>`
   select actor_user_id, before, after from audit_log
   where workspace_id = ${workspace} and action = 'workspace_settings.bank_details_updated' order by created_at`;
+// The owner email jobs (plan Task 16): one per Owner per change, data IDs only, id from the change and the Owner.
+const emailJobs = (workspace = workspaceId) => admin<{ id: string; data: Record<string, string> }[]>`
+  select id, data from pgboss.job_common
+  where name = 'email.bank_details_changed' and data->>'workspaceId' = ${workspace} order by data->>'userId'`;
 const notifications = (workspace = workspaceId) => admin<{ user_id: string; kind: string; target_type: string; target_id: string }[]>`
   select user_id, kind, target_type, target_id from notification where workspace_id = ${workspace} order by user_id`;
 
@@ -111,6 +116,9 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
+  const boss = globalThis as typeof globalThis & { crmSendBoss?: Promise<{ stop(): Promise<void> }> };
+  await (await boss.crmSendBoss?.catch(() => undefined))?.stop();
+  boss.crmSendBoss = undefined;
   const cache = globalThis as typeof globalThis & { crmDb?: { sql: { end(): Promise<void> } } };
   await cache.crmDb?.sql.end();
   cache.crmDb = undefined;
@@ -126,6 +134,7 @@ describe("saveBankDetails", () => {
     expect(await settings()).toEqual(before);
     expect(await bankAudits()).toHaveLength(0);
     expect(await notifications()).toHaveLength(0);
+    expect(await emailJobs()).toHaveLength(0);
   });
 
   it("refuses an Admin with FORBIDDEN, even after step-up (Owner only, spec line 798)", async () => {
@@ -160,6 +169,15 @@ describe("saveBankDetails", () => {
 
     const target = { kind: "bank_details_changed", target_type: "workspace_settings", target_id: workspaceId };
     expect(await notifications()).toEqual([actor, otherOwner].sort().map((user_id) => ({ user_id, ...target })));
+
+    // One email job per Owner (not the Admin), in the same transaction; IDs only, the change is the audit entry.
+    const [{ id: changeId } = { id: "" }] = await admin<{ id: string }[]>`
+      select id from audit_log where workspace_id = ${workspaceId} and action = 'workspace_settings.bank_details_updated'`;
+    const jobs = await emailJobs();
+    expect(jobs).toEqual(
+      [actor, otherOwner].sort().map((userId) => ({ id: stableJobId(changeId, userId), data: { workspaceId, changeId, userId } })),
+    );
+    expect(JSON.stringify(jobs)).not.toContain("1234");
   });
 
   it("writes nothing for a save that changes nothing", async () => {
@@ -171,6 +189,7 @@ describe("saveBankDetails", () => {
     expect(await settings()).toEqual(saved);
     expect(await bankAudits()).toHaveLength(1);
     expect(await notifications()).toHaveLength(1);
+    expect(await emailJobs()).toHaveLength(1);
   });
 
   it.each([
@@ -207,6 +226,7 @@ describe("uploadPaymentQr", () => {
     const audits = await bankAudits();
     expect(audits.map((audit) => (audit.after as { duitnow_qr_key: string }).duitnow_qr_key)).toEqual([keyA, (await settings()).duitnow_qr_key]);
     expect(await notifications()).toHaveLength(2);
+    expect(await emailJobs()).toHaveLength(2);
   });
 
   it("stores the same image once: uploading it again changes nothing", async () => {

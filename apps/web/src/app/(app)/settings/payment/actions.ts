@@ -1,11 +1,18 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { PAYMENT_QR_MAX_BYTES, SETTINGS_TEXT_MAX_LENGTH } from "@crm/core/security";
 import { z } from "zod";
 import { getStorage } from "@/adapters/storage";
 import { notifyUsers } from "@/db/settings/notifications";
-import { getSettings, type SettingsPatch, updateSettings } from "@/db/settings/workspace-settings";
+import {
+  BANK_DETAILS_AUDIT_ACTION,
+  getSettings,
+  type SettingsPatch,
+  updateSettings,
+} from "@/db/settings/workspace-settings";
 import { listOwnerIds } from "@/db/system";
+import { enqueueJob, stableJobId } from "@/jobs/enqueue";
 import { ActionRefusedError, type ActionContext, action } from "@/lib/auth/action";
 import { requireStepUp, STEP_UP_ACTION } from "@/lib/auth/step-up";
 import { expectedVersion, requiredText } from "@/lib/settings-input";
@@ -14,7 +21,8 @@ import { validateUpload } from "@/lib/uploads/validate";
 
 // Bank details and the payment QR are Owner only, with step-up (spec lines 788 and 798; plan Task 14). Each change
 // is audited (the account number as its last 4 characters, the QR as its key), stamps bank_details_changed_at and
-// gives every Owner an in-app notification, all in the one transaction (plan Task 15). The owner email is PR 5c.
+// gives every Owner an in-app notification and an email job, all in the one transaction (plan Tasks 15 and 16). The
+// job holds IDs only: the change is its audit entry (changeId), read by the worker (jobs/bank-details-email.ts).
 
 // The step-up prompt of this page: verifyStepUp (lib/auth/step-up.ts), with the code read from the form.
 export const confirmStepUp = action({ ...STEP_UP_ACTION, fromForm: (form) => ({ code: form.get("code") }) });
@@ -35,18 +43,21 @@ async function changePaymentDetails(
   const patch = await makePatch();
   const keys = Object.keys(patch) as (keyof SettingsPatch)[];
   if (keys.every((key) => patch[key] === before[key])) return { version };
+  const changeId = randomUUID();
   const after = await updateSettings(
     ctx.tx,
     { ...patch, bankDetailsChangedAt: new Date() },
     version,
     ctx.userId,
-    "workspace_settings.bank_details_updated",
+    BANK_DETAILS_AUDIT_ACTION,
+    changeId,
   );
-  await notifyUsers(ctx.tx, await listOwnerIds(ctx.tx, ctx.workspaceId), {
-    kind: "bank_details_changed",
-    targetType: "workspace_settings",
-    targetId: ctx.workspaceId,
-  });
+  const owners = await listOwnerIds(ctx.tx, ctx.workspaceId);
+  await notifyUsers(ctx.tx, owners, { kind: "bank_details_changed", targetType: "workspace_settings", targetId: ctx.workspaceId });
+  for (const userId of owners) {
+    const data = { workspaceId: ctx.workspaceId, changeId, userId };
+    await enqueueJob(ctx.tx, "email.bank_details_changed", data, { id: stableJobId(changeId, userId) });
+  }
   return { version: after.version };
 }
 

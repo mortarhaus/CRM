@@ -81,9 +81,9 @@ describe("pg-boss install migration", () => {
 });
 
 describe("queues (migration, spec: queue options change only in migrations)", () => {
-  // Six application queues (migration 0016) and pg-boss's internal cron queue __pgboss__send-it (migration 0017,
-  // created by crm_migrator so the patched worker start() never creates it).
-  it("are the six application queues and the internal cron queue, with notify off", async () => {
+  // Six application queues (migration 0016), the owner email queues (0032) and pg-boss's internal cron queue
+  // __pgboss__send-it (migration 0017, created by crm_migrator so the patched worker start() never creates it).
+  it("are the eight application queues and the internal cron queue, with notify off", async () => {
     const rows = await admin`
       select name, policy, retry_limit, retry_delay, retry_backoff, dead_letter, notify, partition
       from pgboss.queue order by name collate "C"`;
@@ -93,6 +93,8 @@ describe("queues (migration, spec: queue options change only in migrations)", ()
       { name: "__pgboss__send-it", policy: "standard", ...plain },
       { name: "domain_event", ...retried, dead_letter: "domain_event.dead" },
       { name: "domain_event.dead", policy: "standard", ...plain },
+      { name: "email.bank_details_changed", ...retried, dead_letter: "email.bank_details_changed.dead" },
+      { name: "email.bank_details_changed.dead", policy: "standard", ...plain },
       { name: "email.send", ...retried, dead_letter: "email.send.dead" },
       { name: "email.send.dead", policy: "standard", ...plain },
       { name: "idempotency.cleanup", policy: "singleton", ...plain },
