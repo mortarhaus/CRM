@@ -1,0 +1,124 @@
+# PR 71 — feat(settings): Phase 2 PR 5c: owner email on a bank or QR change, bank details e2e
+
+- **Merged:** 2026-11-23T13:37:45Z · **Merge commit:** e5efb74ed54730a22959c81006e691435865ef1b · **Branch:** feat/p2-owner-email
+- **Gate breaches:** none
+- **Approval receipt:** `reviews/PR-71.receipt` on agent-logs (log-branch commit 06460934 holds the review; receipt commit 7cff820; written 2026-11-23T12:57:55Z, 39 minutes before the merge; head 4d5ac0a, review-file hash 9a8c94fe…)
+- **Merge evidence:** `gh pr view 71` state MERGED with the time and commit above; commit reachable from fetched `origin/main`. Final head 4d5ac0a equals the reviewed head. All five CI jobs SUCCESS on that head (Changed files, Dependency audit, Secret scan, Typecheck/lint/test, Image/Trivy/E2E; E2E 227 passed, 10 skipped, 57.2 min).
+- **Drafted by:** Opus 5.5 helper under Andy (Sonnet 5.5); CI timeout fix by Andy · **Final verdict:** Approved (round 1)
+- **Spec:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` v4.7 revision 9 (hash `b8e5a758`) · **Plan:** `docs/superpowers/plans/2026-11-04-phase-2-settings-onboarding.md` (PR 5, Task 16) · **Milestone:** Phase 2
+
+## What changed
+A bank-details or payment QR change now queues one `email.bank_details_changed` job per Owner in the same transaction (migration 0032 adds the queue and its `.dead` queue). The worker sends Charlie's approved Q18 wording with the date and time in the workspace time zone and date format; the email never shows account numbers, the holder or the QR. New `e2e/bank-details.spec.ts` (step-up, expiry, save, QR upload and replace, non-square QR, Admin refusal, the email in Mailpit, keyboard, axe, 320/768/desktop). Leftovers from PR 70: QR preview at the image's own proportions, the stale "expired" message clears, runbook line 604, DECISIONS for the 2 MB and any-shape answers. CI: the image job timeout goes from 60 to 90 minutes.
+
+## Why
+Spec line 803 (email to all owners), plan Task 16, Q18, and Bob's PR 70 deferred conditions (the browser tests). The timeout change: run 45095688151 had the E2E step cancelled at the 60-minute job limit with no failing test.
+
+## Review rounds
+- R1: Approved. No P0, P1 or P2. Two optional P3s (below).
+
+## Deferred conditions
+none
+
+## Decisions worth keeping
+- One job per Owner (plan said one per change); a failed send retries for that Owner alone. Recipients are the Owners at change time, each re-checked as still Owner at send time.
+- `changed_at` shows the date, the time and the IANA zone (builder choice beyond the Q18 text).
+- The default email text lives in one place so PR 8's email_template can take it over; no template table or editor was built.
+- CI image job timeout is 90 minutes (DECISIONS 2026-11-23). The E2E step was 57.2 min, serial, one worker, three projects, and grows about 2.5 min per project per new spec.
+
+## Follow-ups
+- [P3] Shard the E2E job (the three Playwright projects as parallel jobs) in its own PR before the run passes about 75 minutes; Charlie decides when.
+- [P3] DECISIONS.md has an extra blank line after the header comment (cosmetic).
+- Residual risk: in a single-Owner workspace, whoever takes over the account and changes its sign-in email first receives the only bank-change alert. Check whether an email-address change notifies the old address when account email change is reviewed (AUTH).
+- At-least-once: a crash between a successful send and job completion can resend once.
+- Open owner asks: wording when the person who made the change has since deleted their account (builder wording: "a user who no longer has an account"); account-number character rules; clearing details or removing the QR; Admin viewing the QR; a DuitNow/PayNow text ID.
+- Next: Phase 2 PR 6 (invoice numbering). Also owed: spec line 803 SHA-256 removal in the next spec PR (PROJECT.md §11).
+
+## Appendix — final review round
+## Round 1 — 2026-11-23 · scope: slice (plan Task 16; Bob's PR 70 deferred conditions and R2 P3s; CI timeout)
+- **Code review:** base (merge base) `a3ee9d51aad643da9925b3b25692faa84a01f396` (= origin/main) · head `4d5ac0ab549c7cadae1069aca03c55be9cde0b07` · head re-checked at end: yes (OPEN, MERGEABLE)
+- Review checkout: `.agent/worktrees/review-71-4d5ac0ab` (detached; `git status --untracked-files=no` clean at end).
+- Spec v4.7 revision 9 (hash `b8e5a758`): line 803 ("email to all owners"), line 798 (Owner only). Plan `docs/superpowers/plans/2026-11-04-phase-2-settings-onboarding.md` Task 16 (lines 236–239), Q18. PR 70 review file (deferred conditions, owner answers after Round 2).
+- Diff: 32 files, +3001/−51, of which ~1,890 lines are the generated `0032_snapshot.json`; non-generated production code is ~350 lines, the rest tests and docs. Five commits.
+
+**Verdict:** Approved
+**Model used:** Opus 5.5 · **Switch model next step?** No.
+
+Merge note: all five CI jobs pass on this head; the "Image, Trivy, E2E" job took 1h0m (E2E 227 passed, 10 skipped, 57.2 min).
+
+### Findings
+
+### [P3] The E2E job is close to its limit and will keep growing
+- Category: ci · Rule: UNI-13
+- Evidence: `.github/workflows/ci.yml` image job `timeout-minutes: 60 → 90` (DECISIONS 2026-11-23). This run's E2E step alone was 57.2 min, serial, one worker, three projects. The bank-details spec adds ~2.5 min per project, mostly waiting for a fresh TOTP window (`freshCode`) and the 59 s expiry test.
+- Why it matters: every Phase 2 spec adds minutes; at this rate 90 is reached within a few PRs, and a long single job delays every merge.
+- Suggested correction: the sharding the DECISIONS entry names (the three Playwright projects as parallel jobs), in its own PR before the run passes ~75 min. The entry says "owner may prefer sharding": Charlie's call on when.
+- Owner: builder / owner · Status: open (follow-up)
+
+### [P3] DECISIONS.md: an extra blank line before the newest entry
+- Evidence: `docs/DECISIONS.md` lines 4–5 (two blank lines after the header comment), and the PR 70 merge left one after the PR 69 entry.
+- Cosmetic; fix with any later DECISIONS edit. Owner: builder · Status: open (optional)
+
+No injection-style text addressed to agents in the PR body, commit messages, diff or comments (no comments on the PR).
+
+### Code review notes
+- **Same-transaction enqueue (EVT-01):** `changePaymentDetails` enqueues one job per Owner through `enqueueJob(ctx.tx, …)` after the audit entry and notifications, inside the action's `withWorkspace` transaction; a refused or no-op save enqueues nothing (`actions.test.ts`: 0 jobs on step-up refusal, still 1 after a no-op save, 2 after two QR changes; job ids and IDs-only data asserted, no account digits in the data).
+- **Plan deviation, recorded and accepted:** plan Task 16 says one job per change, worker loads owners. The PR does one job per Owner with `stableJobId(changeId, userId)` (SHA-256 → RFC 9562 v8 UUID; variant bits checked). DECISIONS gives the reason (a failed send retries only that Owner, no duplicate to the others). I agree: it is the better at-least-once shape. Recipients are the Owners at change time, and each is re-checked as still Owner at send time.
+- **Handler:** zod object strips unknown fields (EVT-03); batch of 1 enforced; missing audit entry throws a value-free error → retries → `.dead` (EVT-05, tested); skip log carries queue + reason only (UNI-09, tested). Send is the last step; a crash between a successful send and job completion can resend once (inherent at-least-once, acceptable for an alert).
+- **Data read:** change = audit entry by id **and** action under `withWorkspace(job.workspaceId)` (RLS), so a job cannot read another workspace's entry; `whatChanged` uses only the column names of `after`, never values. Names and address via the system module (`getUserContact`, `getWorkspaceName`), uuid-checked (TEN-10).
+- **`recordAudit` change:** optional caller-supplied id, returns the id; insert-only path unchanged (TEN-03/UNI-10). Other callers unaffected (default `randomUUID()`).
+- **Email:** wording matches the Q18 text quoted in DECISIONS word for word; single-pass `{{field}}` fill (FILE-05), React escaping, CR/LF stripped from subject (FILE-06), tested. E2E asserts no account number, last 4, holder or SWIFT in text or HTML.
+- **`formatDateTime`:** `Intl` with `h23`, English `mmm`; unit-tested across the three formats.
+- **Migration 0032:** two `create_queue` calls, dead-letter first, options identical to `email.send` (0016); no grant change needed (grants are on pgboss tables). `install.test.ts` covers it; runbooks list the queue and redrive.
+- **UI:** QR preview in a fixed `h-40` slot, image `max-h-full max-w-full` at its own ratio (no layout shift below; e2e checks the 2.5:1 ratio and 160 px slot). `useStepUpRefusal` uses the "store previous render info" pattern, no effect; e2e confirms the expired message clears after re-confirming.
+- **E2E (`bank-details.spec.ts`):** covers every PR 70 deferred condition: wrong/right code, expiry with focus and kept values, save with a 100-char name, QR upload/replace with old object kept and old URL 404, Admin no link + refused, keyboard-only, axe light/dark, no page errors; ran green at chromium, tablet-768, mobile-320 in CI.
+- **Test helper credentials (UNI-08):** `src/test/payment-e2e.ts` falls back to the MinIO dev-only user already in `docker/compose.dev.yml`; not a secret, test-only. Secret scan passes.
+- **PR 70 leftovers:** runbook line now `base-server.js:604` (R2 P3 closed); stale refusal (R2 P3) closed; QR size and shape answers recorded in DECISIONS.
+
+### Self-check audit
+| Rule | Applies? | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| EVT-01 | yes | pass | pass | actions.ts; actions.test.ts job rows | none |
+| EVT-02 | n-a (no relay) | n-a | n-a | job id idempotency tested | none |
+| EVT-03 | yes | pass | pass | zod object; bad-data test | none |
+| EVT-05 | yes | pass | pass | 0032 options; not-found test; runbook redrive | none |
+| UNI-02 | yes | pass | pass | wording constant; QR 2 MB confirmed by Charlie | none |
+| UNI-05 | yes | pass | pass | no template table/editor | none |
+| UNI-08 | yes | pass | pass | dev-only creds from compose | none |
+| UNI-09 | yes | pass | pass | skip log reason only; email has no values | none |
+| UNI-13 | yes (CI change) | not listed | pass, with P3 | ci.yml timeout; DECISIONS entry | builder could have listed it |
+| UNI-15 | yes (migration 0032) | not listed | pass (additive) | migration | minor omission |
+| UNI-16 | yes | pass | pass | both runbooks | none |
+| TEN-03 / TEN-10 / TEN-11 | yes | pass (03, 10) | pass | audit insert path; system module reads; workspace from tx | none |
+| FILE-03 / 05 / 06 | yes | pass | pass | e2e storage check; email tests | none |
+| FE-70 / FE-71 / A11Y-06 | yes | pass | pass | CI e2e at 3 widths | none |
+
+### Verification performed
+| Command / check | Result |
+|---|---|
+| `pnpm install --frozen-lockfile` (Node v24.21.0, pnpm 11.6.0) | ok |
+| `pnpm typecheck` | pass |
+| `pnpm lint` | pass |
+| `pnpm vitest run` bank-details-email, email template, date-time, payment dir, enqueue, install, privileges, entry-points | 9 files, 104 passed |
+| `git diff --check` merge base..head | clean |
+| secret-scan pattern on added lines | no match |
+| CI (`gh pr checks 71`) | 5/5 pass; CI log shows all 5 bank-details tests passed at chromium, tablet-768 and mobile-320 |
+| e2e, full `pnpm test`, gates locally | not run (CI ran test and e2e; no pooler change) |
+
+### Residual risks and test gaps
+- The alert goes to each Owner's address **at send time**. In a single-Owner workspace, someone who takes over the account and changes its sign-in email first, then the bank details, receives the only alert. Whether an email-address change notifies the old address is an AUTH question outside this PR; worth checking when account email change is reviewed.
+- A crash after a successful send and before job completion can send one duplicate (at-least-once).
+- Multi-Owner fan-out is tested at the job-row level, not end-to-end in Mailpit (e2e uses one Owner).
+
+### Owner items (no merge block)
+- ASK 5: the wording when the actor's account was deleted ("a user who no longer has an account", builder wording).
+- `changed_at` adds the time and the IANA zone to the date (builder choice beyond the Q18 text; e.g. "23-Nov-2026 09:15 (Asia/Kuala_Lumpur)").
+- When to shard the E2E job (P3 above).
+
+### Required before merge
+- None (CI is green on this head).
+
+### Deferred conditions
+- None.
+
+### Optional improvements
+- The two P3s.
