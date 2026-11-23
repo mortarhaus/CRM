@@ -12,7 +12,7 @@ import { startDatabase, type TestDatabase } from "../test/postgres";
 import { startWorker, type WorkerHandle } from "../worker/start";
 import { getSendBoss } from "./boss";
 import { type DomainEvent, domainEventHandler } from "./domain-event";
-import { emitEvent, enqueueJob, EventPayloadError, type JobData, JobDataError } from "./enqueue";
+import { emitEvent, enqueueJob, EventPayloadError, type JobData, JobDataError, stableJobId } from "./enqueue";
 
 // Plan Task 19 Step 2: domain_event rows and their pg-boss jobs are written in the caller's transaction (EVT-01), as
 // crm_app, and a worker on crm_worker works them through the domain_event handler.
@@ -280,6 +280,16 @@ describe("job data carries IDs only (PROJECT.md §9)", () => {
       callSite: "app/(app)/settings/email/actions.ts enqueueJob",
       keys: ["userId", "workspaceId"],
       run: (tx) => enqueueJob(tx, "email.send", { workspaceId: workspaceA, userId: crypto.randomUUID() }),
+    },
+    {
+      queue: "email.bank_details_changed",
+      callSite: "app/(app)/settings/payment/actions.ts enqueueJob",
+      keys: ["changeId", "userId", "workspaceId"],
+      run: (tx) => {
+        const [changeId, userId] = [crypto.randomUUID(), crypto.randomUUID()];
+        const data = { workspaceId: workspaceA, changeId, userId };
+        return enqueueJob(tx, "email.bank_details_changed", data, { id: stableJobId(changeId, userId) });
+      },
     },
   ];
 

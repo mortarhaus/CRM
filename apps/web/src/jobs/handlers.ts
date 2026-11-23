@@ -1,12 +1,19 @@
 import type { Job } from "pg-boss";
+import { bankDetailsEmailHandler } from "./bank-details-email";
 import { idempotencyCleanupHandler, rateLimitCleanupHandler } from "./cleanup";
 import { domainEventHandler } from "./domain-event";
 import { emailSendHandler } from "./email-send";
 import type { Log } from "./log";
 
-// The application queues the worker works (migrations 0016 and 0017 create them). The dead-letter queues have no
+// The application queues the worker works (migrations 0016, 0017 and 0032 create them). The dead-letter queues have no
 // handler: a job there waits for the admin command (scripts/retry-job.ts redrives the copy back to its queue).
-export const QUEUE_NAMES = ["domain_event", "email.send", "rate_limit.cleanup", "idempotency.cleanup"] as const;
+export const QUEUE_NAMES = [
+  "domain_event",
+  "email.send",
+  "email.bank_details_changed",
+  "rate_limit.cleanup",
+  "idempotency.cleanup",
+] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];
 
 export interface HandlerContext {
@@ -23,6 +30,7 @@ export type Handlers = { readonly [Queue in QueueName]?: Handler };
 export const HANDLERS: Handlers = {
   domain_event: domainEventHandler(),
   "email.send": emailSendHandler(),
+  "email.bank_details_changed": bankDetailsEmailHandler(),
   "rate_limit.cleanup": rateLimitCleanupHandler(),
   "idempotency.cleanup": idempotencyCleanupHandler(),
 };
