@@ -26,6 +26,7 @@ export type OnboardedSettings = {
   tax_registration_no: string | null;
   default_tax_name: string | null;
   default_tax_rate_bps: number | null;
+  short_code: string | null;
 };
 
 export type SeededSequence = {
@@ -67,7 +68,7 @@ export async function readWorkspaceSettings(email: string): Promise<OnboardedSet
     const rows = await runInWorkspace(app.db, membership.organization_id, (tx) =>
       tx.execute<OnboardedSettings>(sql`
         select country, base_currency, default_currency, timezone, date_format, locale, tax_registered,
-               tax_registration_no, default_tax_name, default_tax_rate_bps
+               tax_registration_no, default_tax_name, default_tax_rate_bps, short_code
           from workspace_settings`),
     );
     const [row] = rows;
