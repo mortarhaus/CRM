@@ -1,6 +1,6 @@
 "use server";
 
-import { parsePatternFor, RESET_RULES } from "@crm/core/numbering";
+import { PeriodBehindError, parsePatternFor, RESET_RULES } from "@crm/core/numbering";
 import { isSupportedCountry } from "@crm/core/settings";
 import { z } from "zod";
 import { ensureInvoiceSequence, StaleSequenceError, updateSequence } from "@/db/numbering/sequence";
@@ -38,10 +38,13 @@ export const updateNumberingSettings = action({
     }
     await ensureInvoiceSequence(ctx.tx, settings.country, ctx.userId);
     try {
-      const updated = await updateSequence(ctx.tx, "invoice", { pattern, resetRule }, version, ctx.userId, new Date(), settings.timezone);
+      const updated = await updateSequence(ctx.tx, "invoice", { pattern, resetRule }, version, ctx.userId, settings.timezone);
       return { version: updated.version };
     } catch (error) {
       if (error instanceof StaleSequenceError) throw new ActionRefusedError("STALE_VERSION");
+      // A reset-rule change while the workspace time zone is still before the last number's period (DECISIONS
+      // 2026-11-24): refused rather than a counter reset that could repeat numbers.
+      if (error instanceof PeriodBehindError) throw new ActionRefusedError("PERIOD_BEHIND");
       throw error;
     }
   },

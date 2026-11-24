@@ -150,6 +150,12 @@ export const NUMBERING_SAVED = "Numbering saved. The change applies to new docum
 export const NUMBERING_STALE = "Someone else changed the numbering after this page loaded. Reload the page, then save again.";
 export const NUMBERING_FORBIDDEN = "Only an Admin or Owner can change document numbering.";
 export const NUMBERING_FAILED = "We couldn't save the numbering. Try again.";
+// The workspace timezone is still before the period of the last number (for example after a change to a timezone
+// further west at a year or month boundary): no number is given and the reset rule cannot change until it begins.
+export const numberingPeriodBehind = (period: string) =>
+  `The last invoice number is from ${period}, which has not started yet in the workspace timezone. Numbering continues when it starts.`;
+export const NUMBERING_PERIOD_BEHIND =
+  "The last invoice number is from a period that has not started yet in the workspace timezone. Change the reset rule once it starts.";
 
 // Why a typed pattern is refused (parsePatternFor), in the words the field shows.
 export function patternErrorMessage(error: PatternError): string {

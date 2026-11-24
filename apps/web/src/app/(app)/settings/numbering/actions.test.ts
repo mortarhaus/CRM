@@ -113,6 +113,23 @@ describe("updateNumberingSettings", () => {
     expect(await sequenceOf(workspaceId)).toMatchObject([{ pattern: "A-{YYYY}-{SEQ:4}", version: 2 }]);
   });
 
+  // Bob PR #72 R1 P1: the stored period is later than the workspace's "now" (as after a time zone change to one
+  // further west at a year boundary); a reset-rule change would restart the counter, so it is refused.
+  it("refuses a reset-rule change before the stored period has started with PERIOD_BEHIND and writes nothing", async () => {
+    const workspaceId = await newWorkspace();
+    await signInAs(workspaceId, "owner");
+    await admin`insert into doc_sequence (workspace_id, doc_type, pattern, reset_rule, counter, last_reset_period)
+      values (${workspaceId}, 'invoice', 'INV-{YYYY}{MM}-{SEQ:4}', 'yearly', 3, '2999')`;
+    expect(await updateNumberingSettings({ expectedVersion: 1, pattern: "INV-{YYYY}{MM}-{SEQ:4}", resetRule: "monthly" })).toEqual({
+      ok: false,
+      status: "PERIOD_BEHIND",
+    });
+    expect(await sequenceOf(workspaceId)).toEqual([{ pattern: "INV-{YYYY}{MM}-{SEQ:4}", reset_rule: "yearly", counter: 3, version: 1 }]);
+    expect(await auditOf(workspaceId)).toEqual([]);
+    // A pattern change alone restarts nothing, so it is saved.
+    expect(await updateNumberingSettings({ expectedVersion: 1, pattern: "Q-{YYYY}{MM}-{SEQ:4}", resetRule: "yearly" })).toMatchObject({ ok: true });
+  });
+
   it("refuses a workspace not yet onboarded with NOT_ONBOARDED", async () => {
     const workspaceId = await newWorkspace(false);
     await signInAs(workspaceId, "owner");

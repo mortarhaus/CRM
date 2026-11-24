@@ -3,6 +3,7 @@ import { COUNTRY_DEFAULTS, type Country } from "@crm/core/settings";
 import { and, eq, sql } from "drizzle-orm";
 import { recordAudit } from "../../lib/audit";
 import { docSequence } from "../schema";
+import { type Clock, databaseClock } from "./clock";
 import { currentWorkspaceId, NoWorkspaceError, type Tx } from "../workspace";
 
 // The document types with a counter. Only the invoice in Phase 2 (plan Q20); a later phase adds its type here and to
@@ -77,21 +78,24 @@ export async function ensureInvoiceSequence(tx: Tx, country: Country, actorUserI
 // A settings change (Admin or Owner, plan Q20): the pattern and the reset rule, to the version the caller read. It
 // takes the allocator's row lock, so it waits for an issue in flight and the next number uses the new pattern (a
 // change applies to new documents only; no number already given is touched, REC-09). A reset-rule change keeps the
-// counter inside the current period (withResetRule). Audited with the before and after pattern and rule; an unchanged
-// save writes nothing. The caller has checked the pattern (parsePatternFor).
+// counter inside the current period (withResetRule), at the database clock's time read after the lock; a rule change
+// at a time in a period earlier than the stored one (the workspace time zone moved west across a boundary) throws
+// PeriodBehindError and writes nothing. Audited with the before and after pattern and rule; an unchanged save writes
+// nothing. The caller has checked the pattern (parsePatternFor). `clock` is for tests only.
 export async function updateSequence(
   tx: Tx,
   docType: DocType,
   change: { pattern: string; resetRule: ResetRule },
   expectedVersion: number,
   actorUserId: string,
-  at: Date,
   timeZone: string,
+  options: { clock?: Clock } = {},
 ): Promise<DocSequence> {
   const current = await findSequence(tx, docType, { forUpdate: true });
   if (!current) throw new NoSequenceError(docType);
   if (current.version !== expectedVersion) throw new StaleSequenceError();
   if (current.pattern === change.pattern && current.resetRule === change.resetRule) return current;
+  const at = await (options.clock ?? databaseClock)(tx);
 
   const state = withResetRule(
     { resetRule: resetRuleOf(current), counter: current.counter, lastResetPeriod: current.lastResetPeriod },

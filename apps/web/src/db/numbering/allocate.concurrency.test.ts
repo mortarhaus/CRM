@@ -38,7 +38,7 @@ it(`${PARALLEL} parallel transactions on separate connections get ${PARALLEL} un
         arrived += 1;
         if (arrived === PARALLEL) allArrived();
         await gate;
-        return allocateNumber(tx, "invoice", at);
+        return (await allocateNumber(tx, "invoice", { clock: async () => at })).number;
       }),
     ),
   );

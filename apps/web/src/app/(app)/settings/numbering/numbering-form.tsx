@@ -5,6 +5,7 @@ import {
   isResetRule,
   MissingCodeError,
   nextSequence,
+  PeriodBehindError,
   parsePatternFor,
   RESET_RULES,
   type ResetRule,
@@ -28,6 +29,7 @@ import {
   NUMBERING_NO_PREVIEW,
   NUMBERING_PATTERN,
   NUMBERING_PATTERN_HINT,
+  NUMBERING_PERIOD_BEHIND,
   NUMBERING_PREVIEW,
   NUMBERING_RESET,
   NUMBERING_RESET_HINT,
@@ -35,6 +37,7 @@ import {
   NUMBERING_SAVED,
   NUMBERING_SAVING,
   NUMBERING_STALE,
+  numberingPeriodBehind,
   patternErrorMessage,
   RESET_RULE_LABELS,
   SETUP_PENDING,
@@ -65,9 +68,10 @@ const REFUSALS: Partial<Record<string, string>> = {
   STALE_VERSION: NUMBERING_STALE,
   FORBIDDEN: NUMBERING_FORBIDDEN,
   NOT_ONBOARDED: SETUP_PENDING,
+  PERIOD_BEHIND: NUMBERING_PERIOD_BEHIND,
 };
 
-type Preview = { ok: true; number: string } | { ok: false; reason: "pattern" | "code"; message: string };
+type Preview = { ok: true; number: string } | { ok: false; reason: "pattern" | "code" | "behind"; message: string };
 
 // The next number for what is typed, by the same core functions the allocator runs (parsePatternFor, withResetRule,
 // nextSequence, formatNumber): the counter the save would leave, for the instant the page was rendered.
@@ -76,11 +80,13 @@ function previewOf(pattern: string, resetRule: ResetRule, values: NumberingValue
   if (!parsed.ok) return { ok: false, reason: "pattern", message: patternErrorMessage(parsed.error) };
   const at = new Date(values.at);
   const stored = { resetRule: values.resetRule, counter: values.counter, lastResetPeriod: values.lastResetPeriod };
-  const { seq } = nextSequence(withResetRule(stored, resetRule, at, values.timeZone), at, values.timeZone);
   try {
+    const { seq } = nextSequence(withResetRule(stored, resetRule, at, values.timeZone), at, values.timeZone);
     return { ok: true, number: formatNumber(parsed.pattern, { code: values.shortCode, seq, at, timeZone: values.timeZone }) };
   } catch (error) {
     if (error instanceof MissingCodeError) return { ok: false, reason: "code", message: NUMBERING_NO_CODE };
+    // The allocator refuses this instant too (no number is given before the stored period starts).
+    if (error instanceof PeriodBehindError) return { ok: false, reason: "behind", message: numberingPeriodBehind(error.lastResetPeriod) };
     throw error;
   }
 }

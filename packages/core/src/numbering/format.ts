@@ -62,10 +62,11 @@ export function formatNumber(pattern: ParsedPattern, input: NumberInput): string
     .join("");
 }
 
-const NEVER_PERIOD = "never";
+export const NEVER_PERIOD = "never";
 
 // The period an instant falls in under a reset rule, in the workspace time zone: "2026" (yearly), "2026-01"
-// (monthly), or one constant (never). The counter starts again at 1 when this differs from the stored period.
+// (monthly), or one constant (never). Periods of one rule are fixed-width digits, so they sort as strings. The counter
+// starts again at 1 when this is later than the stored period, and refuses one earlier (nextSequence).
 export function periodKey(resetRule: ResetRule, at: Date, timeZone: string): string {
   if (resetRule === "never") return NEVER_PERIOD;
   const { year, month } = zonedYearMonth(at, timeZone);

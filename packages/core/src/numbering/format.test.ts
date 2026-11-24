@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { formatNumber, MissingCodeError, periodKey } from "./format";
 import { parsePattern } from "./pattern";
-import { nextSequence, withResetRule } from "./sequence";
+import { nextSequence, PeriodBehindError, withResetRule } from "./sequence";
 
 const pattern = (source: string) => {
   const result = parsePattern(source);
@@ -74,5 +74,50 @@ describe("nextSequence and withResetRule", () => {
     const stale = { resetRule: "yearly" as const, counter: 5, lastResetPeriod: "2025" };
     expect(withResetRule(stale, "never", before, KL)).toEqual({ resetRule: "never", counter: 0, lastResetPeriod: null });
     expect(withResetRule(stale, "yearly", before, KL)).toBe(stale);
+  });
+
+  // Bob PR #72 R1 P1: an instant in a period earlier than the stored one never starts the counter again.
+  it("refuses a yearly period earlier than the stored one (a time before the last number's)", () => {
+    const state = { resetRule: "yearly" as const, counter: 7, lastResetPeriod: "2027" };
+    expect(() => nextSequence(state, before, KL)).toThrow(PeriodBehindError);
+    expect(() => nextSequence(state, before, KL)).toThrow(expect.objectContaining({ period: "2026", lastResetPeriod: "2027" }));
+    expect(nextSequence(state, after, KL)).toEqual({ seq: 8, period: "2027" });
+  });
+
+  it("refuses the earlier period a time zone further west gives for the same instant", () => {
+    // 1 Jan 2027 00:30 in KL is 31 Dec 2026 11:30 in New York.
+    const instant = new Date("2026-12-31T16:30:00Z");
+    const state = nextSequence({ resetRule: "yearly", counter: 0, lastResetPeriod: null }, instant, KL);
+    expect(state).toEqual({ seq: 1, period: "2027" });
+    expect(() => nextSequence({ resetRule: "yearly", counter: 1, lastResetPeriod: "2027" }, instant, "America/New_York")).toThrow(
+      PeriodBehindError,
+    );
+  });
+
+  it("refuses a monthly period earlier than the stored one, across a year too", () => {
+    const state = { resetRule: "monthly" as const, counter: 3, lastResetPeriod: "2027-01" };
+    expect(() => nextSequence(state, new Date("2026-12-15T00:00:00Z"), KL)).toThrow(PeriodBehindError);
+    expect(() => nextSequence({ ...state, lastResetPeriod: "2026-11" }, new Date("2026-10-31T00:00:00Z"), KL)).toThrow(PeriodBehindError);
+    expect(nextSequence({ ...state, lastResetPeriod: "2026-09" }, new Date("2026-10-31T00:00:00Z"), KL)).toEqual({ seq: 1, period: "2026-10" });
+  });
+
+  it("never: one constant period, so no instant is behind", () => {
+    const state = { resetRule: "never" as const, counter: 9, lastResetPeriod: "never" };
+    expect(nextSequence(state, new Date("1990-01-01T00:00:00Z"), KL).seq).toBe(10);
+  });
+
+  it("a stored period of another rule's shape is an error, not a reset", () => {
+    expect(() => nextSequence({ resetRule: "yearly", counter: 3, lastResetPeriod: "2026-11" }, before, KL)).toThrow(/does not fit/);
+    expect(() => nextSequence({ resetRule: "never", counter: 3, lastResetPeriod: "2026" }, before, KL)).toThrow(/does not fit/);
+  });
+
+  it("a rule change at an instant before the stored period is refused, not a reset", () => {
+    const yearly = { resetRule: "yearly" as const, counter: 4, lastResetPeriod: "2027" };
+    expect(() => withResetRule(yearly, "monthly", before, KL)).toThrow(PeriodBehindError);
+    expect(() => withResetRule(yearly, "never", before, KL)).toThrow(PeriodBehindError);
+    const monthly = { resetRule: "monthly" as const, counter: 2, lastResetPeriod: "2027-01" };
+    expect(() => withResetRule(monthly, "yearly", before, KL)).toThrow(PeriodBehindError);
+    // The same rule changes nothing, so nothing is refused here; the next number is (nextSequence).
+    expect(withResetRule(yearly, "yearly", before, KL)).toBe(yearly);
   });
 });

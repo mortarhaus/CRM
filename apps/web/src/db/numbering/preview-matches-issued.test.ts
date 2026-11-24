@@ -1,4 +1,4 @@
-import { RESET_RULES, type ResetRule } from "@crm/core/numbering";
+import { PeriodBehindError, RESET_RULES, type ResetRule } from "@crm/core/numbering";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createDb, type DbHandle } from "../client";
 import { runInWorkspace } from "../workspace";
@@ -8,7 +8,9 @@ import { updateSequence } from "./sequence";
 
 // Phase 2 done-when "Pattern preview matches issued numbers" (spec line 1138), through a test harness because no
 // document is issued before Phase 4: for random patterns, reset rules, time zones and instants, the preview taken
-// just before an issue equals the number the issue gets. A seeded generator, so a failure can be replayed.
+// just before an issue equals the number the issue gets. A seeded generator, so a failure can be replayed. Time only
+// moves forward in each workspace (sorted instants), as the database clock does; every 7th round also tries a
+// backdated instant, where the preview and the allocator must agree too (the same number, or both PeriodBehindError).
 const ROUNDS = 300;
 const TIME_ZONES = ["Asia/Kuala_Lumpur", "Asia/Singapore", "UTC", "America/New_York", "Pacific/Auckland", "Asia/Kolkata"];
 
@@ -64,25 +66,48 @@ it(`previewNumber then allocateNumber give the same number (${ROUNDS} random rou
     return new Date(boundary + (random.int(3) - 1) * 1000);
   };
 
+  // The same number, or the same refusal, from the preview and the allocator at `at`.
+  const outcome = (promise: Promise<string>) =>
+    promise.then(
+      (number) => number,
+      (error: unknown) => {
+        if (error instanceof PeriodBehindError) return "PeriodBehindError";
+        throw error;
+      },
+    );
+  const previewThenAllocate = (workspace: string, at: Date) =>
+    runInWorkspace(handle.db, workspace, async (tx) => [
+      await outcome(previewNumber(tx, "invoice", at)),
+      await outcome(allocateNumber(tx, "invoice", { clock: async () => at }).then((taken) => taken.number)),
+    ]);
+
+  const instants = Array.from({ length: ROUNDS }, randomInstant).sort((x, y) => x.getTime() - y.getTime());
   let issued = 0;
+  let backdatedRefused = 0;
   for (let round = 0; round < ROUNDS; round += 1) {
     const timeZone = random.pick(TIME_ZONES);
     const workspace = workspaces.get(timeZone) as string;
-    const at = randomInstant();
+    const at = instants[round] as Date;
     if (round % 10 === 0) {
       const resetRule = random.pick(RESET_RULES);
       const pattern = randomPattern(random, resetRule);
       await runInWorkspace(handle.db, workspace, async (tx) => {
         const [row] = await db.admin<{ version: number }[]>`select version from doc_sequence where workspace_id = ${workspace}`;
-        await updateSequence(tx, "invoice", { pattern, resetRule }, row?.version ?? 0, actor, at, timeZone);
+        await updateSequence(tx, "invoice", { pattern, resetRule }, row?.version ?? 0, actor, timeZone, { clock: async () => at });
       });
     }
-    const [previewed, allocated] = await runInWorkspace(handle.db, workspace, async (tx) => [
-      await previewNumber(tx, "invoice", at),
-      await allocateNumber(tx, "invoice", at),
-    ]);
+    const [previewed, allocated] = await previewThenAllocate(workspace, at);
     expect(allocated, `round ${round}, ${timeZone}, ${at.toISOString()}`).toBe(previewed);
+    expect(allocated).not.toBe("PeriodBehindError");
     issued += 1;
+    if (round % 7 === 3) {
+      const backdated = new Date(at.getTime() - (1 + random.int(60)) * 24 * 3600 * 1000);
+      const [previewedBack, allocatedBack] = await previewThenAllocate(workspace, backdated);
+      expect(allocatedBack, `backdated round ${round}, ${timeZone}, ${backdated.toISOString()}`).toBe(previewedBack);
+      if (allocatedBack === "PeriodBehindError") backdatedRefused += 1;
+    }
   }
   expect(issued).toBe(ROUNDS);
+  // The backdated tries cross a period boundary often enough to exercise the refusal.
+  expect(backdatedRefused).toBeGreaterThan(0);
 });

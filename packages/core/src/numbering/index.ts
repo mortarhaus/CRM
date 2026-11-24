@@ -1,4 +1,4 @@
-export { formatNumber, MissingCodeError, type NumberInput, periodKey, zonedYearMonth } from "./format";
+export { formatNumber, MissingCodeError, NEVER_PERIOD, type NumberInput, periodKey, zonedYearMonth } from "./format";
 export {
   checkResetRule,
   isResetRule,
@@ -12,4 +12,4 @@ export {
   type ResetRule,
   usesCode,
 } from "./pattern";
-export { nextSequence, type SequenceState, withResetRule } from "./sequence";
+export { nextSequence, PeriodBehindError, type SequenceState, withResetRule } from "./sequence";
