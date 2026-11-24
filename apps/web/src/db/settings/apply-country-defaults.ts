@@ -14,6 +14,9 @@ export interface OnboardingAnswer {
   tax: TaxAnswer;
   ownTin: string | null;
   ownBrn: string | null;
+  // The workspace short code ({CODE} in document numbers); null when the owner skipped it (set later in General
+  // settings, Charlie 2026-11-24).
+  shortCode: string | null;
 }
 
 export class AlreadyOnboardedError extends Error {
@@ -48,6 +51,7 @@ export async function applyCountryDefaults(
   fill("defaultCurrency", defaults.currency);
   fill("ownTin", answer.ownTin);
   fill("ownBrn", answer.ownBrn);
+  fill("shortCode", answer.shortCode);
   if (answer.tax.registered && !current.taxRegistered) {
     patch.taxRegistered = true;
     fill("taxRegistrationNo", answer.tax.registrationNo);
