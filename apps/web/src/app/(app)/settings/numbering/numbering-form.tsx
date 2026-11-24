@@ -138,7 +138,7 @@ function NumberingFields({ action, values, unreachable }: FormProps & { unreacha
           value={pattern}
           onChange={(event) => setPattern(event.target.value)}
           aria-invalid={patternInvalid ? true : undefined}
-          aria-describedby="number-pattern-hint number-preview"
+          aria-describedby={error ? "number-pattern-hint number-preview numbering-error" : "number-pattern-hint number-preview"}
           className="font-mono"
         />
       </div>
@@ -183,7 +183,8 @@ function NumberingFields({ action, values, unreachable }: FormProps & { unreacha
       <p className="text-sm text-muted-foreground">{NEW_DOCUMENTS_ONLY}</p>
 
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        // Named by the pattern field's aria-describedby too, so the save refusal is read with the field.
+        <p id="numbering-error" role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}

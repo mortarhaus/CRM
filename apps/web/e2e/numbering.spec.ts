@@ -69,6 +69,8 @@ test("the preview follows the pattern as it is typed; an unknown token is refuse
   await expectAccessible(page, "/settings/numbering, unknown token");
   await page.getByRole("button", { name: NUMBERING_SAVE }).click();
   await expect(page.getByRole("main").getByRole("alert")).toHaveText(NUMBERING_INVALID);
+  // The refusal is tied to the field as well as announced (Bob PR #72 R1 P3).
+  await expect(patternField(page)).toHaveAccessibleDescription(new RegExp(NUMBERING_INVALID.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
   // A monthly counter needs the month: the preview says so until {MM} is in the pattern.
   await page.getByLabel("Start the counter again at 1").selectOption("monthly");
