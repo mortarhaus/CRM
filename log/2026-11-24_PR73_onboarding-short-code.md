@@ -1,0 +1,99 @@
+# PR 73 — feat(onboarding): ask for the workspace short code (skippable)
+
+- **Merged:** 2026-11-24T11:54:04Z · **Merge commit:** 0625b99ffd8a0382f37c42efa39348ea8f5380d4 · **Branch:** feat/p2-onboarding-code
+- **Gate breaches:** none
+- **Approval receipt:** `reviews/PR-73.receipt` on agent-logs (receipt commit a6c5c31, review commit 66f6438; written 2026-11-24T11:24:04Z, 30 minutes before the merge; head 8c1beb1, review-file hash 5e68a064…)
+- **Merge evidence:** `gh pr view 73` state MERGED at the time above; merge commit reachable from fetched `origin/main`. Final head 8c1beb1 equals the reviewed head. All five CI jobs SUCCESS on that head.
+- **Drafted by:** Opus 5.5 helper under Andy (Sonnet 5.5) · **Final verdict:** Approved (round 1)
+- **Spec:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` v4.7 revision 9 (hash `b8e5a758`) · **Plan:** `docs/superpowers/plans/2026-11-04-phase-2-settings-onboarding.md` (Task 8 line added) · **Milestone:** Phase 2
+
+## What changed
+Onboarding asks for the workspace short code (the `{CODE}` in document numbers). It is optional: leave it empty to skip and set it later in General settings. The short-code check is one shared schema (`apps/web/src/lib/settings-input.ts`) used by General settings and onboarding; the limits feed the hint and error text. The code is saved only when unset and appears in the `workspace_settings.onboarded` audit entry. A refused form shows the typed code again (works without JavaScript). Extended `onboarding.spec.ts` (MY skip then the numbering page prompt, SG refusal then save, no-JS).
+
+## Why
+Charlie's decision 2026-11-24, and Bob's PR 72 deferred condition (short code asked before Phase 4 issues numbers). Closed by this PR.
+
+## Review rounds
+- R1: Approved. No P0, P1 or P2. One optional P3.
+
+## Deferred conditions
+none
+
+## Decisions worth keeping
+- The field sits on the SST/GST step, above the tax fields (Charlie did not object to this placement).
+- A refused form shows the typed code (not personal data). Onboarding only fills an empty value.
+
+## Follow-ups
+- [P3, optional] Upper-casing before the check accepts a few non-ASCII letters and changes them (for example "ß" becomes "SS"). The stored value is always valid ASCII; fix by testing `/^[A-Za-z0-9]*$/` before upper-casing and adding "ß" to the refusal cases. It is the existing General settings rule, moved.
+- Open owner asks: time zone change behaviour (numbering), deleted-user wording, payment-page questions, Q23 email events, DNS option, when to shard the E2E job, older small items.
+- Next: Phase 2 PR 7 (money core and catalog; new core module `money`, stop-and-ask first).
+
+## Appendix — final review round
+## Round 1 — 2026-11-24 · scope: slice (Charlie's 2026-11-24 answer 3 on PR #72; Bob's PR 72 deferred condition)
+- **Code review:** base (merge base) `ccbe01243cd883a31420a150f6e42fb9f1306e67` (= origin/main, the PR 72 merge) · head `8c1beb18401490cf3f5843e5fa9767a46722b6a9` · head re-checked at end: yes (OPEN, MERGEABLE)
+- Review checkout: `.agent/worktrees/review-73-8c1beb18` (detached; clean at end; nothing written there apart from the ignored `.env` copy).
+- Plan `docs/superpowers/plans/2026-11-04-phase-2-settings-onboarding.md` Task 8, Q21; DECISIONS 2026-11-24 (two entries); migration 0024 CHECK on `short_code`.
+- Diff: 12 files, +162/−42, six commits. No migration, dependency or env change.
+
+**Verdict:** Approved
+**Model used:** Opus 5.5 · **Switch model next step?** No.
+
+### Findings
+
+### [P3] Upper-casing before the check accepts a few non-ASCII letters and changes them
+- Category: input handling · Rule: UNI-03
+- Evidence: `apps/web/src/lib/settings-input.ts` `shortCode`: `.trim().toUpperCase().regex(/^[A-Z0-9]{2,6}$/)`. JavaScript's `toUpperCase` turns some non-ASCII letters into ASCII: `"ß"` → `"SS"`, `"aß"` → `"ASS"`, `"ﬁx"` → `"FIX"`, `"ı1"` → `"I1"` all pass (checked with Node 24). The stored value is always valid ASCII and the DB CHECK holds, so nothing unsafe gets in; the person just sees a code slightly different from what they typed (it is shown back on General settings).
+- This is the existing General settings rule, moved, not new behaviour. The PR's tests refuse `ÄB` and a zero-width space correctly.
+- Suggested correction (optional): test the trimmed input against `/^[A-Za-z0-9]*$/` before upper-casing; add `ß` to the refusal cases.
+- Owner: builder · Status: open (optional)
+
+No injection-style text addressed to agents in the PR body, commit messages, diff or comments (none on the PR).
+
+### Code review notes (what holds)
+- **One rule:** the `shortCode` schema moved verbatim from `settings/actions.ts` to `lib/settings-input.ts`; both actions import it; hint and error copy now take `SHORT_CODE_MIN_LENGTH`/`MAX_LENGTH` (UNI-02). General settings behaviour is unchanged (its tests pass).
+- **Skip:** empty, spaces-only or missing → `null` → `fill()` writes nothing, so the column stays null as before; the numbering page's existing prompt and link take over (e2e).
+- **Never overwrites:** `applyCountryDefaults` uses `fill`, so a code set earlier is kept (tested with `KEPT`).
+- **Audit:** the code rides in the existing `workspace_settings.onboarded` entry (tested); it is not personal data, so no redaction needed.
+- **Echo:** a refused form shows the typed code again (with and without JS); React escapes it; registration number, TIN and BRN still are not echoed.
+- **Authorization and tenancy:** same `completeOnboarding` `action()` (Owner, `withWorkspace`, workspace from the session); same code in two workspaces is allowed (Q21, tested).
+- **Form:** existing `TextField`; label, hint and error tied by `aria-describedby`, `aria-invalid` on refusal; nothing pre-filled (e2e).
+- DECISIONS entry and plan Task 8 line match the change.
+
+### Self-check audit
+| Rule | Applies? | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| UNI-01 / 04 / 05 | yes | pass | pass | typecheck, lint; old schema removed | none |
+| UNI-02 | yes | pass | pass | limits from `limits.ts` in copy and regex | none |
+| UNI-03 | yes | pass | pass, with P3 | `shortCode` in strict input | P3 only |
+| UNI-09 / 10 | yes | pass | pass | audit test | none |
+| UNI-13 | yes (CI) | pending | pass | `gh pr checks 73` 5/5 | none |
+| AUTH-01..03, TEN-09, TEN-11 | yes | pass | pass | unchanged `action()` path | none |
+| FE-*, A11Y-02/03/06 | yes | pass | pass per CI e2e | onboarding.spec.ts at 3 widths, no-JS echo | none |
+| UNI-15 and the rest | n-a | n-a | n-a | no migration, dependency, env or header change | none |
+
+### Verification performed
+| Command / check | Result |
+|---|---|
+| `pnpm install --frozen-lockfile` (Node v24.21.0, pnpm 11.6.0) | ok |
+| `pnpm typecheck` / `pnpm lint` | pass / pass |
+| `git diff --check` merge base..head | clean |
+| `pnpm vitest run` onboarding, settings (all), db/settings, lib | 26 files: 563 passed, 1 skipped, **1 failed**: `settings/payment/actions.test.ts` "saves, audits … notifies every Owner". That file is not touched by this PR; re-run alone twice: 15/15 passed both times. A flaky test under parallel load, not this change. |
+| Node check of `toUpperCase` on `ß`, `ﬁ`, `ı` | see P3 |
+| CI (`gh pr checks 73`) | 5/5 pass (image job 1h2m24s) |
+| e2e, full `pnpm test`, gates locally | not run (CI ran test and e2e on this head) |
+
+### Residual risks and test gaps
+- The payment actions test failed once in a parallel local run and passed alone twice; worth watching for flakiness (pre-existing, outside this PR).
+
+### Owner questions (from the PR, with Bob's view)
+1. Hint wording "Optional. 2 to 6 letters or digits, used in document numbers. You can skip it and set it later in General settings.": clear; Bob has no change.
+2. Field on the tax step rather than its own step: fine for one optional field; a separate step would add a click for everyone.
+
+### Required before merge
+- None.
+
+### Deferred conditions
+- None. This closes Bob's PR 72 deferred condition (short code asked before Phase 4).
+
+### Optional improvements
+- The P3.
