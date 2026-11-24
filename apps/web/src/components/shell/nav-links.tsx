@@ -1,4 +1,4 @@
-import { Building2, Hash, Landmark, Mail, Palette, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { Building2, Hash, Landmark, Mail, Package, Palette, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { NavItem, type NavItemProps } from "./nav-item";
 
 const ICON = "size-5";
@@ -15,8 +15,8 @@ interface NavLinksProps {
 }
 
 // The destinations that exist today, shared by the rail, the phone tab bar and the menu drawer (UNI-05: nothing
-// from a later phase). Email, General, Branding and Numbering settings are Admin and Owner only (AUTH-03); each page and action checks
-// the role. Bank details are Owner only.
+// from a later phase). Email, General, Branding and Numbering settings and the Catalog are Admin and Owner only (AUTH-03); each page
+// and action checks the role. Bank details are Owner only.
 export function NavLinks({ showAdminSettings, showOwnerSettings = false, layout, quick = false, className }: NavLinksProps) {
   return (
     <ul className={className}>
@@ -59,6 +59,11 @@ export function NavLinks({ showAdminSettings, showOwnerSettings = false, layout,
       {showAdminSettings && !quick && (
         <li>
           <NavItem href="/settings/numbering" label="Numbering" layout={layout} icon={<Hash aria-hidden className={ICON} />} />
+        </li>
+      )}
+      {showAdminSettings && !quick && (
+        <li>
+          <NavItem href="/catalog" label="Catalog" layout={layout} icon={<Package aria-hidden className={ICON} />} />
         </li>
       )}
       {showOwnerSettings && !quick && (
