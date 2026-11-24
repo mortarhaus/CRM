@@ -62,8 +62,7 @@ function OnboardingFields({ action, country, taxName, taxRate, version, unreacha
   const refused = result?.ok === false && result.status === "INVALID_INPUT" ? result : null;
   const invalid = new Set(refused?.fields ?? []);
   // Without JavaScript the page is rendered from the result: the echoed short code, answer and tax values come back as
-  // defaults.
-  // With JavaScript the form is not reset (onSubmit below), so the inputs keep what was typed either way.
+  // defaults. With JavaScript the form is not reset (onSubmit below), so the inputs keep what was typed either way.
   const echoed = refused?.echo ?? {};
   const yes = echoed.taxRegistered === "yes";
   const fieldError = (name: string) => (invalid.has(name) ? FIELD_ERRORS[name] : undefined);
