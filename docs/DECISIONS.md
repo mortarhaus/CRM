@@ -2,6 +2,17 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-24 — Onboarding asks for the workspace short code, and it can be skipped
+- **Owner decision (Charlie, 2026-11-24; item 3 of the PR 6 answers below):** onboarding asks for the short code (`{CODE}` in numbers such as `INV-{CODE}-2026-0001`), and the owner may skip it and set it later in General settings.
+- **Decision:**
+  - The SST/GST step of `/onboarding` has an optional **Short code** field: the General settings label and error, and a hint that says it is optional, used in document numbers, and can be set later in General settings (`ONBOARDING_SHORT_CODE_HINT`). Nothing is pre-filled or suggested.
+  - **One rule, shared:** the Zod `shortCode` schema moved from `settings/actions.ts` to `lib/settings-input.ts` and is used by both actions (trimmed, upper-cased, 2 to 6 letters or digits from `SHORT_CODE_MIN_LENGTH`/`SHORT_CODE_MAX_LENGTH`, as the CHECK of 0024; unique per workspace only, plan Q21). The hint and error copy take the same constants.
+  - **Skip:** empty, spaces only or a missing field leaves `short_code` null, as before; the numbering page then shows its prompt and link to General settings. `applyCountryDefaults` fills the code only when it is unset (as every onboarding field) and it is audited in `workspace_settings.onboarded`. A refused form echoes the typed code (not personal data).
+- **Tests:** `onboarding/actions.test.ts` (saved upper-cased, the 2 and 6 bounds, skipped when empty, spaces or missing, refused for 1 or 7 characters, a hyphen, a space, a non-ASCII letter and a zero-width space, the same code in two workspaces); `apply-country-defaults.test.ts` (stored, audited, never overwrites); `e2e/onboarding.spec.ts` (skip then the numbering prompt; a refused then saved code; the echo without JavaScript).
+- **Scope / affects:** `apps/web/src/lib/settings-input.ts`, `apps/web/src/app/(app)/settings/actions.ts`, `apps/web/src/app/(onboarding)/onboarding/{actions.ts,onboarding-form.tsx,actions.test.ts}`, `apps/web/src/db/settings/apply-country-defaults{,.test}.ts`, `apps/web/src/lib/auth/messages.ts`, `apps/web/e2e/onboarding.spec.ts`, `apps/web/src/test/workspace-settings.ts`; Phase 2 plan Task 8. No migration, env var or dependency.
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-11-24); the shared schema and copy are builder choices.
+
 ## 2026-11-24 — Phase 2 PR 6: Charlie's answers to the numbering questions
 - **Owner answers (Charlie, 2026-11-24, on PR #72):**
   1. The pattern bounds are confirmed: `NUMBER_PATTERN_MAX_LENGTH` = 50 code points and `NUMBER_SEQ_MAX_WIDTH` = 9 (`packages/core/src/security/limits.ts`); no longer proposals.
