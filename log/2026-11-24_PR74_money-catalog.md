@@ -1,0 +1,131 @@
+# PR 74 — feat(catalog): Phase 2 PR 7: money core, service table, catalog page
+
+- **Merged:** 2026-11-24T15:04:09Z · **Merge commit:** 9b8a6d02ed80ea6b09434f49313ff53b95cebde2 · **Branch:** feat/p2-money-catalog
+- **Gate breaches:** none
+- **Approval receipt:** `reviews/PR-74.receipt` on agent-logs (receipt commit fa23795, review commit e02987d; written 2026-11-24T15:03:54Z, 15 seconds before the merge; head 5ec9bb5, review-file hash 5c588069…)
+- **Merge evidence:** `gh pr view 74` state MERGED at the time above; merge commit reachable from fetched `origin/main`. Final head 5ec9bb5 equals the reviewed head. All five CI jobs SUCCESS on that head.
+- **Drafted by:** Opus 5.5 helper under Andy (Sonnet 5.5) · **Final verdict:** Approved (round 1)
+- **Spec:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` v4.7 revision 9 (hash `b8e5a758`) · **Plan:** `docs/superpowers/plans/2026-11-04-phase-2-settings-onboarding.md` (PR 7, Tasks 20-22) · **Milestone:** Phase 2
+
+## What changed
+New core module `@crm/core/money` (approved by Charlie 2026-11-24): 155 ISO 4217 codes with exponents, `parseDecimalToMinor` by string arithmetic and one BigInt (more decimals than the currency allows is refused), `minorToDecimal`, `formatMinor`. New `service` tenant table (migrations 0035, 0036; RLS template; no DELETE; column-level UPDATE; a `BEFORE UPDATE OF currency` trigger refuses a currency change while a default price is set). Catalog page `/catalog` for Admin and Owner: audited create, update, archive and unarchive, archived filter, plain table.
+
+## Why
+Spec line 472 and 180 (service currency lock), line 788 (Admin and Owner), plan Tasks 20-22, Q22 (archive only), Q25.
+
+## Review rounds
+- R1: Approved. No P0, P1 or P2. Three optional P3s.
+
+## Deferred conditions
+none
+
+## Decisions worth keeping
+- Bounds are proposals Bob agrees with: `MONEY_MAX_MINOR` 999,999,999,999,999 and input length 40; name 200, description 2,000, unit 20 (free text).
+- Trailing-zero decimals (100.0 in JPY) are refused; Bob leans to accept zeros-only later (never round).
+- ISO funds codes and no-minor-unit entries are excluded. The workspace default and base currency are still MYR and SGD only (SETTINGS_CURRENCIES unchanged); widening belongs with the multi-currency work.
+- "Taxable by default" pre-ticked when the workspace is tax-registered.
+
+## Follow-ups
+- [P3] The database currency list copies the code table with no test that they match.
+- [P3] An edit link for a service that does not exist shows the create form with no message.
+- [P3] FE-71: a long service name at 320 px is not in the e2e.
+- Owner (no merge block, unanswered): the six PR questions above (bounds, lengths, tax pre-tick, full ISO list for default/base currency, trailing zeros, excluded codes).
+- Open owner asks: time zone change behaviour (numbering), deleted-user wording, payment-page questions, Q23 email events, DNS option, when to shard the E2E job, older small items.
+- Next: Phase 2 PR 8 (email templates; needs Q23 event list and default texts from Charlie).
+
+## Appendix — final review round
+## Round 1 — 2026-11-24 · scope: slice (plan Tasks 20–22, Q22)
+- **Code review:** base (merge base) `0625b99ffd8a0382f37c42efa39348ea8f5380d4` (= origin/main) · head `5ec9bb5493180ede9ead9ff1757dbf37bf8f0d4c` · head re-checked at end: yes (OPEN, MERGEABLE)
+- Review checkout: `.agent/worktrees/review-74-5ec9bb54` (detached; clean at end; only the ignored `.env` copy). My probe scripts were kept outside the checkout (scratchpad).
+- Spec v4.7 revision 9: Money rules "Representation", "Service currency edit", "Service price prefill"; data model `service`; line 792 (catalog roles). Plan `docs/superpowers/plans/2026-11-04-phase-2-settings-onboarding.md` Tasks 20–22, Q22. Guardrails MON-01..03, MON-07, TEN, UNI, FE.
+- Diff: 32 files, +6061/−11; about 4,276 lines are the two generated drizzle snapshots. Seven commits.
+
+**Verdict:** Approved
+**Model used:** Opus 5.5 · **Switch model next step?** No.
+
+Merge note: CI is 5/5 on this head (image job 1h4m3s, limit 90 min).
+
+### Findings
+
+### [P3] The database currency list is a copy of the code table, with no test that they match
+- Category: maintainability · Rule: MON-02
+- Evidence: `0035_service.sql` `service_currency_check` lists 155 codes; `CURRENCY_EXPONENT` in `currency.ts` holds 155. I compared them: identical today. Nothing in the tests ties the two, so a later ISO amendment (a code added or withdrawn) could update one and not the other. The DECISIONS entry says the amendment needs a migration; a test would make that automatic.
+- Suggested correction (optional): one test that reads the CHECK's list from `pg_get_constraintdef` and compares it with `CURRENCY_CODES`.
+- Owner: builder · Status: open (optional)
+
+### [P3] An edit link for a service that does not exist shows the create form with no message
+- Evidence: `page.tsx` `findService` returns null for an unknown, or other workspace's, id and the page renders the "new service" form as if there were no `?edit=`. No data leaks (RLS), and a person only gets there by a stale or hand-typed link.
+- Suggested correction (optional): a short "That service was not found" line. Owner: builder · Status: open (optional)
+
+### [P3] FE-71: a long service name at 320 px is not in the e2e
+- Evidence: the PR's own self-check says "partly". The name cell uses `break-words` and the table scrolls inside its own box (the "fix" commit), and the CI e2e at 320 px passes, so I expect it holds; it is just not asserted.
+- Suggested correction (optional): one 200-character name in `catalog.spec.ts`. Owner: builder · Status: open (optional)
+
+No injection-style text addressed to agents in the PR body, commit messages, diff or comments (none on the PR).
+
+### Code review notes (what holds)
+- **No floats (MON-01):** `parseDecimalToMinor` splits whole and fraction by one regex, pads the fraction to the exponent and calls `BigInt` once on the joined digits. I grepped `Number(`, `parseFloat`, `toFixed`, `Math.`, `parseInt` in the non-test money, db and catalog code: the only hits are `Math.max` on a row version and `Number(form.get("expectedVersion"))`, neither money. More decimals than the currency has is refused, never rounded; the bound is checked on the digits as a `bigint`; the input length is limited before the regex runs.
+- **The regex:** I ran it on odd inputs: ASCII digits only (Arabic-Indic and full-width digits refused), `1,234.50` ok, `1234,567`, `1,23`, `1e3`, `+5`, `5.`, `.5` and inner spaces refused, leading zeros ok, `-0` matches and is then refused as negative by default.
+- **Formatting:** `minorToDecimal` is string arithmetic (pads to exponent + 1, so 5 JPY → `5`, 5 KWD → `0.005`); `formatMinor` gives `Intl.NumberFormat` the exact decimal string and forces the ISO exponent as both minimum and maximum digits, so the display cannot disagree with the stored scale.
+- **Currency table:** 155 codes. I compared it with this Node's ICU list: only differences are the withdrawn codes the table rightly leaves out (ANG, BGN, HRK, SLL, CUC, ZWL) and the units with no minor unit (XDR, XSU), plus `VED`, which my ICU lacks. The table follows ISO 4217 exponents (for example HUF 2, IDR 2, IQD 3), while the Unicode data (`Intl`) uses 0 for some of them in everyday use; because the exponent is forced, the page shows what ISO says. That is the spec's rule ("exponent from a static table"), noted so it is not a surprise.
+- **Schema and RLS (0035, 0036):** `workspace_id` NOT NULL with FK; composite unique `(workspace_id, id)` for later line items; CHECKs on name, description, unit (code points), price `0..MONEY_MAX_MINOR`, currency list; ENABLE and FORCE RLS; RESTRICTIVE workspace policy plus PERMISSIVE SELECT/INSERT/UPDATE (USING and WITH CHECK); `crm_app` SELECT, INSERT and a nine-column UPDATE (never `id`, `workspace_id`, `created_at`); no DELETE, nothing for `crm_purge` or `crm_worker`; privileges manifest, isolation fixture and runbook list updated.
+- **The currency lock:** the `BEFORE UPDATE OF currency` trigger raises 23514 when the OLD row has a price and the currency differs, so a statement that clears the price and changes the currency together is refused too (matches the spec's "clear the price first"). `SECURITY INVOKER`, fixed `search_path`, no grants needed. The action checks the same on the locked row first (`CURRENCY_LOCKED`), so the person gets a message, and the trigger covers any other writer. The trigger tests run as `crm_app`.
+- **Actions:** `action()` with `minRole: "admin"` on each of create, update, archive; Zod `strictObject`; currency must be on the list; the server parses the price text (the client parse only words the error, MON-07); audited before and after, the price as a decimal string; `FOR UPDATE` plus `version` for stale saves; an unchanged save or an archive of an archived row writes nothing; `NOT_FOUND` for an id outside the workspace.
+- **Page and form:** Admin and Owner only (Staff see the refusal); currency prefilled from the workspace default; archived filter; plain table with column headers and a visually hidden row label on the edit link; works without JavaScript (refused posts echo what was typed, the unticked checkbox is handled); focus returns to the button; `router.refresh()` after a save.
+- **Spec:** matches "Service currency edit" and "Service price prefill"; the catalog is Admin and Owner (line 792); archive, never delete (Q22).
+
+### Self-check audit
+| Rule | Applies? | Builder said | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| MON-01 | yes | met | pass | parse.ts; grep; float-trap tests | none |
+| MON-02 | yes | met | pass, with P3 | currency stored beside price; CHECK; exponents | list/test link (P3) |
+| MON-03 | yes | met | pass | audit string; exact format past 2^53 | none |
+| MON-04/05/06 | n-a | n-a | n-a | no rounding, sums or finalized values | none |
+| MON-07 | yes | met | pass | server parses | none |
+| TEN-01/02/04..08 | yes | met | pass | 0035, 0036, tests as crm_app | none |
+| TEN-03 / TEN-12 | n-a | n-a | n-a | not append-only; no bypass | none |
+| TEN-09/10/11 | yes | met | pass | `action()`; workspace from session | none |
+| AUTH-01..03 | yes | met | pass | minRole admin on page and each action; Staff refused | none |
+| UNI-01..05 | yes | met | pass | typecheck, lint; zod; limits.ts | limits are proposals (UNI-02), see questions |
+| UNI-06 / 14 | yes | met | pass | no dependency; lockfile unchanged | none |
+| UNI-09 / 10 | yes | met | pass | no logging added; `recordAudit` only | none |
+| UNI-13 | yes (CI) | pending | pass | `gh pr checks 74` 5/5 | none |
+| UNI-15 | yes | met | pass (additive) | 0035, 0036 | none |
+| UNI-16 | checked | n-a | pass | runbook tenant list updated | none |
+| FE-01..07, 10..14, 20..24, 31/32/34, 40..61 | yes | met | pass | page, form, e2e at 3 widths | none |
+| FE-70 | yes | met | pass per CI e2e | catalog.spec.ts | none |
+| FE-71 | partly | partly | agree; see P3 | long name not asserted | none |
+
+### Verification performed
+| Command / check | Result |
+|---|---|
+| `pnpm install --frozen-lockfile` (Node v24.21.0, pnpm 11.6.0) | ok |
+| `pnpm typecheck` / `pnpm lint` | pass / pass |
+| `git diff --check` merge base..head | clean |
+| `pnpm vitest run` core money, db (catalog, isolation, privileges, rls and the rest of `src/db`), catalog actions | 24 files, 540 passed |
+| Float grep over money, db/catalog and catalog app code | no money hit (see notes) |
+| Currency table vs ICU list; amount regex on 13 inputs (scripts kept outside the checkout) | as in the notes |
+| Migration CHECK list vs `CURRENCY_EXPONENT` | identical (155) |
+| CI (`gh pr checks 74`) | 5/5 pass (image job 1h4m3s) |
+| e2e, full `pnpm test`, gates locally | not run (CI ran test and e2e on this head) |
+
+### Residual risks and test gaps
+- The ISO table is a hand-kept copy of a published list (SIX, 2026-09-17); it is correct today as far as I can tell, and a future amendment is a code and migration change.
+- Builder says the catalog no-JS e2e runs on chromium only, to keep CI short; the other two projects rely on the unit and action tests.
+
+### Owner questions (from the PR, with Bob's view)
+1. `MONEY_MAX_MINOR` = 999,999,999,999,999 and input length 40: reasonable; I agree (a sum of 9,000 such amounts still fits a bigint).
+2. Name 200, description 2,000, unit 20; unit free text: agree. A fixed list would be a business choice and can be added later without a migration problem.
+3. "Taxable by default" ticked when the workspace is tax-registered: agree; it is only a starting value.
+4. Full ISO list for the workspace default and base currency: a separate decision. The service currency is already free; the workspace base currency drives totals, so widening it belongs with the multi-currency work. Charlie's call; no change needed in this PR.
+5. Trailing zeros (`100.0` in JPY): refusing is safe; accepting when every extra digit is zero changes no value and is friendlier. Slight lean to accept zeros only (never round). Either is fine for merge.
+6. ISO funds codes and no-minor-unit entries excluded: right; they are not currencies a studio invoices in.
+
+### Required before merge
+- None.
+
+### Deferred conditions
+- None.
+
+### Optional improvements
+- The three P3s.
