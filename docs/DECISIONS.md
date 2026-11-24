@@ -2,6 +2,16 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-24 — Phase 2 PR 6: Charlie's answers to the numbering questions
+- **Owner answers (Charlie, 2026-11-24, on PR #72):**
+  1. The pattern bounds are confirmed: `NUMBER_PATTERN_MAX_LENGTH` = 50 code points and `NUMBER_SEQ_MAX_WIDTH` = 9 (`packages/core/src/security/limits.ts`); no longer proposals.
+  2. "Exactly one `{SEQ:n}`" and "a yearly reset needs a year token, a monthly reset a year token and `{MM}`" are confirmed as rules.
+  3. The short code is asked at onboarding, with a skip option. That is a separate, later PR (not PR 6); until then a workspace without a short code cannot issue with a `{CODE}` pattern (`MissingCodeError`), and the numbering page says so.
+  4. Phase 4 adds a unique `(workspace_id, number)` index on each issued document type as a safety net (a pattern change such as A- to B- and back can otherwise repeat a number), and decides what an issue does when it hits it. A Phase 4 plan item.
+- **Scope / affects:** `packages/core/src/security/limits.ts` (comment only); the 2026-11-23 PR 6 entry's "builder proposals pending Charlie" item is settled by this one.
+- **Exception to a rule?** no
+- **Decided by:** owner (Charlie, 2026-11-24).
+
 ## 2026-11-24 — Phase 2 PR 6 review R1: the number's time is the database clock's after the lock; a period never resets backwards
 - **Decision:**
   - **`allocateNumber(tx, docType)` returns `{ number, issuedAt }`.** It no longer takes a time from the caller: after `SELECT … FOR UPDATE` is granted it reads Postgres `clock_timestamp()` (one clock for every app instance; `now()` would be the transaction start, which can be before the lock), formats the number for that instant and returns the instant with it. Phase 4 uses `issuedAt` as the issue date, so the date and the number's period tokens always agree. An optional `{ clock }` exists for tests only (a fixed instant); it is still read after the lock. `previewNumber(tx, docType, at)` keeps its `at` and stays lock-free.
@@ -27,7 +37,7 @@
   - **A reset-rule change never restarts the counter inside the current period** (`withResetRule`): a reset already due under the old rule happens, then the counter continues and the stored period becomes the new rule's current one; the first reset under the new rule is at its next boundary. Restarting at once would repeat numbers already given this period.
   - A **pattern change keeps the counter** (spec: "Pattern changes affect only new documents"). A pattern change can still produce a number given before (for example removing `{YYYY}` under "never" is safe, but going from `A-{SEQ:4}` to `B-{SEQ:4}` and back is not). Phase 4 must add a unique index on each issued document's `(workspace_id, number)` as the backstop; recorded here for the Phase 4 plan.
   - `{SEQ:n}` is a **minimum** width: a counter past it prints all its digits, never a cut number.
-  - The pattern bounds are **builder proposals pending Charlie** (they bound input, UNI-03, not business rules): `NUMBER_PATTERN_MAX_LENGTH` = 50 code points, `NUMBER_SEQ_MAX_WIDTH` = 9 (`packages/core/src/security/limits.ts`). Free text may not hold `{`, `}`, control or format characters.
+  - The pattern bounds (confirmed by Charlie 2026-11-24, entry above; they bound input, UNI-03, not business rules): `NUMBER_PATTERN_MAX_LENGTH` = 50 code points, `NUMBER_SEQ_MAX_WIDTH` = 9 (`packages/core/src/security/limits.ts`). Free text may not hold `{`, `}`, control or format characters.
   - A pattern with `{CODE}` while the workspace has no short code: the preview says to set one in General settings (with a link); `allocateNumber` refuses with `MissingCodeError` and takes no number. Onboarding does not ask for the short code, so a new workspace starts in this state.
   - The page preview is computed for the page's render time (server and browser alike), not the browser clock.
 - **Why:** Phase 2 plan Tasks 17-19, Q20, Q21; spec "Numbering" and Data model `doc_sequence`; REC-06 to REC-10.
