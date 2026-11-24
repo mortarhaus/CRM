@@ -1,12 +1,7 @@
 "use server";
 
 import { HEX_COLOUR } from "@crm/core/branding";
-import {
-  ADDRESS_LINE_MAX_LENGTH,
-  SETTINGS_TEXT_MAX_LENGTH,
-  SHORT_CODE_MAX_LENGTH,
-  SHORT_CODE_MIN_LENGTH,
-} from "@crm/core/security";
+import { ADDRESS_LINE_MAX_LENGTH, SETTINGS_TEXT_MAX_LENGTH } from "@crm/core/security";
 import { DATE_FORMATS, SETTINGS_CURRENCIES } from "@crm/core/settings";
 import { z } from "zod";
 import {
@@ -17,17 +12,7 @@ import {
   type WorkspaceSettings,
 } from "@/db/settings/workspace-settings";
 import { ActionRefusedError, type ActionContext, action } from "@/lib/auth/action";
-import { echoFields, expectedVersion, requiredText, taxAnswerFromForm, taxRate, text } from "@/lib/settings-input";
-
-// Empty clears the code, as for text().
-const shortCode = z
-  .string()
-  .trim()
-  .toUpperCase()
-  .regex(new RegExp(`^([A-Z0-9]{${SHORT_CODE_MIN_LENGTH},${SHORT_CODE_MAX_LENGTH}})?$`))
-  .transform((value) => (value === "" ? null : value))
-  .nullable()
-  .optional();
+import { echoFields, expectedVersion, requiredText, shortCode, taxAnswerFromForm, taxRate, text } from "@/lib/settings-input";
 
 // Lower-cased before the check, and nothing but six hex digits passes (UNI-03): the value is later rendered into a
 // CSS custom property (lib/brand.ts, which checks it again), and the column's CHECK refuses the same set.

@@ -1,4 +1,4 @@
-import { characterCount } from "@crm/core/security";
+import { characterCount, SHORT_CODE_MAX_LENGTH, SHORT_CODE_MIN_LENGTH } from "@crm/core/security";
 import { percentToBps } from "@crm/core/settings";
 import { z } from "zod";
 
@@ -19,6 +19,17 @@ export const text = (max: number) =>
     .transform((value) => (value === "" ? null : value))
     .nullable()
     .optional();
+
+// The workspace short code ({CODE} in document numbers; plan Q21): upper-cased, 2 to 6 letters or digits, as the
+// CHECK of migration 0024. Empty clears it in General settings and skips it at onboarding, as for text().
+export const shortCode = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(new RegExp(`^([A-Z0-9]{${SHORT_CODE_MIN_LENGTH},${SHORT_CODE_MAX_LENGTH}})?$`))
+  .transform((value) => (value === "" ? null : value))
+  .nullable()
+  .optional();
 
 // As text(), but a value is required: empty, missing or null is refused.
 export const requiredText = (max: number) => text(max).pipe(z.string());

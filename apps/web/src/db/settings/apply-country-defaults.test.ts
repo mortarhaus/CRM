@@ -58,7 +58,7 @@ afterAll(async () => {
 describe("applyCountryDefaults", () => {
   it("MY, not registered: MYR, Asia/Kuala_Lumpur, dd-mmm-yyyy, en; tax off with every tax field empty", async () => {
     const workspaceId = await newWorkspace();
-    const updated = await apply(workspaceId, { country: "MY", tax: NO_TAX, ownTin: null, ownBrn: null });
+    const updated = await apply(workspaceId, { country: "MY", tax: NO_TAX, ownTin: null, ownBrn: null, shortCode: null });
     expect(updated).toMatchObject({
       country: "MY",
       baseCurrency: "MYR",
@@ -72,6 +72,7 @@ describe("applyCountryDefaults", () => {
       defaultTaxRateBps: null,
       ownTin: null,
       ownBrn: null,
+      shortCode: null,
       version: 2,
     });
   });
@@ -83,6 +84,7 @@ describe("applyCountryDefaults", () => {
       tax: { registered: true, registrationNo: "M90312345A", taxName: "GST", taxRateBps: 900 },
       ownTin: "T-1",
       ownBrn: "201912345K",
+      shortCode: "SG1",
     });
     expect(updated).toMatchObject({
       country: "SG",
@@ -97,6 +99,7 @@ describe("applyCountryDefaults", () => {
       defaultTaxRateBps: 900,
       ownTin: "T-1",
       ownBrn: "201912345K",
+      shortCode: "SG1",
     });
   });
 
@@ -107,6 +110,7 @@ describe("applyCountryDefaults", () => {
       tax: { registered: true, registrationNo: "W10-1808-32000001", taxName: "Service Tax", taxRateBps: 800 },
       ownTin: "C1234567890",
       ownBrn: null,
+      shortCode: "MS1",
     });
     const rows = await auditRows(workspaceId);
     // One transaction, one now(): the two entries are not ordered by created_at.
@@ -126,6 +130,7 @@ describe("applyCountryDefaults", () => {
       default_tax_name: "Service Tax",
       default_tax_rate_bps: 800,
       own_tin: "[pii]",
+      short_code: "MS1",
       version: 2,
     });
   });
@@ -133,9 +138,9 @@ describe("applyCountryDefaults", () => {
   it("never overwrites a field that is already set", async () => {
     const workspaceId = await newWorkspace();
     await admin`
-      update workspace_settings set timezone = 'Asia/Singapore', base_currency = 'USD', own_brn = 'kept'
+      update workspace_settings set timezone = 'Asia/Singapore', base_currency = 'USD', own_brn = 'kept', short_code = 'KEPT'
        where workspace_id = ${workspaceId}`;
-    const updated = await apply(workspaceId, { country: "MY", tax: NO_TAX, ownTin: null, ownBrn: "typed" });
+    const updated = await apply(workspaceId, { country: "MY", tax: NO_TAX, ownTin: null, ownBrn: "typed", shortCode: "TYPED" });
     expect(updated).toMatchObject({
       country: "MY",
       timezone: "Asia/Singapore",
@@ -143,14 +148,15 @@ describe("applyCountryDefaults", () => {
       defaultCurrency: "MYR",
       dateFormat: "dd-mmm-yyyy",
       ownBrn: "kept",
+      shortCode: "KEPT",
     });
   });
 
   it("refuses a workspace that already has a country and writes nothing", async () => {
     const workspaceId = await newWorkspace();
-    await apply(workspaceId, { country: "MY", tax: NO_TAX, ownTin: null, ownBrn: null });
+    await apply(workspaceId, { country: "MY", tax: NO_TAX, ownTin: null, ownBrn: null, shortCode: null });
     const before = await settingsOf(workspaceId);
-    await expect(apply(workspaceId, { country: "SG", tax: NO_TAX, ownTin: null, ownBrn: null }, before.version)).rejects.toBeInstanceOf(
+    await expect(apply(workspaceId, { country: "SG", tax: NO_TAX, ownTin: null, ownBrn: null, shortCode: null }, before.version)).rejects.toBeInstanceOf(
       AlreadyOnboardedError,
     );
     expect(await settingsOf(workspaceId)).toEqual(before);
@@ -159,7 +165,7 @@ describe("applyCountryDefaults", () => {
 
   it("refuses a stale version and writes nothing", async () => {
     const workspaceId = await newWorkspace();
-    await expect(apply(workspaceId, { country: "MY", tax: NO_TAX, ownTin: null, ownBrn: null }, 0)).rejects.toBeInstanceOf(
+    await expect(apply(workspaceId, { country: "MY", tax: NO_TAX, ownTin: null, ownBrn: null, shortCode: null }, 0)).rejects.toBeInstanceOf(
       StaleSettingsError,
     );
     expect((await settingsOf(workspaceId)).country).toBeNull();
@@ -170,7 +176,7 @@ describe("applyCountryDefaults", () => {
   // Plan Task 18 and Q20 (Charlie 2026-11-23): the invoice counter is seeded with the country pattern, reset yearly.
   it.each(["MY", "SG"] as const)("%s: seeds the invoice sequence INV-{CODE}-{YYYY}-{SEQ:4}, yearly, at 0, audited", async (country) => {
     const workspaceId = await newWorkspace();
-    await apply(workspaceId, { country, tax: NO_TAX, ownTin: null, ownBrn: null });
+    await apply(workspaceId, { country, tax: NO_TAX, ownTin: null, ownBrn: null, shortCode: null });
     expect(await sequenceOf(workspaceId)).toEqual([
       { doc_type: "invoice", pattern: "INV-{CODE}-{YYYY}-{SEQ:4}", reset_rule: "yearly", counter: 0, last_reset_period: null },
     ]);

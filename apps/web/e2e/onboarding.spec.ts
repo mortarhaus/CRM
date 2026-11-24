@@ -1,5 +1,12 @@
 import type { Page } from "@playwright/test";
-import { ONBOARDING_INVALID, ONBOARDING_REGISTRATION_REQUIRED, SETUP_PENDING } from "../src/lib/auth/messages";
+import {
+  GENERAL_SHORT_CODE_INVALID,
+  NUMBERING_NO_CODE,
+  ONBOARDING_INVALID,
+  ONBOARDING_REGISTRATION_REQUIRED,
+  ONBOARDING_SHORT_CODE_HINT,
+  SETUP_PENDING,
+} from "../src/lib/auth/messages";
 import { readDocSequences, readWorkspaceSettings } from "../src/test/workspace-settings";
 import { expectAccessible } from "./a11y";
 import { expect, test } from "./fixtures";
@@ -23,7 +30,9 @@ async function newOwnerAtOnboarding(page: Page, workspace: string): Promise<stri
   return email;
 }
 
-test("MY, not SST-registered: MYR, Asia/Kuala_Lumpur and dd-mmm-yyyy are applied, and tax stays off", async ({ page }) => {
+test("MY, not SST-registered, short code skipped: MYR, Asia/Kuala_Lumpur and dd-mmm-yyyy are applied, tax stays off", async ({
+  page,
+}) => {
   const email = await newOwnerAtOnboarding(page, "MY Studio");
   await expect(page.getByRole("heading", { level: 1, name: "Set up your workspace" })).toBeVisible();
   await expectAccessible(page, "/onboarding country step");
@@ -34,6 +43,9 @@ test("MY, not SST-registered: MYR, Asia/Kuala_Lumpur and dd-mmm-yyyy are applied
   await expect(page.getByLabel("No", { exact: true })).toBeChecked();
   // The tax fields show only for a Yes.
   await expect(page.getByLabel("SST registration number")).toBeHidden();
+  // Charlie 2026-11-24: the short code is asked, never pre-filled, and can be skipped.
+  await expect(page.getByLabel("Short code")).toHaveValue("");
+  await expect(page.getByLabel("Short code")).toHaveAccessibleDescription(ONBOARDING_SHORT_CODE_HINT);
   await expectAccessible(page, "/onboarding SST question");
 
   await page.getByRole("button", { name: "Finish setup" }).click();
@@ -49,11 +61,19 @@ test("MY, not SST-registered: MYR, Asia/Kuala_Lumpur and dd-mmm-yyyy are applied
     tax_registration_no: null,
     default_tax_name: null,
     default_tax_rate_bps: null,
+    short_code: null,
   });
   expect(await readDocSequences(email)).toEqual(INVOICE_SEQUENCE);
+
+  // Skipped, the numbering page says to set the code in General settings, and links there.
+  await page.goto("/settings/numbering");
+  await expect(page.locator("#number-preview")).toContainText(NUMBERING_NO_CODE);
+  await page.getByRole("link", { name: "General settings" }).click();
+  await expect(page).toHaveURL(/\/settings\/general$/);
+  await expect(page.getByLabel("Short code")).toHaveValue("");
 });
 
-test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselected and SGD, Asia/Singapore applied", async ({
+test("SG, GST-registered: a Yes without a number and a bad short code are refused; GST 9% preselected; the code is saved", async ({
   page,
 }) => {
   const email = await newOwnerAtOnboarding(page, "SG Studio");
@@ -64,6 +84,8 @@ test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselect
   await expect(number).toBeVisible();
   await expect(page.getByLabel("Tax name")).toHaveValue("GST");
   await expect(page.getByLabel("Tax rate (%)")).toHaveValue("9");
+  const code = page.getByLabel("Short code");
+  await code.fill("S");
 
   await page.getByRole("button", { name: "Finish setup" }).click();
   await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
@@ -71,11 +93,15 @@ test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselect
   await expect(page.getByRole("button", { name: "Finish setup" })).toBeFocused();
   await expect(number).toHaveAttribute("aria-invalid", "true");
   await expect(number).toHaveAccessibleDescription(ONBOARDING_REGISTRATION_REQUIRED);
+  await expect(code).toHaveAttribute("aria-invalid", "true");
+  await expect(code).toHaveAccessibleDescription(`${ONBOARDING_SHORT_CODE_HINT} ${GENERAL_SHORT_CODE_INVALID}`);
+  await expect(code).toHaveValue("S");
   await expectAccessible(page, "/onboarding refused Yes");
   expect((await readWorkspaceSettings(email)).country).toBeNull();
   expect(await readDocSequences(email)).toEqual([]);
 
   await number.fill("M90312345A");
+  await code.fill("sg1");
   await page.getByRole("button", { name: "Finish setup" }).click();
   await expect(page).toHaveURL(/\/workspaces$/);
   expect(await readWorkspaceSettings(email)).toEqual({
@@ -89,6 +115,7 @@ test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselect
     tax_registration_no: "M90312345A",
     default_tax_name: "GST",
     default_tax_rate_bps: 900,
+    short_code: "SG1",
   });
   expect(await readDocSequences(email)).toEqual(INVOICE_SEQUENCE);
 });
@@ -148,6 +175,7 @@ test.describe("without JavaScript", () => {
     await page.getByLabel("Yes", { exact: true }).check();
     await page.getByLabel("Tax name").fill("Sales and Service Tax");
     await page.getByLabel("Tax rate (%)").fill("6");
+    await page.getByLabel("Short code").fill("ns1");
     await page.getByRole("button", { name: "Finish setup" }).click();
 
     await expect(page.getByRole("main").getByRole("alert")).toHaveText(ONBOARDING_INVALID);
@@ -158,6 +186,7 @@ test.describe("without JavaScript", () => {
     await expect(number).toHaveAccessibleDescription(ONBOARDING_REGISTRATION_REQUIRED);
     await expect(page.getByLabel("Tax name")).toHaveValue("Sales and Service Tax");
     await expect(page.getByLabel("Tax rate (%)")).toHaveValue("6");
+    await expect(page.getByLabel("Short code")).toHaveValue("ns1");
 
     await number.fill("W10-1808-32000002");
     await page.getByRole("button", { name: "Finish setup" }).click();
@@ -167,6 +196,7 @@ test.describe("without JavaScript", () => {
       tax_registration_no: "W10-1808-32000002",
       default_tax_name: "Sales and Service Tax",
       default_tax_rate_bps: 600,
+      short_code: "NS1",
     });
   });
 });

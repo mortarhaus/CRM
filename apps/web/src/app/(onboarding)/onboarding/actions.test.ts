@@ -48,8 +48,9 @@ async function settings(workspaceId: string) {
       default_tax_name: string | null;
       default_tax_rate_bps: number | null;
       own_tin: string | null;
+      short_code: string | null;
     }[]
-  >`select country, tax_registered, tax_registration_no, default_tax_name, default_tax_rate_bps, own_tin
+  >`select country, tax_registered, tax_registration_no, default_tax_name, default_tax_rate_bps, own_tin, short_code
       from workspace_settings where workspace_id = ${workspaceId}`;
   if (!row) throw new Error("no settings row");
   return row;
@@ -157,6 +158,54 @@ describe("completeOnboarding", () => {
       status: "FORBIDDEN",
     });
     expect((await settings(workspaceId)).country).toBeNull();
+  });
+
+  // Charlie 2026-11-24: onboarding asks for the short code with the rule of General settings (lib/settings-input.ts),
+  // and it can be skipped. The code is audited with the other fields (apply-country-defaults.test.ts).
+  it.each([
+    ["saved upper-cased and trimmed", " ms1 ", "MS1"],
+    ["saved at the 2-character minimum", "AB", "AB"],
+    ["saved at the 6-character maximum", "ABC123", "ABC123"],
+    ["skipped when empty", "", null],
+    ["skipped when only spaces", "   ", null],
+  ])("the short code is %s", async (_case, posted, stored) => {
+    const workspaceId = await signInToNewWorkspace("owner");
+    await expect(
+      completeOnboarding(null, form({ expectedVersion: "1", country: "MY", taxRegistered: "no", shortCode: posted })),
+    ).rejects.toMatchObject({ url: "/" });
+    expect(await settings(workspaceId)).toMatchObject({ country: "MY", short_code: stored });
+  });
+
+  it("a form without the short code field leaves it unset, as before", async () => {
+    const workspaceId = await signInToNewWorkspace("owner");
+    await expect(completeOnboarding(null, form({ expectedVersion: "1", country: "SG", taxRegistered: "no" }))).rejects.toMatchObject({
+      url: "/",
+    });
+    expect(await settings(workspaceId)).toMatchObject({ country: "SG", short_code: null });
+  });
+
+  it.each(["A", "ABCDEFG", "AB-1", "AB C", "ÄB", "AB\u200B"])(
+    "the short code %j is refused as INVALID_INPUT, echoed as typed, and nothing is written",
+    async (shortCode) => {
+      const workspaceId = await signInToNewWorkspace("owner");
+      expect(await completeOnboarding(null, form({ expectedVersion: "1", country: "MY", taxRegistered: "no", shortCode }))).toEqual({
+        ok: false,
+        status: "INVALID_INPUT",
+        fields: ["shortCode"],
+        echo: { taxRegistered: "no", shortCode },
+      });
+      expect(await settings(workspaceId)).toMatchObject({ country: null, short_code: null });
+    },
+  );
+
+  it("two workspaces may use the same short code (unique per workspace only, plan Q21)", async () => {
+    const onboard = (shortCode: string) => completeOnboarding(null, form({ expectedVersion: "1", country: "MY", taxRegistered: "no", shortCode }));
+    const first = await signInToNewWorkspace("owner");
+    await expect(onboard("SAME")).rejects.toMatchObject({ url: "/" });
+    const second = await signInToNewWorkspace("owner");
+    await expect(onboard("same")).rejects.toMatchObject({ url: "/" });
+    expect((await settings(first)).short_code).toBe("SAME");
+    expect((await settings(second)).short_code).toBe("SAME");
   });
 
   it("a second onboarding is refused with STALE_VERSION and changes nothing", async () => {
