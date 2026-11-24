@@ -71,3 +71,18 @@ export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 // The payment QR (DuitNow/PayNow), PNG or JPG by magic bytes. Builder proposal pending Charlie (PR 5b ASK): the logo's
 // limit, which any phone screenshot of a bank's QR fits.
 export const PAYMENT_QR_MAX_BYTES = LOGO_MAX_BYTES;
+
+// Money (Phase 2 plan Task 20; spec Money rules "Representation"). Builder proposal pending Charlie (DECISIONS
+// 2026-11-24): the largest amount a person may enter, in minor units, whatever the currency: 15 digits, so
+// MYR 9,999,999,999,999.99, JPY 999,999,999,999,999 or KWD 999,999,999,999.999. Far above any agency price, and a
+// sum of more than 9,000 such amounts still fits a Postgres bigint (9,223,372,036,854,775,807). It bounds input
+// (UNI-03); it is not a business rule. A typed amount is at most MONEY_INPUT_MAX_LENGTH characters before parsing.
+export const MONEY_MAX_MINOR = 999_999_999_999_999n;
+export const MONEY_INPUT_MAX_LENGTH = 40;
+
+// The catalog (Phase 2 plan Task 21). Builder proposals pending Charlie: they bound storage and input (UNI-03), they
+// are not business rules. Each is enforced by Zod and by a char_length CHECK, both in code points. The unit is a short
+// free-text label printed beside a quantity ("hour", "day", "page").
+export const SERVICE_NAME_MAX_LENGTH = 200;
+export const SERVICE_DESCRIPTION_MAX_LENGTH = 2000;
+export const SERVICE_UNIT_MAX_LENGTH = 20;
