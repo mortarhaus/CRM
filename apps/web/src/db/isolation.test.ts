@@ -6,7 +6,17 @@ import { holdsCommand, tenantTables } from "../test/catalog";
 import { sqlState, startDatabase, type TestDatabase } from "../test/postgres";
 import { createDb, type DbHandle } from "./client";
 import { EXPECTED_PRIVILEGES } from "./privileges";
-import { auditLog, docSequence, domainEvent, idempotencyKey, notification, organization, stepUp, workspaceSettings } from "./schema";
+import {
+  auditLog,
+  docSequence,
+  domainEvent,
+  idempotencyKey,
+  notification,
+  organization,
+  service,
+  stepUp,
+  workspaceSettings,
+} from "./schema";
 import { runInWorkspace, type Tx } from "./workspace";
 
 // TEN-08: every tenant table gets read and write isolation tests over two workspaces, as crm_app.
@@ -80,6 +90,19 @@ const TENANT_FIXTURES: Record<string, TenantFixture> = {
     },
     async update(tx, workspaceId) {
       const result = await tx.update(notification).set({ readAt: new Date() }).where(eq(notification.workspaceId, workspaceId));
+      return result.count;
+    },
+  },
+  // A catalog service (Phase 2 plan Task 21): crm_app edits and archives it and deletes none.
+  service: {
+    async seed(tx, workspaceId) {
+      await tx.insert(service).values({ workspaceId, name: "Design", currency: "MYR", defaultUnitPriceMinor: 10_000n, defaultTaxable: false });
+    },
+    async update(tx, workspaceId) {
+      const result = await tx
+        .update(service)
+        .set({ archivedAt: new Date(), version: sql`${service.version} + 1` })
+        .where(eq(service.workspaceId, workspaceId));
       return result.count;
     },
   },

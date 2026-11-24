@@ -10,7 +10,7 @@ import { boolean, char, check, integer, pgTable, text, timestamp, uuid } from "d
 import { organization } from "./auth";
 
 // A stored text value is 1 to max code points; an empty value is stored as null.
-const bounded = (column: AnyColumn, max: number): SQL => sql`char_length(${column}) between 1 and ${sql.raw(String(max))}`;
+export const bounded = (column: AnyColumn, max: number): SQL => sql`char_length(${column}) between 1 and ${sql.raw(String(max))}`;
 
 // One row per workspace, under RLS (spec Tenancy). The spec line-460 columns except proposal cover options (Phase 6,
 // plan Q24). Every column is nullable or defaulted, so a row made
