@@ -156,8 +156,9 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             {loaded.services.length === 0 ? (
               <p className="text-sm text-muted-foreground">{archived ? CATALOG_ARCHIVED_EMPTY : CATALOG_EMPTY}</p>
             ) : (
-              // Wide content scrolls inside its own box, never the page (FE-14).
-              <div className="overflow-x-auto rounded-md border border-border">
+              // Wide content scrolls inside its own box, never the page (FE-14). relative: the sr-only spans
+              // (position absolute) are then clipped by this box too, not placed past the page's edge.
+              <div className="relative overflow-x-auto rounded-md border border-border">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-muted">
                     <tr>
