@@ -28,6 +28,31 @@ export type OnboardedSettings = {
   default_tax_rate_bps: number | null;
 };
 
+export type SeededSequence = {
+  doc_type: string;
+  pattern: string;
+  reset_rule: string;
+  counter: number;
+};
+
+// The document counters of the user's one workspace, for E2E (Phase 2 plan Task 18: onboarding seeds the invoice's),
+// read the same way as readWorkspaceSettings below (doc_sequence forces RLS too).
+export async function readDocSequences(email: string): Promise<SeededSequence[]> {
+  const migrator = postgres(envValue("DATABASE_MIGRATOR_URL"), { max: 1, onnotice: () => {} });
+  const app = createDb(envValue("DATABASE_URL"), { max: 1 });
+  try {
+    const [membership] = await migrator<{ organization_id: string }[]>`
+      select organization_id from member where user_id = (select id from "user" where email = ${email})`;
+    if (!membership) throw new Error("no membership");
+    const rows = await runInWorkspace(app.db, membership.organization_id, (tx) =>
+      tx.execute<SeededSequence>(sql`select doc_type, pattern, reset_rule, counter from doc_sequence order by doc_type`),
+    );
+    return [...rows];
+  } finally {
+    await Promise.all([migrator.end(), app.sql.end()]);
+  }
+}
+
 // The settings row of the user's one workspace, for E2E (Phase 2 plan Task 8). The workspace is found through
 // `member` as crm_migrator (a system table, no RLS); the row is read as crm_app under that workspace's setting, since
 // workspace_settings forces RLS and has no policy for the migrator.

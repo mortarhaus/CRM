@@ -1,12 +1,14 @@
 import type { Page } from "@playwright/test";
 import { ONBOARDING_INVALID, ONBOARDING_REGISTRATION_REQUIRED, SETUP_PENDING } from "../src/lib/auth/messages";
-import { readWorkspaceSettings } from "../src/test/workspace-settings";
+import { readDocSequences, readWorkspaceSettings } from "../src/test/workspace-settings";
 import { expectAccessible } from "./a11y";
 import { expect, test } from "./fixtures";
 import { completeOnboarding, respectRateLimit, setMemberRole, signIn, signUp, uniqueEmail, workspaceSwitcher } from "./helpers";
 
-// Phase 2 plan Task 8, done-when "MY and SG defaults applied on sign-up" (spec line 1138) as far as the spec gives the
-// values: the invoice pattern (the same for MY and SG, plan Q10) is seeded with doc_sequence (plan PR 6, re-run there).
+// Phase 2 plan Task 8, done-when "MY and SG defaults applied on sign-up" (spec line 1138), completed by PR 6 (plan
+// Task 18): the invoice counter is seeded with the pattern (the same for MY and SG, plan Q10), reset yearly (Charlie
+// 2026-11-23).
+const INVOICE_SEQUENCE = [{ doc_type: "invoice", pattern: "INV-{CODE}-{YYYY}-{SEQ:4}", reset_rule: "yearly", counter: 0 }];
 
 // A new user who creates a workspace and is sent to its onboarding. Returns their email.
 async function newOwnerAtOnboarding(page: Page, workspace: string): Promise<string> {
@@ -48,6 +50,7 @@ test("MY, not SST-registered: MYR, Asia/Kuala_Lumpur and dd-mmm-yyyy are applied
     default_tax_name: null,
     default_tax_rate_bps: null,
   });
+  expect(await readDocSequences(email)).toEqual(INVOICE_SEQUENCE);
 });
 
 test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselected and SGD, Asia/Singapore applied", async ({
@@ -70,6 +73,7 @@ test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselect
   await expect(number).toHaveAccessibleDescription(ONBOARDING_REGISTRATION_REQUIRED);
   await expectAccessible(page, "/onboarding refused Yes");
   expect((await readWorkspaceSettings(email)).country).toBeNull();
+  expect(await readDocSequences(email)).toEqual([]);
 
   await number.fill("M90312345A");
   await page.getByRole("button", { name: "Finish setup" }).click();
@@ -86,6 +90,7 @@ test("SG, GST-registered: a Yes without a number is refused; GST 9% is preselect
     default_tax_name: "GST",
     default_tax_rate_bps: 900,
   });
+  expect(await readDocSequences(email)).toEqual(INVOICE_SEQUENCE);
 });
 
 test("an Owner who leaves onboarding unfinished is sent back to it, and its link back to the country works", async ({ page }) => {
@@ -106,7 +111,7 @@ test("Staff of a workspace not yet set up see only that the owner has not finish
   await expect(page.getByRole("heading", { level: 1, name: SETUP_PENDING })).toBeVisible();
   await expect(workspaceSwitcher(page)).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-  for (const name of ["General", "Branding"]) await expect(page.getByRole("link", { name })).toHaveCount(0);
+  for (const name of ["General", "Branding", "Numbering"]) await expect(page.getByRole("link", { name })).toHaveCount(0);
   await expectAccessible(page, "setup pending");
 
   // The onboarding page is the Owner's only.

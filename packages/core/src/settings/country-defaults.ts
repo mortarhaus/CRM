@@ -1,3 +1,5 @@
+import type { ResetRule } from "../numbering/pattern";
+
 // Country defaults applied to workspace_settings at onboarding (spec "Onboarding", lines 731-732; Phase 2 plan Task 7;
 // the module's location is DECISIONS 2026-11-06). The values are the spec's, except those Charlie set for plan Q10
 // (below). A null value would mean UNRESOLVED, not a default: nothing is written for it. None is null today.
@@ -7,6 +9,8 @@
 //
 // The tax rates are pending professional check (spec "Verify with professionals before Phase 4 goes live" -> SST,
 // line 1176; PROJECT.md §11). They are editable defaults, never a rule.
+//
+// The invoice reset rule (Charlie, 2026-11-23): yearly for both countries, in the workspace time zone.
 
 export const SUPPORTED_COUNTRIES = ["MY", "SG"] as const;
 export type Country = (typeof SUPPORTED_COUNTRIES)[number];
@@ -14,8 +18,10 @@ export type Country = (typeof SUPPORTED_COUNTRIES)[number];
 export interface CountryDefaults {
   // ISO 4217, used for both the base and the default currency.
   currency: string;
-  // Seeded into the invoice doc_sequence by the numbering PR (plan Task 18); not a workspace_settings column.
+  // Seeded into the invoice doc_sequence at onboarding (plan Task 18); not a workspace_settings column.
   invoicePattern: string | null;
+  // How often the invoice counter starts again at 1; seeded with the pattern.
+  invoiceResetRule: ResetRule;
   // IANA time zone.
   timezone: string;
   dateFormat: string | null;
@@ -30,6 +36,7 @@ export const COUNTRY_DEFAULTS: Readonly<Record<Country, Readonly<CountryDefaults
   MY: {
     currency: "MYR",
     invoicePattern: "INV-{CODE}-{YYYY}-{SEQ:4}",
+    invoiceResetRule: "yearly",
     timezone: "Asia/Kuala_Lumpur",
     dateFormat: "dd-mmm-yyyy",
     locale: "en",
@@ -39,6 +46,7 @@ export const COUNTRY_DEFAULTS: Readonly<Record<Country, Readonly<CountryDefaults
   SG: {
     currency: "SGD",
     invoicePattern: "INV-{CODE}-{YYYY}-{SEQ:4}",
+    invoiceResetRule: "yearly",
     timezone: "Asia/Singapore",
     dateFormat: "dd-mmm-yyyy",
     locale: "en",

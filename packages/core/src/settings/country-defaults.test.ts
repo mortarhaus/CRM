@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parsePatternFor } from "../numbering/pattern";
 import { COUNTRY_DEFAULTS, DATE_FORMAT_EXAMPLES, DATE_FORMATS, isSupportedCountry, SETTINGS_CURRENCIES, SUPPORTED_COUNTRIES } from "./country-defaults";
 
 // Phase 2 plan Task 7: every value equals the spec text (Onboarding, spec lines 731-732) or Charlie's plan Q10 answer
@@ -13,6 +14,7 @@ describe("COUNTRY_DEFAULTS", () => {
     expect(COUNTRY_DEFAULTS.MY).toEqual({
       currency: "MYR",
       invoicePattern: "INV-{CODE}-{YYYY}-{SEQ:4}",
+      invoiceResetRule: "yearly",
       timezone: "Asia/Kuala_Lumpur",
       dateFormat: "dd-mmm-yyyy",
       locale: "en",
@@ -25,12 +27,21 @@ describe("COUNTRY_DEFAULTS", () => {
     expect(COUNTRY_DEFAULTS.SG).toEqual({
       currency: "SGD",
       invoicePattern: "INV-{CODE}-{YYYY}-{SEQ:4}",
+      invoiceResetRule: "yearly",
       timezone: "Asia/Singapore",
       dateFormat: "dd-mmm-yyyy",
       locale: "en",
       taxName: "GST",
       taxRateBps: 900,
     });
+  });
+
+  // Charlie 2026-11-23: the invoice counter resets yearly; the seeded pattern must parse under that rule.
+  it("seeds an invoice pattern that parses under its reset rule", () => {
+    for (const country of SUPPORTED_COUNTRIES) {
+      const { invoicePattern, invoiceResetRule } = COUNTRY_DEFAULTS[country];
+      expect(invoicePattern && parsePatternFor(invoicePattern, invoiceResetRule).ok).toBe(true);
+    }
   });
 
   it("names a real IANA timezone for each country", () => {

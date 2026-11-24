@@ -34,6 +34,11 @@ const auditRows = (workspaceId: string) =>
   admin<{ action: string; actor_user_id: string; before: Record<string, unknown>; after: Record<string, unknown> }[]>`
     select action, actor_user_id, before, after from audit_log where workspace_id = ${workspaceId} order by created_at`;
 
+const sequenceOf = (workspaceId: string) =>
+  admin`select doc_type, pattern, reset_rule, counter, last_reset_period from doc_sequence where workspace_id = ${workspaceId}`.then(
+    (rows) => [...rows],
+  );
+
 beforeAll(async () => {
   database = await startDatabase();
   admin = postgres(database.adminUrl, { max: 1, onnotice: () => {} });
@@ -103,8 +108,10 @@ describe("applyCountryDefaults", () => {
       ownTin: "C1234567890",
       ownBrn: null,
     });
-    const [row, ...rest] = await auditRows(workspaceId);
-    expect(rest).toHaveLength(0);
+    const rows = await auditRows(workspaceId);
+    // One transaction, one now(): the two entries are not ordered by created_at.
+    expect(rows.map((entry) => entry.action).sort()).toEqual(["doc_sequence.created", "workspace_settings.onboarded"]);
+    const row = rows.find((entry) => entry.action === "workspace_settings.onboarded");
     expect(row?.action).toBe("workspace_settings.onboarded");
     expect(row?.actor_user_id).toBe(actor);
     expect(row?.after).toEqual({
@@ -147,7 +154,7 @@ describe("applyCountryDefaults", () => {
       AlreadyOnboardedError,
     );
     expect(await settingsOf(workspaceId)).toEqual(before);
-    expect(await auditRows(workspaceId)).toHaveLength(1);
+    expect(await auditRows(workspaceId)).toHaveLength(2);
   });
 
   it("refuses a stale version and writes nothing", async () => {
@@ -157,5 +164,20 @@ describe("applyCountryDefaults", () => {
     );
     expect((await settingsOf(workspaceId)).country).toBeNull();
     expect(await auditRows(workspaceId)).toHaveLength(0);
+    expect(await sequenceOf(workspaceId)).toEqual([]);
+  });
+
+  // Plan Task 18 and Q20 (Charlie 2026-11-23): the invoice counter is seeded with the country pattern, reset yearly.
+  it.each(["MY", "SG"] as const)("%s: seeds the invoice sequence INV-{CODE}-{YYYY}-{SEQ:4}, yearly, at 0, audited", async (country) => {
+    const workspaceId = await newWorkspace();
+    await apply(workspaceId, { country, tax: NO_TAX, ownTin: null, ownBrn: null });
+    expect(await sequenceOf(workspaceId)).toEqual([
+      { doc_type: "invoice", pattern: "INV-{CODE}-{YYYY}-{SEQ:4}", reset_rule: "yearly", counter: 0, last_reset_period: null },
+    ]);
+    const [created] = (await auditRows(workspaceId)).filter((entry) => entry.action === "doc_sequence.created");
+    expect(created).toMatchObject({
+      actor_user_id: actor,
+      after: { doc_type: "invoice", pattern: "INV-{CODE}-{YYYY}-{SEQ:4}", reset_rule: "yearly", version: 1 },
+    });
   });
 });

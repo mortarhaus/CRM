@@ -232,6 +232,20 @@
       "when": 1795396690684,
       "tag": "0032_bank_details_email_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795442185133,
+      "tag": "0033_doc_sequence",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795442198905,
+      "tag": "0034_rls_doc_sequence",
+      "breakpoints": true
     }
   ]
 }

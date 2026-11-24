@@ -59,6 +59,12 @@ export const STEP_UP_VERIFY_USER_FAILURE_LIMIT: RateLimit = { windowSeconds: 15 
 // for at most 3 steps (90 s); one more step covers clock skew between the app and the database.
 export const STEP_UP_CODE_REUSE_SECONDS = 4 * 30;
 
+// Document numbering patterns (Phase 2 plan Task 17; spec "Numbering"). Confirmed by Charlie on 2026-11-24 (DECISIONS
+// 2026-11-24): they bound input (UNI-03), they are not business rules. A pattern is at most 50 code points; {SEQ:n} pads to n digits, 1 to 9
+// (a counter is a Postgres integer, at most 10 digits; a longer counter prints all its digits, never a cut number).
+export const NUMBER_PATTERN_MAX_LENGTH = 50;
+export const NUMBER_SEQ_MAX_WIDTH = 9;
+
 // Uploads (Phase 2 plan Q12; FILE-02). The logo is at most 2 MB (2 * 1024 * 1024 bytes), PNG or JPG only, checked by
 // magic bytes (Charlie, 2026-11-11; DECISIONS 2026-11-11).
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024;

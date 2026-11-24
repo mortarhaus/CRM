@@ -41,8 +41,8 @@ test("below md a tab bar and a menu button; from md up the rail and no tab bar",
     for (const name of ["Workspaces", "Security", "Email"]) {
       await expect(tabBar(page).getByRole("link", { name })).toBeVisible();
     }
-    // A fourth item does not fit at 320px: General and Branding are in the menu drawer only.
-    for (const name of ["General", "Branding"]) await expect(tabBar(page).getByRole("link", { name })).toHaveCount(0);
+    // A fourth item does not fit at 320px: General, Branding and Numbering are in the menu drawer only.
+    for (const name of ["General", "Branding", "Numbering"]) await expect(tabBar(page).getByRole("link", { name })).toHaveCount(0);
     // The current page is the filled item.
     await expect(tabBar(page).getByRole("link", { name: "Workspaces" })).toHaveAttribute("aria-current", "page");
     // The bar floats inside the viewport, inset from its edges.
@@ -73,7 +73,7 @@ test("the menu drawer opens from the menu button, is modal, and Esc or Close ret
   await expect(button).toHaveAttribute("aria-expanded", "true");
   // A modal dialog: the page behind it is inert.
   expect(await drawer(page).evaluate((dialog) => dialog.matches(":modal"))).toBe(true);
-  for (const name of ["Workspaces", "Security", "Email", "General", "Branding"]) {
+  for (const name of ["Workspaces", "Security", "Email", "General", "Branding", "Numbering"]) {
     await expect(drawer(page).getByRole("link", { name })).toBeVisible();
   }
   await expect(drawer(page).getByRole("combobox", { name: "Active workspace" })).toBeVisible();
@@ -81,7 +81,7 @@ test("the menu drawer opens from the menu button, is modal, and Esc or Close ret
   // Tab never reaches the page behind: past the last control focus leaves for the browser's own UI (the document in a
   // headless browser), as a native modal dialog does, then comes back to the drawer.
   const focusPlaces = new Set<string>();
-  for (let presses = 0; presses < 10; presses += 1) {
+  for (let presses = 0; presses < 12; presses += 1) {
     await page.keyboard.press("Tab");
     focusPlaces.add(
       await drawer(page).evaluate((dialog) =>
