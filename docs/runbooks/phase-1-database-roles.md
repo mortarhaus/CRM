@@ -317,6 +317,7 @@ errors in `apps/web` (TEN-09). `crm_migrator` and `crm_worker` have no policy on
 | `domain_event` | SELECT, INSERT (append-only, TEN-03) | `domain_event_workspace` (RESTRICTIVE), `_app_select`, `_app_insert` | migrations 0019 (table) and 0020 (RLS, grants) |
 | `notification` | SELECT, INSERT, UPDATE (`read_at` only) | `notification_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update` | migrations 0019 (table) and 0020 (RLS, grants) |
 | `doc_sequence` | SELECT, INSERT, UPDATE (`pattern`, `reset_rule`, `counter`, `last_reset_period`, `version`, `updated_at`); no DELETE, so a counter is never removed and a number never given twice; nothing for `crm_purge` | `doc_sequence_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update` | migrations 0033 (table) and 0034 (RLS, grants) |
+| `service` | SELECT, INSERT, UPDATE (`name`, `default_description`, `default_unit_price_minor`, `currency`, `unit`, `default_taxable`, `archived_at`, `version`, `updated_at`); no DELETE, a service is archived, never deleted; nothing for `crm_purge`. Trigger `service_currency_locked` refuses a currency change while a default price is set (SQLSTATE 23514) | `service_workspace` (RESTRICTIVE), `_app_select`, `_app_insert`, `_app_update` | migrations 0035 (table) and 0036 (RLS, grants, trigger) |
 
 Every new workspace gets its `workspace_settings` row from Better Auth's `afterCreateOrganization` hook
 (`apps/web/src/db/system/workspaces.ts`, `ensureWorkspaceSettings`). It is a second write after Better

@@ -75,7 +75,7 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...table("billing_account", "SELECT", "INSERT"), // system table, no RLS (migration 0005)
     ...table("auth_audit_log", "INSERT"), // system table, no RLS, append-only, no reader (migration 0008)
     ...table("rate_limit", "SELECT", "INSERT", "UPDATE", "DELETE"), // system table, no RLS (migration 0022)
-    // Tenant tables, under RLS (migrations 0003, 0012, 0014, 0020, 0029 and 0034).
+    // Tenant tables, under RLS (migrations 0003, 0012, 0014, 0020, 0029, 0034 and 0036).
     ...table("workspace_settings", "SELECT", "INSERT"),
     // Per column since migration 0025: never workspace_id or created_at.
     ...columns("workspace_settings", "UPDATE", ...WORKSPACE_SETTINGS_UPDATE_COLUMNS),
@@ -90,6 +90,21 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     // Migration 0034: no DELETE, so a counter is never removed; never workspace_id, doc_type or created_at.
     ...table("doc_sequence", "SELECT", "INSERT"),
     ...columns("doc_sequence", "UPDATE", "pattern", "reset_rule", "counter", "last_reset_period", "version", "updated_at"),
+    // Migration 0036: no DELETE, a service is archived (plan Q22); never id, workspace_id or created_at.
+    ...table("service", "SELECT", "INSERT"),
+    ...columns(
+      "service",
+      "UPDATE",
+      "name",
+      "default_description",
+      "default_unit_price_minor",
+      "currency",
+      "unit",
+      "default_taxable",
+      "archived_at",
+      "version",
+      "updated_at",
+    ),
     // The web send-only pg-boss instance: enqueue only, never a payload column (migration 0016, install.test.ts).
     "schema:pgboss:USAGE",
     ...table("pgboss.version", "SELECT"),

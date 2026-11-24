@@ -16,7 +16,8 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 // row changed since the caller read its version, e.g. the settings; a settings write before the Owner has onboarded
 // the workspace); so are the upload refusals (an empty, too large or not allowed file, by its bytes; storage not
 // configured); so is PERIOD_BEHIND (a numbering change at a time before the period of the last number, in the workspace
-// time zone: PeriodBehindError); the others by the checks below. TWO_FACTOR_REQUIRED (the user has no 2FA: enrol first) comes from the
+// time zone: PeriodBehindError); so are CURRENCY_LOCKED (a service's currency change while it has a default price,
+// spec Money rules "Service currency edit") and NOT_FOUND (no such row in the workspace); the others by the checks below. TWO_FACTOR_REQUIRED (the user has no 2FA: enrol first) comes from the
 // require_2fa check below or from step-up; STEP_UP_REQUIRED (no step-up of this session in the last
 // STEP_UP_WINDOW_SECONDS) from requireStepUp; WRONG_CODE from verifyStepUp (step-up.ts).
 type Refusal =
@@ -27,6 +28,8 @@ type Refusal =
   | "STALE_VERSION"
   | "NOT_ONBOARDED"
   | "PERIOD_BEHIND"
+  | "CURRENCY_LOCKED"
+  | "NOT_FOUND"
   | "UPLOAD_EMPTY"
   | "UPLOAD_TOO_LARGE"
   | "UPLOAD_TYPE_NOT_ALLOWED"

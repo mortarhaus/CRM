@@ -5,6 +5,9 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   PAYMENT_QR_MAX_BYTES,
+  SERVICE_DESCRIPTION_MAX_LENGTH,
+  SERVICE_NAME_MAX_LENGTH,
+  SERVICE_UNIT_MAX_LENGTH,
   SETTINGS_TEXT_MAX_LENGTH,
   SHORT_CODE_MAX_LENGTH,
   SHORT_CODE_MIN_LENGTH,
@@ -12,6 +15,7 @@ import {
   STEP_UP_WINDOW_SECONDS,
   WORKSPACE_NAME_MAX_LENGTH,
 } from "@crm/core/security";
+import type { MoneyParseReason } from "@crm/core/money";
 import type { PatternError, ResetRule } from "@crm/core/numbering";
 import type { Country } from "@crm/core/settings";
 import type { LimitErrorCode } from "./input-limits";
@@ -232,6 +236,76 @@ export const PAYMENT_QR_TOO_LARGE = `That file is larger than ${PAYMENT_QR_MAX_B
 export const PAYMENT_QR_TYPE_NOT_ALLOWED = "That file isn't a PNG or JPG image. Choose a PNG or JPG file.";
 export const PAYMENT_QR_UNAVAILABLE = "QR uploads are not set up on this server yet.";
 export const PAYMENT_QR_FAILED = "We couldn't upload the QR code. Try again.";
+
+// /catalog (plan Task 22; builder copy). A price is never rounded: too many decimals is refused with the currency's
+// own number of places (core money, MON-01).
+export const CATALOG_TITLE = "Catalog";
+export const CATALOG_INTRO = "The services you sell, with a default description and price for new quotes and invoices.";
+export const CATALOG_FORBIDDEN = "Only an Admin or Owner can see and change the catalog.";
+export const CATALOG_NEW_HEADING = "New service";
+export const CATALOG_EDIT_HEADING = "Edit service";
+export const CATALOG_LIST_HEADING = "Services";
+export const CATALOG_ARCHIVED_HEADING = "Archived services";
+export const CATALOG_SHOW_ARCHIVED = "Show archived services";
+export const CATALOG_SHOW_ACTIVE = "Show active services";
+export const CATALOG_BACK = "Back to the catalog";
+export const CATALOG_EMPTY = "No services yet. Add your first one above.";
+export const CATALOG_ARCHIVED_EMPTY = "No archived services.";
+export const CATALOG_COLUMN_NAME = "Name";
+export const CATALOG_COLUMN_PRICE = "Default price";
+export const CATALOG_COLUMN_UNIT = "Unit";
+export const CATALOG_COLUMN_TAXABLE = "Taxable";
+export const CATALOG_COLUMN_ACTIONS = "Actions";
+export const CATALOG_NO_PRICE = "No default price";
+export const CATALOG_EDIT = "Edit";
+export const CATALOG_NAME = "Name";
+export const CATALOG_DESCRIPTION = "Default description";
+export const CATALOG_PRICE = "Default unit price";
+export const CATALOG_PRICE_HINT = "Optional. For example 1,234.50. Leave it empty to enter a price on each document.";
+export const CATALOG_CURRENCY = "Currency";
+export const CATALOG_CURRENCY_LOCKED_HINT = "The currency can't change while a default price is set. Clear the price and save first.";
+export const CATALOG_UNIT = "Unit";
+export const CATALOG_UNIT_HINT = "Optional. For example hour, day or page.";
+export const CATALOG_TAXABLE = "Taxable by default";
+export const CATALOG_YES = "Yes";
+export const CATALOG_NO = "No";
+export const CATALOG_CREATE = "Add service";
+export const CATALOG_SAVE = "Save service";
+export const CATALOG_SAVING = "Saving…";
+export const CATALOG_CREATED = "Service added.";
+export const CATALOG_SAVED = "Service saved.";
+export const CATALOG_ARCHIVE = "Archive service";
+export const CATALOG_RESTORE = "Restore service";
+export const CATALOG_ARCHIVE_HINT = "An archived service is hidden from the catalog list. Nothing is deleted.";
+export const CATALOG_IS_ARCHIVED = "This service is archived.";
+export const CATALOG_ARCHIVED = "Service archived.";
+export const CATALOG_RESTORED = "Service restored.";
+export const CATALOG_INVALID = "Check the fields marked below, then try again.";
+export const CATALOG_NAME_INVALID = `Enter a name of at most ${SERVICE_NAME_MAX_LENGTH} characters, without special formatting characters.`;
+export const CATALOG_DESCRIPTION_INVALID = `Use at most ${SERVICE_DESCRIPTION_MAX_LENGTH} characters, without special formatting characters.`;
+export const CATALOG_UNIT_INVALID = `Use at most ${SERVICE_UNIT_MAX_LENGTH} characters, without special formatting characters.`;
+export const CATALOG_CURRENCY_INVALID = "Choose a currency from the list.";
+export const CATALOG_CURRENCY_LOCKED = "The currency can't change while a default price is set. Clear the price and save, then change the currency.";
+export const CATALOG_STALE = "Someone else changed this service after this page loaded. Reload the page, then save again.";
+export const CATALOG_NOT_FOUND = "That service doesn't exist in this workspace.";
+export const CATALOG_FAILED = "We couldn't save the service. Try again.";
+
+// Why a typed price was refused (parseDecimalToMinor), for its currency.
+export function priceErrorMessage(reason: MoneyParseReason, currency: string, exponent: number, largest: string): string {
+  switch (reason) {
+    case "too_many_decimals":
+      return exponent === 0
+        ? `A ${currency} price has no decimal places. We don't round prices, so enter a whole number.`
+        : `A ${currency} price has at most ${exponent} decimal ${exponent === 1 ? "place" : "places"}. We don't round prices, so enter it with at most ${exponent}.`;
+    case "negative":
+      return "Enter a price of 0 or more.";
+    case "too_large":
+      return `Enter a price of at most ${largest}.`;
+    case "empty":
+    case "invalid":
+      return exponent === 0 ? "Enter the price as a number, for example 1,500." : "Enter the price as a number, for example 1,234.50.";
+  }
+}
 
 // Shown on every page when the browser lacks a feature the app relies on (Charlie via Bob, PR #53 R2; builder copy).
 export const OUTDATED_BROWSER = "Your browser is out of date, so parts of CRM may not work properly. Please update your browser.";

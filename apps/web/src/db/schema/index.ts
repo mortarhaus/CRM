@@ -1,5 +1,6 @@
 export * from "./audit";
 export * from "./auth";
+export * from "./catalog";
 export * from "./events";
 export * from "./idempotency";
 export * from "./numbering";
