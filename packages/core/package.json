@@ -12,6 +12,7 @@
     "./password": "./src/password/index.ts",
     "./security": "./src/security/limits.ts",
     "./settings": "./src/settings/index.ts",
+    "./templates": "./src/templates/index.ts",
     "./workspace": "./src/workspace/slug.ts"
   },
   "scripts": {
