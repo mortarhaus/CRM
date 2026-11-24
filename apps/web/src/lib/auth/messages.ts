@@ -6,6 +6,8 @@ import {
   PASSWORD_MIN_LENGTH,
   PAYMENT_QR_MAX_BYTES,
   SETTINGS_TEXT_MAX_LENGTH,
+  SHORT_CODE_MAX_LENGTH,
+  SHORT_CODE_MIN_LENGTH,
   STEP_UP_VERIFY_USER_FAILURE_LIMIT,
   STEP_UP_WINDOW_SECONDS,
   WORKSPACE_NAME_MAX_LENGTH,
@@ -103,8 +105,10 @@ export const GENERAL_BUSINESS_LEGEND = "Business details";
 export const GENERAL_REGIONAL_LEGEND = "Timezone and currencies";
 export const GENERAL_COUNTRY = "Country";
 export const GENERAL_SHORT_CODE = "Short code";
-export const GENERAL_SHORT_CODE_HINT = "2 to 6 letters or digits, used in document numbers.";
-export const GENERAL_SHORT_CODE_INVALID = "Use 2 to 6 letters or digits.";
+export const GENERAL_SHORT_CODE_HINT = `${SHORT_CODE_MIN_LENGTH} to ${SHORT_CODE_MAX_LENGTH} letters or digits, used in document numbers.`;
+export const GENERAL_SHORT_CODE_INVALID = `Use ${SHORT_CODE_MIN_LENGTH} to ${SHORT_CODE_MAX_LENGTH} letters or digits.`;
+// Onboarding asks for the same code with the same label and error, and says it can be skipped (Charlie 2026-11-24).
+export const ONBOARDING_SHORT_CODE_HINT = `Optional. ${GENERAL_SHORT_CODE_HINT} You can skip it and set it later in General settings.`;
 export const GENERAL_ADDRESS_LINE1 = "Address line 1";
 export const GENERAL_ADDRESS_LINE2 = "Address line 2";
 export const GENERAL_ADDRESS_CITY = "City";
