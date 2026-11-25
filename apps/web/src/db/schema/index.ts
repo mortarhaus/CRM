@@ -6,4 +6,5 @@ export * from "./idempotency";
 export * from "./numbering";
 export * from "./step-up";
 export * from "./system";
+export * from "./templates";
 export * from "./tenancy";

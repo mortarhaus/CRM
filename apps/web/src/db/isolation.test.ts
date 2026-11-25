@@ -10,6 +10,7 @@ import {
   auditLog,
   docSequence,
   domainEvent,
+  emailTemplate,
   idempotencyKey,
   notification,
   organization,
@@ -45,6 +46,19 @@ const TENANT_FIXTURES: Record<string, TenantFixture> = {
         .update(docSequence)
         .set({ counter: sql`${docSequence.counter} + 1` })
         .where(eq(docSequence.workspaceId, workspaceId));
+      return result.count;
+    },
+  },
+  // A workspace's email template (Phase 2 plan Task 23): crm_app edits its text and deletes none.
+  email_template: {
+    async seed(tx, workspaceId) {
+      await tx.insert(emailTemplate).values({ workspaceId, event: "invoice_sent", subject: "Invoice", body: "Hi" });
+    },
+    async update(tx, workspaceId) {
+      const result = await tx
+        .update(emailTemplate)
+        .set({ body: "Hello", version: sql`${emailTemplate.version} + 1` })
+        .where(eq(emailTemplate.workspaceId, workspaceId));
       return result.count;
     },
   },

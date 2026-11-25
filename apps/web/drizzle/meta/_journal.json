@@ -260,6 +260,20 @@
       "when": 1795524572142,
       "tag": "0036_rls_service",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1795534383664,
+      "tag": "0037_email_template",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1795534387874,
+      "tag": "0038_rls_email_template",
+      "breakpoints": true
     }
   ]
 }
