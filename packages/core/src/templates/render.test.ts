@@ -68,7 +68,18 @@ describe("the Q23 defaults", () => {
   it.each(EMAIL_EVENTS)("%s: its default uses only its own fields and saves as it is", (event) => {
     const { fields, subject, body } = EMAIL_TEMPLATE_DEFAULTS[event];
     expect(templateProblems({ subject, body }, fields)).toEqual([]);
-    expect(fields.slice(0, 3)).toEqual(["client_name", "workspace_name", "sender_name"]);
+    if (event !== "payment_details_changed") expect(fields.slice(0, 3)).toEqual(["client_name", "workspace_name", "sender_name"]);
+  });
+
+  it("keeps the Q18 owner notification text for event 8, with no client fields", () => {
+    const { fields, subject, body } = EMAIL_TEMPLATE_DEFAULTS.payment_details_changed;
+    expect(fields).toEqual(["owner_name", "workspace_name", "changed_at", "changed_by", "what_changed"]);
+    expect(subject).toBe("Payment details changed on {{workspace_name}}");
+    expect(body).toBe(
+      "Hi {{owner_name}},\n\nThe payment details for {{workspace_name}} were changed on {{changed_at}} by {{changed_by}}.\n\n" +
+        "What changed: {{what_changed}}.\n\nFor your safety this email never shows account numbers.\n\n" +
+        "If you didn't expect this change, open Settings, then Payment, and review it now.",
+    );
   });
 
   it("keeps the approved invoice text", () => {

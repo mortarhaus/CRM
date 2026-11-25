@@ -1,9 +1,10 @@
 // The email template events, the fields each may use and their default text: Charlie's answer to Q23 (2026-11-24,
-// he approved the builder's draft; DECISIONS 2026-11-24). This is the one place the defaults live: a workspace has no
-// email_template row until it first saves one, and its page shows these until then. Changed only by a reviewed PR.
-// Nothing sends from them in Phase 2 (UNI-05): the sending phase of each event reads them.
+// he approved the builder's draft; DECISIONS 2026-11-24), except event 8, which keeps the Q18 text (2026-11-25).
+// This is the one place the defaults live: a workspace has no email_template row until it first saves one, and its
+// page shows these until then. Changed only by a reviewed PR.
+// Only payment_details_changed sends today (the bank-details job); each other event is read by its sending phase.
 
-// Fields every event may use.
+// Fields every client email may use (not the owner notification).
 export const COMMON_FIELDS = ["client_name", "workspace_name", "sender_name"] as const;
 
 const SIGN_OFF = "Thank you,\n{{sender_name}}\n{{workspace_name}}";
@@ -82,17 +83,18 @@ export const EMAIL_TEMPLATE_DEFAULTS = {
       SIGN_OFF,
     ].join("\n\n"),
   },
-  // The owner notification. Not yet what the bank-details job sends (apps/web/src/emails/bank-details-changed.tsx,
-  // Q18 wording of 2026-11-22): the two texts differ, so that job keeps its own until Charlie chooses (DECISIONS
-  // 2026-11-24).
+  // The owner notification on a bank-details or payment QR change. Charlie kept the Q18 text that the bank-details
+  // job already sends (approved 2026-11-22; on 2026-11-25 it superseded the Q23 draft for this event), and that job
+  // reads this default. It goes to the owner, not a client: no client_name or sender_name. It never shows a bank value.
   payment_details_changed: {
-    fields: [...COMMON_FIELDS, "changed_by", "changed_at", "change_summary"],
+    fields: ["owner_name", "workspace_name", "changed_at", "changed_by", "what_changed"],
     subject: "Payment details changed on {{workspace_name}}",
     body: [
-      "Hi,",
-      "{{changed_by}} changed the payment details for {{workspace_name}} on {{changed_at}}.",
-      "{{change_summary}}",
-      "If you did not expect this change, review your workspace users and security settings now.",
+      "Hi {{owner_name}},",
+      "The payment details for {{workspace_name}} were changed on {{changed_at}} by {{changed_by}}.",
+      "What changed: {{what_changed}}.",
+      "For your safety this email never shows account numbers.",
+      "If you didn't expect this change, open Settings, then Payment, and review it now.",
     ].join("\n\n"),
   },
 } as const satisfies Record<string, { fields: readonly string[]; subject: string; body: string }>;
