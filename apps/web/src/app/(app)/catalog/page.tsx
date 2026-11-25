@@ -139,7 +139,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                 values={formValues(loaded.editing)}
                 currencies={currencyOptions(loaded.locale)}
               />
-              <ArchiveForm key={loaded.workspaceId} workspaceId={loaded.workspaceId} action={setServiceArchivedAction} values={formValues(loaded.editing)} />
+              <ArchiveForm key={`archive:${loaded.workspaceId}`} workspaceId={loaded.workspaceId} action={setServiceArchivedAction} values={formValues(loaded.editing)} />
               <Link href={listHref} className="self-start text-sm underline underline-offset-4">
                 {CATALOG_BACK}
               </Link>
