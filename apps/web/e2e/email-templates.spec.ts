@@ -10,6 +10,7 @@ import {
   TEMPLATE_SAVED,
   TEMPLATE_SUBJECT_REFUSED,
   TEMPLATES_FORBIDDEN,
+  TEMPLATES_INTRO,
   unknownFieldsMessage,
 } from "../src/lib/auth/messages";
 import { expectAccessible } from "./a11y";
@@ -91,6 +92,8 @@ test("an Owner previews, edits, is refused an unknown field, saves and restores 
   await expect(preview(page)).toContainText("Hi Siti Rahim,");
   await expect(preview(page)).toContainText("The payment details for Your Studio were changed on 10-Dec-2026 09:15 (Asia/Kuala_Lumpur) by Ben Tan.");
   await expect(page.getByText("{{client_name}}")).toHaveCount(0);
+  // Saved text is not sent yet, the owner email included (PR 76 Review R1 P2).
+  await expect(main(page).getByText(TEMPLATES_INTRO)).toBeVisible();
   await expectAccessible(page, "/settings/templates, owner notification");
 });
 

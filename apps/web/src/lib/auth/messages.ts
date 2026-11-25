@@ -294,8 +294,10 @@ export const CATALOG_NOT_FOUND = "That service doesn't exist in this workspace."
 export const CATALOG_FAILED = "We couldn't save the service. Try again.";
 
 export const TEMPLATES_TITLE = "Email templates";
+// Q23 Phase 2 scope: saved templates are stored and previewed, and no sender reads them yet (runbook phase-1-security,
+// "Owner email on a bank-details or payment QR change"; PR 76 Review R1 P2).
 export const TEMPLATES_INTRO =
-  "The text of the emails CRM sends for each event. Until you change a template, CRM uses its default text.";
+  "Edit and preview this workspace's copy of each email. Saved changes are not used yet: every email CRM sends, including the payment details email to the owner, still uses the default text.";
 export const TEMPLATES_FORBIDDEN = "Only an Admin or Owner can see and change email templates.";
 export const TEMPLATES_EVENTS = "Emails";
 export const TEMPLATE_EVENT_LABELS: Record<EmailEvent, string> = {
