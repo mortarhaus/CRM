@@ -1,7 +1,7 @@
 "use server";
 
 import { isCurrency, MoneyParseError, parseDecimalToMinor } from "@crm/core/money";
-import { characterCount, SERVICE_DESCRIPTION_MAX_LENGTH, SERVICE_NAME_MAX_LENGTH, SERVICE_UNIT_MAX_LENGTH } from "@crm/core/security";
+import { SERVICE_DESCRIPTION_MAX_LENGTH, SERVICE_NAME_MAX_LENGTH, SERVICE_UNIT_MAX_LENGTH } from "@crm/core/security";
 import { z } from "zod";
 import {
   CurrencyLockedError,
@@ -13,16 +13,10 @@ import {
   updateService,
 } from "@/db/catalog/services";
 import { ActionRefusedError, action } from "@/lib/auth/action";
-import { echoFields, expectedVersion, requiredText, text } from "@/lib/settings-input";
+import { echoFields, expectedVersion, multilineText, requiredText, text } from "@/lib/settings-input";
 
-// A description may run over several lines (line breaks kept, as \n); otherwise as text(): trimmed, no other control
-// or format character, at most the limit in code points, empty is none.
-const description = z
-  .string()
-  .transform((value) => value.replace(/\r\n?/g, "\n").trim())
-  .pipe(z.string().regex(/^(?:\n|[^\p{Cc}\p{Cf}])*$/u))
-  .refine((value) => characterCount(value) <= SERVICE_DESCRIPTION_MAX_LENGTH)
-  .transform((value) => (value === "" ? null : value));
+// A description may run over several lines; empty is none.
+const description = multilineText(SERVICE_DESCRIPTION_MAX_LENGTH).transform((value) => (value === "" ? null : value));
 
 // The service as typed (UNI-03). The price is text, read in the chosen currency's exponent by the core parser, never
 // through a float (MON-01); empty means no default price. More decimals than the currency has is refused, never
