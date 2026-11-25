@@ -31,7 +31,7 @@ const stale = (error: unknown): never => {
   throw error;
 };
 
-// Email templates are Admin and Owner (spec line 788, "email settings"); Staff are refused with FORBIDDEN. Each change
+// Email templates are Admin and Owner (spec line 792, "Templates, … email settings"); Staff are refused with FORBIDDEN. Each change
 // is audited by event, version and the parts changed, never the text (email-templates.ts). Nothing sends from a template in Phase 2 (Q23).
 export const saveEmailTemplateAction = action({
   name: "settings.email_template.update",

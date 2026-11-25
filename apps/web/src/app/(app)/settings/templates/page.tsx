@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Email templates · CRM" };
 
 type Loaded = { kind: "forbidden" } | { kind: "ready"; template: EmailTemplateText };
 
-// Admin and Owner (spec line 788). Staff see the refusal instead of the form; each action checks the role again
+// Admin and Owner (spec line 792). Staff see the refusal instead of the form; each action checks the role again
 // (AUTH-02). An event the workspace has not saved shows its default text (core, Q23).
 async function load(event: EmailEvent): Promise<Loaded> {
   try {
