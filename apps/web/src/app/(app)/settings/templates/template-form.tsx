@@ -1,0 +1,219 @@
+"use client";
+
+import { EMAIL_TEMPLATE_DEFAULTS, type EmailEvent, renderParts, templateProblems } from "@crm/core/templates";
+import { redirect, useRouter } from "next/navigation";
+import { type FormEvent, startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import type { ActionResult } from "@/lib/auth/action";
+import {
+  TEMPLATE_BODY,
+  TEMPLATE_BODY_INVALID,
+  TEMPLATE_FAILED,
+  TEMPLATE_FIELDS_HINT,
+  TEMPLATE_INVALID,
+  TEMPLATE_IS_DEFAULT,
+  TEMPLATE_NO_PREVIEW,
+  TEMPLATE_PREVIEW,
+  TEMPLATE_PREVIEW_HINT,
+  TEMPLATE_RESTORE,
+  TEMPLATE_RESTORE_HINT,
+  TEMPLATE_RESTORED,
+  TEMPLATE_SAMPLE_VALUES,
+  TEMPLATE_SAVE,
+  TEMPLATE_SAVED,
+  TEMPLATE_SAVING,
+  TEMPLATE_STALE,
+  TEMPLATE_SUBJECT,
+  TEMPLATE_SUBJECT_INVALID,
+  TEMPLATES_FORBIDDEN,
+  unknownFieldsMessage,
+} from "@/lib/auth/messages";
+
+type SaveResult = ActionResult<{ version: number; isDefault: boolean }>;
+// A template action, called as (previous state, form data): it reads the form (action() fromForm).
+type FormAction = (previous: SaveResult | null, form: FormData) => Promise<SaveResult>;
+
+export interface TemplateValues {
+  event: EmailEvent;
+  subject: string;
+  body: string;
+  version: number;
+  isDefault: boolean;
+}
+
+interface FormProps {
+  action: FormAction;
+  template: TemplateValues;
+}
+
+const REFUSALS: Partial<Record<string, string>> = {
+  INVALID_INPUT: TEMPLATE_INVALID,
+  STALE_VERSION: TEMPLATE_STALE,
+  FORBIDDEN: TEMPLATES_FORBIDDEN,
+};
+
+// The typed template filled with sample data by the same single pass a send will run (renderParts; every field has a
+// sample, so only an unknown field stops it); React escapes every part. Watermarked "Preview", never stored or sent
+// (REC-12).
+function Preview({ event, subject, body }: { event: EmailEvent; subject: string; body: string }) {
+  const fields = EMAIL_TEMPLATE_DEFAULTS[event].fields;
+  const unknown = templateProblems({ subject, body }, fields).flatMap((problem) => (problem.kind === "unknown_field" ? [problem.field] : []));
+  const fill = (text: string) =>
+    renderParts(text, TEMPLATE_SAMPLE_VALUES, fields)
+      .map((part) => part.text)
+      .join("");
+  return (
+    // The faint diagonal watermark is a pseudo-element (data-watermark), decoration beside the "Preview" heading.
+    <section
+      aria-labelledby="preview-heading"
+      data-watermark={TEMPLATE_PREVIEW}
+      className="relative flex min-w-0 flex-col gap-3 overflow-hidden rounded-md border-2 border-dashed border-border bg-card p-4 before:pointer-events-none before:absolute before:inset-0 before:flex before:-rotate-12 before:items-center before:justify-center before:text-6xl before:font-bold before:tracking-widest before:text-muted-foreground/15 before:uppercase before:content-[attr(data-watermark)] before:select-none"
+    >
+      <div className="flex flex-wrap items-baseline gap-2">
+        <h3 id="preview-heading" className="rounded-sm bg-muted px-2 py-0.5 text-xs font-semibold tracking-wide uppercase">
+          {TEMPLATE_PREVIEW}
+        </h3>
+        <p className="text-sm text-muted-foreground">{TEMPLATE_PREVIEW_HINT}</p>
+      </div>
+      {unknown.length === 0 ? (
+        <div className="flex flex-col gap-3 text-sm break-words">
+          <p className="font-semibold">{fill(subject)}</p>
+          <p className="whitespace-pre-wrap">{fill(body)}</p>
+        </div>
+      ) : (
+        <p className="text-sm text-destructive">
+          {TEMPLATE_NO_PREVIEW}: {unknownFieldsMessage([...new Set(unknown)])}
+        </p>
+      )}
+    </section>
+  );
+}
+
+type Part = "subject" | "body";
+
+// The subject, the message and their preview. Keyed by the stored version, so a save or a restore shows the stored
+// text; a refusal keeps what was typed (without JavaScript, what the action echoed).
+function Editor({ template, refused }: { template: TemplateValues; refused: { fields: string[]; echo?: Record<string, string> } | null }) {
+  const [subject, setSubject] = useState(refused?.echo?.subject ?? template.subject);
+  const [body, setBody] = useState(refused?.echo?.body ?? template.body);
+  const fields = EMAIL_TEMPLATE_DEFAULTS[template.event].fields;
+  // Why the posted text was refused (the action echoes what it was given), whatever has been typed since.
+  const fieldError = (part: Part) => {
+    if (!refused?.fields.includes(part)) return undefined;
+    const posted = { subject: refused.echo?.subject ?? subject, body: refused.echo?.body ?? body };
+    const unknown = templateProblems(posted, fields).flatMap((problem) =>
+      problem.kind === "unknown_field" && problem.part === part ? [problem.field] : [],
+    );
+    return unknown.length > 0 ? unknownFieldsMessage([...new Set(unknown)]) : part === "subject" ? TEMPLATE_SUBJECT_INVALID : TEMPLATE_BODY_INVALID;
+  };
+  const describedBy = (part: Part) => ["template-fields-hint", fieldError(part) && `template-${part}-error`].filter(Boolean).join(" ");
+
+  return (
+    <>
+      <p id="template-fields-hint" className="text-sm break-words text-muted-foreground">
+        {TEMPLATE_FIELDS_HINT} {fields.map((field) => `{{${field}}}`).join(", ")}
+      </p>
+      {template.isDefault && <p className="text-sm">{TEMPLATE_IS_DEFAULT}</p>}
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="template-subject">{TEMPLATE_SUBJECT}</Label>
+        <Input
+          id="template-subject"
+          name="subject"
+          type="text"
+          autoComplete="off"
+          value={subject}
+          onChange={(event) => setSubject(event.target.value)}
+          aria-invalid={fieldError("subject") ? true : undefined}
+          aria-describedby={describedBy("subject")}
+        />
+        {fieldError("subject") && (
+          <p id="template-subject-error" className="text-sm text-destructive">
+            {fieldError("subject")}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="template-body">{TEMPLATE_BODY}</Label>
+        <Textarea
+          id="template-body"
+          name="body"
+          rows={12}
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          aria-invalid={fieldError("body") ? true : undefined}
+          aria-describedby={describedBy("body")}
+        />
+        {fieldError("body") && (
+          <p id="template-body-error" className="text-sm text-destructive">
+            {fieldError("body")}
+          </p>
+        )}
+      </div>
+      <Preview event={template.event} subject={subject} body={body} />
+    </>
+  );
+}
+
+function TemplateFields({ action, template, unreachable }: FormProps & { unreachable: boolean }) {
+  const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
+  const router = useRouter();
+  const button = useRef<HTMLButtonElement>(null);
+  // A save is rendered again from the stored row (the version moves on). Focus goes back to Save, which was disabled
+  // while the post was in flight (A11Y-01).
+  useEffect(() => {
+    if (result?.ok) router.refresh();
+    if (result !== null || unreachable) button.current?.focus();
+  }, [result, unreachable, router]);
+  if (result?.ok === false && result.status === "UNAUTHENTICATED") redirect("/sign-in");
+  const error = result?.ok === false ? (REFUSALS[result.status] ?? TEMPLATE_FAILED) : unreachable ? TEMPLATE_FAILED : null;
+  const refused = result?.ok === false && result.status === "INVALID_INPUT" ? result : null;
+  const version = result?.ok ? Math.max(result.data.version, template.version) : template.version;
+
+  // The button that posted names the intent (save, or restore the default).
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget, (event.nativeEvent as SubmitEvent).submitter);
+    startTransition(() => formAction(form));
+  }
+
+  return (
+    <form action={formAction} onSubmit={onSubmit} className="flex min-w-0 flex-col gap-6">
+      <input type="hidden" name="event" value={template.event} />
+      <input type="hidden" name="expectedVersion" value={version} />
+      <Editor key={template.version} template={template} refused={refused} />
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {result?.ok && (
+        <p role="status" className="text-sm">
+          {result.data.isDefault ? TEMPLATE_RESTORED : TEMPLATE_SAVED}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-3">
+        <Button ref={button} type="submit" name="intent" value="save" disabled={pending}>
+          {pending ? TEMPLATE_SAVING : TEMPLATE_SAVE}
+        </Button>
+        {!template.isDefault && (
+          <Button type="submit" name="intent" value="restore" variant="outline" disabled={pending} aria-describedby="template-restore-hint">
+            {TEMPLATE_RESTORE}
+          </Button>
+        )}
+      </div>
+      {!template.isDefault && (
+        <p id="template-restore-hint" className="text-sm text-muted-foreground">
+          {TEMPLATE_RESTORE_HINT}
+        </p>
+      )}
+    </form>
+  );
+}
+
+export function TemplateForm(props: FormProps) {
+  return <SubmitFailureBoundary>{(unreachable) => <TemplateFields {...props} unreachable={unreachable} />}</SubmitFailureBoundary>;
+}
