@@ -19,7 +19,8 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 // time zone: PeriodBehindError); so are CURRENCY_LOCKED (a service's currency change while it has a default price,
 // spec Money rules "Service currency edit") and NOT_FOUND (no such row in the workspace); the others by the checks below. TWO_FACTOR_REQUIRED (the user has no 2FA: enrol first) comes from the
 // require_2fa check below or from step-up; STEP_UP_REQUIRED (no step-up of this session in the last
-// STEP_UP_WINDOW_SECONDS) from requireStepUp; WRONG_CODE from verifyStepUp (step-up.ts).
+// STEP_UP_WINDOW_SECONDS) from requireStepUp; WRONG_CODE from verifyStepUp (step-up.ts). WORKSPACE_CHANGED: a form
+// rendered for another workspace than the session's active one (the email templates form, PR 76 Review R1).
 type Refusal =
   | "UNAUTHENTICATED"
   | "NO_WORKSPACE"
@@ -36,7 +37,8 @@ type Refusal =
   | "STORAGE_UNAVAILABLE"
   | "TWO_FACTOR_REQUIRED"
   | "STEP_UP_REQUIRED"
-  | "WRONG_CODE";
+  | "WRONG_CODE"
+  | "WORKSPACE_CHANGED";
 
 export type ActionResult<O> =
   | { ok: true; status: "DONE" | "REPLAYED"; data: O }

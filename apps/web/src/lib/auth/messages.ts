@@ -1,5 +1,7 @@
 import {
   ADDRESS_LINE_MAX_LENGTH,
+  EMAIL_TEMPLATE_BODY_MAX_LENGTH,
+  EMAIL_TEMPLATE_SUBJECT_MAX_LENGTH,
   NAME_MAX_LENGTH,
   NUMBER_SEQ_MAX_WIDTH,
   PASSWORD_MAX_LENGTH,
@@ -18,6 +20,7 @@ import {
 import type { MoneyParseReason } from "@crm/core/money";
 import type { PatternError, ResetRule } from "@crm/core/numbering";
 import type { Country } from "@crm/core/settings";
+import type { EmailEvent, TemplateField } from "@crm/core/templates";
 import type { LimitErrorCode } from "./input-limits";
 
 export const TOO_MANY_ATTEMPTS = "Too many attempts. Wait a moment and try again.";
@@ -289,6 +292,79 @@ export const CATALOG_CURRENCY_LOCKED = "The currency can't change while a defaul
 export const CATALOG_STALE = "Someone else changed this service after this page loaded. Reload the page, then save again.";
 export const CATALOG_NOT_FOUND = "That service doesn't exist in this workspace.";
 export const CATALOG_FAILED = "We couldn't save the service. Try again.";
+
+export const TEMPLATES_TITLE = "Email templates";
+// Q23 Phase 2 scope: saved templates are stored and previewed, and no sender reads them yet (runbook phase-1-security,
+// "Owner email on a bank-details or payment QR change"; PR 76 Review R1 P2).
+export const TEMPLATES_INTRO =
+  "Edit and preview this workspace's copy of each email. Saved changes are not used yet: every email CRM sends, including the payment details email to the owner, still uses the default text.";
+export const TEMPLATES_FORBIDDEN = "Only an Admin or Owner can see and change email templates.";
+export const TEMPLATES_EVENTS = "Emails";
+export const TEMPLATE_EVENT_LABELS: Record<EmailEvent, string> = {
+  invoice_sent: "Invoice sent",
+  payment_reminder: "Payment reminder",
+  payment_receipt: "Payment receipt",
+  payment_voided: "Payment reversed",
+  quote_sent: "Quote sent",
+  proposal_sent: "Proposal sent",
+  agreement_sent: "Agreement sent",
+  payment_details_changed: "Payment details changed (to the owner)",
+};
+export const TEMPLATE_SUBJECT = "Subject";
+export const TEMPLATE_BODY = "Message";
+export const TEMPLATE_FIELDS_HINT = "You can use these fields, written with double braces:";
+export const TEMPLATE_IS_DEFAULT = "This email uses the default text.";
+export const TEMPLATE_SAVE = "Save template";
+export const TEMPLATE_SAVING = "Saving…";
+export const TEMPLATE_SAVED = "Template saved.";
+export const TEMPLATE_RESTORE = "Restore the default text";
+export const TEMPLATE_RESTORE_HINT = "Replaces this template's subject and message with the default text.";
+export const TEMPLATE_RESTORED = "Default text restored.";
+export const TEMPLATE_INVALID = "Check the fields marked below, then try again.";
+export const TEMPLATE_SUBJECT_INVALID = `Enter a subject of one line and at most ${EMAIL_TEMPLATE_SUBJECT_MAX_LENGTH} characters, without special formatting characters.`;
+export const TEMPLATE_BODY_INVALID = `Enter a message of at most ${EMAIL_TEMPLATE_BODY_MAX_LENGTH} characters, without special formatting characters.`;
+// Without JavaScript the refusal carries no text (a template can hold personal data), so the reason is the field's rule.
+export const TEMPLATE_SUBJECT_REFUSED = `This subject was not saved. Use one line of at most ${EMAIL_TEMPLATE_SUBJECT_MAX_LENGTH} characters, and only the fields listed above, each written as {{field_name}}.`;
+export const TEMPLATE_BODY_REFUSED = `This message was not saved. Use at most ${EMAIL_TEMPLATE_BODY_MAX_LENGTH} characters, and only the fields listed above, each written as {{field_name}}.`;
+export const TEMPLATE_DRAFT_NOT_KEPT = "Your changes were not kept: the subject and message below are the saved text. Make your change again, then save.";
+export const TEMPLATE_STALE = "Someone else changed this template after this page loaded. Reload the page, then save again.";
+export const TEMPLATE_WORKSPACE_CHANGED =
+  "This page was opened in another workspace, so nothing was saved. Reload the page to edit this workspace's templates.";
+export const TEMPLATE_FAILED = "We couldn't save the template. Try again.";
+export const TEMPLATE_PREVIEW = "Preview";
+export const TEMPLATE_PREVIEW_HINT = "With sample data. Nothing is sent.";
+export const TEMPLATE_NO_PREVIEW = "No preview";
+export const TEMPLATE_MALFORMED_PLACEHOLDER =
+  "Write each field as {{field_name}}, with two braces on each side. Check for a missing, extra or nested brace.";
+export const unknownFieldsMessage = (fields: readonly string[]) =>
+  `${fields.map((field) => `{{${field}}}`).join(", ")} ${fields.length === 1 ? "is not a field" : "are not fields"} of this email. Use only the fields listed above.`;
+// Sample values for the preview (REC-12: watermarked, never stored or sent). Dates as the MY default, dd-mmm-yyyy.
+export const TEMPLATE_SAMPLE_VALUES: Record<TemplateField, string> = {
+  client_name: "Aisha Rahman",
+  workspace_name: "Your Studio",
+  sender_name: "Ben Tan",
+  invoice_number: "INV-STU-2026-0042",
+  amount_due: "MYR 4,800.00",
+  amount_paid: "MYR 4,800.00",
+  amount_voided: "MYR 4,800.00",
+  total: "MYR 12,500.00",
+  due_date: "15-Dec-2026",
+  paid_date: "10-Dec-2026",
+  voided_date: "11-Dec-2026",
+  valid_until: "31-Dec-2026",
+  quote_number: "QUO-STU-2026-0007",
+  proposal_title: "Brand refresh 2027",
+  agreement_title: "Service Agreement",
+  invoice_link: "https://example.com/l/sample-invoice",
+  receipt_link: "https://example.com/l/sample-receipt",
+  quote_link: "https://example.com/l/sample-quote",
+  proposal_link: "https://example.com/l/sample-proposal",
+  agreement_link: "https://example.com/l/sample-agreement",
+  owner_name: "Siti Rahim",
+  changed_by: "Ben Tan",
+  changed_at: "10-Dec-2026 09:15 (Asia/Kuala_Lumpur)",
+  what_changed: "bank details",
+};
 
 // Why a typed price was refused (parseDecimalToMinor), for its currency.
 export function priceErrorMessage(reason: MoneyParseReason, currency: string, exponent: number, largest: string): string {

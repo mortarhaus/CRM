@@ -225,7 +225,9 @@ reads only `DATABASE_WORKER_URL`, so it needs no email setting.
   number, the holder name or the QR. The text lives in one place, the `payment_details_changed` default in
   `packages/core/src/templates/events.ts` (event 8 of the email templates); the worker renders it with
   `apps/web/src/emails/bank-details-changed.tsx` and still sends this Q18 copy. A workspace's saved event 8 template
-  is not read by the worker (no sender reads saved templates in Phase 2).
+  (edited on `/settings/templates`, "Payment details changed (to the owner)") is not read by the worker (no sender
+  reads saved templates in Phase 2): an owner who edits it there still receives the Q18 copy. The page says so
+  in its intro (`TEMPLATES_INTRO` in `apps/web/src/lib/auth/messages.ts`).
 - **Test email wording** (Charlie, ASK 8 = A, 2026-11-01): subject "Test email from CRM", body "This is a test
   email sent from your CRM workspace settings. If you received it, email delivery works."
   (`apps/web/src/emails/test-email.tsx`).
