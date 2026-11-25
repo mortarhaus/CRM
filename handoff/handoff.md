@@ -1,4 +1,4 @@
-# Handoff — 2026-11-25 · PR 75 (Phase 2 PR 8a) merged (a65399e) and logged; next PR 8b (built, not pushed)
+# Handoff — 2026-11-25 · PR #76 (Phase 2 PR 8b) open at 2a5827c; awaiting `review 76`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,13 +6,13 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: none open (next is 8b, not yet pushed)
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: 76
 - Working folder: repo root (`/Users/charlie/Documents/Projects/Personal/CRM`, branch `main`). Build worktree for 8b: `.agent/worktrees/build-feat-p2-email-templates-page`. Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- Branch: `main` = `a65399e` (equal to origin/main). Open PRs: 0. Repo `mortarhaus/CRM` is PRIVATE (standing rule: public while a PR needs CI, private after merge).
+- Branch: `main` = `a65399e`. Open PR: #76 (`feat/p2-email-templates-page`, head `2a5827c`). Repo `mortarhaus/CRM` is PUBLIC while PR 76 is open; make private after merge.
 - Last merged: PR 75 (Phase 2 PR 8a, email template events, table, renderer) 2026-11-25T09:11:22Z, no gate breach, log on agent-logs (`54b7a1b`). Log gate clear.
-- Next: PR 8b, branch `feat/p2-email-templates-page` at `ef2dec4`, stacked on the pre-merge 8a head `bae8dd6`, NOT pushed.
+- Next: Charlie runs `review 76`, then `approved 76` BEFORE merging, then `merged 76`.
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1; Phase 2 plan PRs 1-7 and PR 8a (#75). All logged on agent-logs.
@@ -38,16 +38,19 @@ agent-logs worktree at `54b7a1b` plus the handoff-copy commit, clean.
 2026-11-25: Q23 answered; PR 8 built by an Opus 5.5 sub-agent and split into 8a and 8b; PR 75 (8a) R1 Blocked, fixed, R2 Approved, receipted, merged and logged. Removed local branch `feat/p2-email-templates-core` and worktree `build-feat-p2-email-templates` (tip equals PR head, on main). Kept backup branch `feat/p2-email-templates` (`ebb723a`). Repo set private. Artifact republished.
 
 ## 5. Next step (file-level)
-1. 8b: in `.agent/worktrees/build-feat-p2-email-templates-page`, rebase onto `origin/main` (drop the 8a commits), fix the stale "pending Charlie" comment at `packages/core/src/security/limits.ts:90` (Bob P3), re-run typecheck, lint, test, build, e2e (email-templates, shell, catalog; warm dev server, `TRUSTED_CLIENT_IP_HEADER=x-forwarded-for`), write the full rule-by-rule self-check table (missing table was a P1 on PR 75), push, make repo public, open PR. Deep tier: Opus 5.5 sub-agent (Charlie chose "subagent").
+1. PR #76: wait for CI and Bob (`review 76`). Sub-agent checks: typecheck, lint, test (1475 passed), build, e2e 97 passed (full test and e2e at 01e79fc; typecheck, lint, build re-run at 2a5827c). 443 non-test code lines (accepted about 433). After Phase 2 closes: answers 3-6 in section 6 need their own PRs.
 2. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
 3. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
 
 ## 6. Open ASK items, blockers, and owner answers
-- 8b size (433 non-test lines, over 400): accept (builder recommends) or split again. Confirm preview sample values owner name "Siti Rahim" and what changed "bank details".
-- DNS for mortarhaus.com (SPF, DKIM, DMARC on Cloudflare and Resend) before the first real email: Charlie has not chosen A (connect Chrome extension), B (Cloudflare token), C (I give the records). Claude-in-Chrome tools are not available in this session.
-- Numbering: confirm or change the behaviour after a time zone change (issuing pauses up to about 26 hours until the new zone reaches the stored period).
-- Payment page: DuitNow/PayNow text ID field; account-number character rules; clear or remove bank details/QR; Admin QR view; the deleted-user wording ("a user who no longer has an account").
-- Catalog and money (PR 74, no merge block, Bob agrees with my defaults): full ISO list for default/base currency; accept zero-only extra decimals (Bob leans yes); service unit free text vs list.
+- Charlie's answers 2026-11-25 ("1 A, 2 ok, then build; 3 b, 4 ok, 5 digits only, yes can clear, admin yes, why is a user details deleted?, 6 ok widen, add 2 decimals 0.00 and drop down list from the settings"). Implementation of 3-6 is NOT in 8b; each needs its own reviewed PR, spec check first (builder s8):
+  - 8b: size accepted (A); preview samples "Siti Rahim" / "bank details" approved.
+  - DNS: option B (Cloudflare token, DNS edit on mortarhaus.com only, in a gitignored local file, never in chat). Waiting for the token and the Resend records.
+  - Numbering time zone: keep behaviour ("4 ok"; includes the suggested warning on the time zone page).
+  - Payment page: account number digits only; Owner can clear bank details / remove QR (spec matrix and step-up to check); Admin can view the QR. OPEN: DuitNow/PayNow ID text field (not answered); deleted-user wording (Charlie asked why it happens; explained, awaiting ok).
+  - Catalog: widen the currency list. OPEN (confirm meaning): "add 2 decimals 0.00 and drop down list from the settings" (builder reading: accept/show 2 decimals; a drop-down, likely service unit, managed in settings).
+  - E2E sharding: unanswered.
+- Note from the 8b run: Next dev mode logs arguments of the existing 2FA actions, incl. setup keys of throwaway e2e accounts (dev only, not from 8b; local logs deleted). Raise with Bob.
 - When to shard the E2E job (57+ min; limit 90; Bob suggests before about 75 min). Older small items: Q24 proposal_cover, header greeting wording, Urbanist font source, outdated-browser notice wording, no-JS 409 policy, CRM sender name wording.
 
 ## 7. Open review findings (P0/P1) and verdict
