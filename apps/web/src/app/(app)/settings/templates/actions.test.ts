@@ -35,6 +35,23 @@ async function signInAs(workspaceId: string, role: string): Promise<string> {
   return user.id;
 }
 
+// The signed-in user also becomes a member of another workspace, and the session's active workspace moves there.
+async function joinAndSwitch(userId: string, workspaceId: string, role: string): Promise<void> {
+  await admin`insert into member (organization_id, user_id, role, created_at) values (${workspaceId}, ${userId}, ${role}, now())`;
+  signedIn = { userId, workspaceId };
+}
+
+const formFor = (workspaceId: string, expectedVersion: number, intent: "save" | "restore", text = edited) => {
+  const form = new FormData();
+  form.set("workspaceId", workspaceId);
+  form.set("event", text.event);
+  form.set("expectedVersion", String(expectedVersion));
+  form.set("intent", intent);
+  form.set("subject", text.subject);
+  form.set("body", text.body);
+  return form;
+};
+
 const rowsOf = async (workspaceId: string) =>
   [...(await admin`select event, subject, body, version from email_template where workspace_id = ${workspaceId}`)];
 const auditOf = async (workspaceId: string) =>
@@ -61,7 +78,7 @@ describe("saveEmailTemplateAction", () => {
   it.each(["owner", "admin"])("%s: the first save creates the row, audited with the default before", async (role) => {
     const workspaceId = await newWorkspace();
     const actor = await signInAs(workspaceId, role);
-    const result = await saveEmailTemplateAction({ ...edited, expectedVersion: 0 });
+    const result = await saveEmailTemplateAction({ ...edited, workspaceId, expectedVersion: 0 });
     expect(result).toEqual({ ok: true, status: "DONE", data: { version: 1, isDefault: false } });
     // CRLF is stored as LF.
     const body = "Hi {{client_name}},\n\nPay here: {{invoice_link}}";
@@ -80,7 +97,7 @@ describe("saveEmailTemplateAction", () => {
   it("refuses Staff", async () => {
     const workspaceId = await newWorkspace();
     await signInAs(workspaceId, "staff");
-    expect(await saveEmailTemplateAction({ ...edited, expectedVersion: 0 })).toEqual({ ok: false, status: "FORBIDDEN" });
+    expect(await saveEmailTemplateAction({ ...edited, workspaceId, expectedVersion: 0 })).toEqual({ ok: false, status: "FORBIDDEN" });
     expect(await rowsOf(workspaceId)).toEqual([]);
   });
 
@@ -97,7 +114,7 @@ describe("saveEmailTemplateAction", () => {
   ])("refuses %s, writing nothing", async (_, change, fields) => {
     const workspaceId = await newWorkspace();
     await signInAs(workspaceId, "admin");
-    const result = await saveEmailTemplateAction({ ...edited, ...change, expectedVersion: 0 });
+    const result = await saveEmailTemplateAction({ ...edited, workspaceId, ...change, expectedVersion: 0 });
     expect(result).toMatchObject({ ok: false, status: "INVALID_INPUT", fields });
     expect(await rowsOf(workspaceId)).toEqual([]);
   });
@@ -105,10 +122,11 @@ describe("saveEmailTemplateAction", () => {
   it("refuses a stale version; restoring the default writes the default text, audited as restored", async () => {
     const workspaceId = await newWorkspace();
     await signInAs(workspaceId, "owner");
-    await saveEmailTemplateAction({ ...edited, expectedVersion: 0 });
-    expect(await saveEmailTemplateAction({ ...edited, subject: "Again", expectedVersion: 0 })).toEqual({ ok: false, status: "STALE_VERSION" });
+    await saveEmailTemplateAction({ ...edited, workspaceId, expectedVersion: 0 });
+    expect(await saveEmailTemplateAction({ ...edited, workspaceId, subject: "Again", expectedVersion: 0 })).toEqual({ ok: false, status: "STALE_VERSION" });
 
     const form = new FormData();
+    form.set("workspaceId", workspaceId);
     form.set("event", "invoice_sent");
     form.set("expectedVersion", "1");
     form.set("intent", "restore");
@@ -122,7 +140,7 @@ describe("saveEmailTemplateAction", () => {
   it("writes nothing for an unchanged save", async () => {
     const workspaceId = await newWorkspace();
     await signInAs(workspaceId, "admin");
-    const result = await saveEmailTemplateAction({ event: "quote_sent", subject: EMAIL_TEMPLATE_DEFAULTS.quote_sent.subject, body: EMAIL_TEMPLATE_DEFAULTS.quote_sent.body, expectedVersion: 0 });
+    const result = await saveEmailTemplateAction({ workspaceId, event: "quote_sent", subject: EMAIL_TEMPLATE_DEFAULTS.quote_sent.subject, body: EMAIL_TEMPLATE_DEFAULTS.quote_sent.body, expectedVersion: 0 });
     expect(result).toEqual({ ok: true, status: "DONE", data: { version: 0, isDefault: true } });
     expect(await rowsOf(workspaceId)).toEqual([]);
     expect(await auditOf(workspaceId)).toEqual([]);
@@ -133,5 +151,51 @@ describe("saveEmailTemplateAction", () => {
     await expect(
       admin`insert into email_template (workspace_id, event, subject, body) values (${workspaceId}, 'invoice_sent', ${"A\nB"}, 'x')`,
     ).rejects.toMatchObject({ code: "23514", constraint_name: "email_template_subject_line_check" });
+  });
+
+  // PR 76 Review R1 P0: a form rendered in workspace A, posted after the session switched to workspace B.
+  describe("a form rendered for another workspace", () => {
+    it("is refused at version 0 (neither workspace has saved the template), and neither workspace changes", async () => {
+      const first = await newWorkspace();
+      const second = await newWorkspace();
+      const userId = await signInAs(first, "owner");
+      await joinAndSwitch(userId, second, "owner");
+      expect(await saveEmailTemplateAction(null, formFor(first, 0, "save"))).toEqual({ ok: false, status: "WORKSPACE_CHANGED" });
+      expect(await saveEmailTemplateAction(null, formFor(first, 0, "restore"))).toEqual({ ok: false, status: "WORKSPACE_CHANGED" });
+      for (const workspaceId of [first, second]) {
+        expect(await rowsOf(workspaceId)).toEqual([]);
+        expect(await auditOf(workspaceId)).toEqual([]);
+      }
+    });
+
+    it("is refused when both workspaces are at the same saved version, and neither row or audit history changes", async () => {
+      const first = await newWorkspace();
+      const second = await newWorkspace();
+      const userId = await signInAs(first, "admin");
+      const own = { ...edited, subject: "First {{invoice_number}}" };
+      expect(await saveEmailTemplateAction(null, formFor(first, 0, "save", own))).toMatchObject({ ok: true, data: { version: 1 } });
+      await joinAndSwitch(userId, second, "admin");
+      expect(await saveEmailTemplateAction(null, formFor(second, 0, "save"))).toMatchObject({ ok: true, data: { version: 1 } });
+      const before = { first: [await rowsOf(first), await auditOf(first)], second: [await rowsOf(second), await auditOf(second)] };
+
+      // The session is in the second workspace; the form was rendered for the first, at the matching version 1.
+      const stale = { ...edited, subject: "Leaked {{invoice_number}}" };
+      expect(await saveEmailTemplateAction(null, formFor(first, 1, "save", stale))).toEqual({ ok: false, status: "WORKSPACE_CHANGED" });
+      expect(await saveEmailTemplateAction(null, formFor(first, 1, "restore"))).toEqual({ ok: false, status: "WORKSPACE_CHANGED" });
+      expect({ first: [await rowsOf(first), await auditOf(first)], second: [await rowsOf(second), await auditOf(second)] }).toEqual(before);
+    });
+
+    it("saves and restores in the workspace it was rendered for", async () => {
+      const first = await newWorkspace();
+      const second = await newWorkspace();
+      const userId = await signInAs(second, "owner");
+      await joinAndSwitch(userId, first, "owner");
+      expect(await saveEmailTemplateAction(null, formFor(first, 0, "save"))).toEqual({ ok: true, status: "DONE", data: { version: 1, isDefault: false } });
+      expect(await saveEmailTemplateAction(null, formFor(first, 1, "restore"))).toEqual({ ok: true, status: "DONE", data: { version: 2, isDefault: true } });
+      expect(await rowsOf(first)).toEqual([{ event: "invoice_sent", subject: DEFAULT.subject, body: DEFAULT.body, version: 2 }]);
+      expect((await auditOf(first)).map((entry) => entry.action)).toEqual(["email_template.updated", "email_template.restored"]);
+      expect(await rowsOf(second)).toEqual([]);
+      expect(await auditOf(second)).toEqual([]);
+    });
   });
 });

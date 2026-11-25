@@ -30,6 +30,7 @@ import {
   TEMPLATE_STALE,
   TEMPLATE_SUBJECT,
   TEMPLATE_SUBJECT_INVALID,
+  TEMPLATE_WORKSPACE_CHANGED,
   TEMPLATES_FORBIDDEN,
   unknownFieldsMessage,
 } from "@/lib/auth/messages";
@@ -48,12 +49,15 @@ export interface TemplateValues {
 
 interface FormProps {
   action: FormAction;
+  // The workspace the template was read from; the action refuses the post if the session has since switched.
+  workspaceId: string;
   template: TemplateValues;
 }
 
 const REFUSALS: Partial<Record<string, string>> = {
   INVALID_INPUT: TEMPLATE_INVALID,
   STALE_VERSION: TEMPLATE_STALE,
+  WORKSPACE_CHANGED: TEMPLATE_WORKSPACE_CHANGED,
   FORBIDDEN: TEMPLATES_FORBIDDEN,
 };
 
@@ -164,7 +168,7 @@ function Editor({ template, refused }: { template: TemplateValues; refused: { fi
   );
 }
 
-function TemplateFields({ action, template, unreachable }: FormProps & { unreachable: boolean }) {
+function TemplateFields({ action, workspaceId, template, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
   const router = useRouter();
   const button = useRef<HTMLButtonElement>(null);
@@ -188,6 +192,7 @@ function TemplateFields({ action, template, unreachable }: FormProps & { unreach
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="flex min-w-0 flex-col gap-6">
+      <input type="hidden" name="workspaceId" value={workspaceId} />
       <input type="hidden" name="event" value={template.event} />
       <input type="hidden" name="expectedVersion" value={version} />
       <Editor key={template.version} template={template} refused={refused} />

@@ -322,6 +322,8 @@ export const TEMPLATE_INVALID = "Check the fields marked below, then try again."
 export const TEMPLATE_SUBJECT_INVALID = `Enter a subject of one line and at most ${EMAIL_TEMPLATE_SUBJECT_MAX_LENGTH} characters, without special formatting characters.`;
 export const TEMPLATE_BODY_INVALID = `Enter a message of at most ${EMAIL_TEMPLATE_BODY_MAX_LENGTH} characters, without special formatting characters.`;
 export const TEMPLATE_STALE = "Someone else changed this template after this page loaded. Reload the page, then save again.";
+export const TEMPLATE_WORKSPACE_CHANGED =
+  "This page was opened in another workspace, so nothing was saved. Reload the page to edit this workspace's templates.";
 export const TEMPLATE_FAILED = "We couldn't save the template. Try again.";
 export const TEMPLATE_PREVIEW = "Preview";
 export const TEMPLATE_PREVIEW_HINT = "With sample data. Nothing is sent.";

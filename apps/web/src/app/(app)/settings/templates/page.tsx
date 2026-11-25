@@ -12,14 +12,14 @@ import { TemplateForm } from "./template-form";
 
 export const metadata: Metadata = { title: "Email templates · CRM" };
 
-type Loaded = { kind: "forbidden" } | { kind: "ready"; template: EmailTemplateText };
+type Loaded = { kind: "forbidden" } | { kind: "ready"; workspaceId: string; template: EmailTemplateText };
 
 // Admin and Owner (spec line 792). Staff see the refusal instead of the form; each action checks the role again
 // (AUTH-02). An event the workspace has not saved shows its default text (core, Q23).
 async function load(event: EmailEvent): Promise<Loaded> {
   try {
     const { workspaceId } = await requireWorkspaceMember("admin");
-    return await withWorkspace(workspaceId, async (tx): Promise<Loaded> => ({ kind: "ready", template: await getEmailTemplate(tx, event) }));
+    return await withWorkspace(workspaceId, async (tx): Promise<Loaded> => ({ kind: "ready", workspaceId, template: await getEmailTemplate(tx, event) }));
   } catch (error) {
     if (!(error instanceof ActionRefusedError)) throw error;
     if (error.status === "UNAUTHENTICATED") redirect("/sign-in");
@@ -69,7 +69,13 @@ export default async function EmailTemplatesPage({ searchParams }: { searchParam
             <h2 id="template-heading" className="text-lg font-semibold">
               {TEMPLATE_EVENT_LABELS[event]}
             </h2>
-            <TemplateForm key={event} action={saveEmailTemplateAction} template={loaded.template} />
+            {/* Keyed by workspace and event: a workspace switch starts a fresh editor, never one holding another workspace's draft. */}
+            <TemplateForm
+              key={`${loaded.workspaceId}:${event}`}
+              action={saveEmailTemplateAction}
+              workspaceId={loaded.workspaceId}
+              template={loaded.template}
+            />
           </section>
         </div>
       )}
