@@ -1,4 +1,4 @@
-# Handoff — 2026-11-25 · PR 76 merged (0b7a04c) and logged; Phase 2 plan PRs all merged; next: workspace-binding fix PR
+# Handoff — 2026-11-25 · `build`: workspace-binding fix, Opus sub-agent in worktree build-fix-settings-workspace-binding (not pushed)
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -7,7 +7,7 @@
 
 ## 0. Active target
 - Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: none (nothing open)
-- Working folder: repo root (`/Users/charlie/Documents/Projects/Personal/CRM`, branch `main`). No build worktree. Log worktree: `.agent/worktrees/agent-logs`.
+- Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-fix-settings-workspace-binding` (branch `fix/settings-workspace-binding` from 0b7a04c). Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
 - Branch: `main` = `0b7a04c` (equal to origin/main). Open PRs: 0. Repo `mortarhaus/CRM` is PRIVATE (standing rule: public while a PR needs CI, private after merge).
@@ -38,7 +38,7 @@ agent-logs worktree at `1ce4ba0` plus the handoff-copy commit, clean.
 2026-11-25: PR 75 (8a) and PR 76 (8b) reviewed, approved, receipted, merged and logged; local branches and build worktrees removed (backup branch `feat/p2-email-templates` at `ebb723a` kept); repo private; artifact republished.
 
 ## 5. Next step (file-level)
-1. `build` the workspace-binding fix PR (security, deep tier: Opus sub-agent): shared fix in `action()` so every settings form is bound to the workspace it was rendered for (brand colour, general, logo, bank details, payment QR, numbering, onboarding, catalog create; check catalog update/archive), reuse `WORKSPACE_CHANGED` from PR 76; check catalog echo of free text; add to `docs/DECISIONS.md` the three 2026-11-25 approvals (8b size 487, no-JS draft loss, this follow-up). Tests: two-workspace real-action cases per form. Full rule-by-rule self-check table with A11Y rows. Keep under 400 lines or ask.
+1. IN PROGRESS (sub-agent started 2026-11-25; next: check its report, push, make repo public, open PR, Charlie `review N`): the workspace-binding fix PR (security, deep tier: Opus sub-agent): shared fix in `action()` so every settings form is bound to the workspace it was rendered for (brand colour, general, logo, bank details, payment QR, numbering, onboarding, catalog create; check catalog update/archive), reuse `WORKSPACE_CHANGED` from PR 76; check catalog echo of free text; add to `docs/DECISIONS.md` the three 2026-11-25 approvals (8b size 487, no-JS draft loss, this follow-up). Tests: two-workspace real-action cases per form. Full rule-by-rule self-check table with A11Y rows. Keep under 400 lines or ask.
 2. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
 3. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
 
