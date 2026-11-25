@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import {
+  TEMPLATE_DRAFT_NOT_KEPT,
   TEMPLATE_INVALID,
   TEMPLATE_IS_DEFAULT,
   TEMPLATE_MALFORMED_PLACEHOLDER,
@@ -7,6 +8,7 @@ import {
   TEMPLATE_RESTORED,
   TEMPLATE_SAVE,
   TEMPLATE_SAVED,
+  TEMPLATE_SUBJECT_REFUSED,
   TEMPLATES_FORBIDDEN,
   unknownFieldsMessage,
 } from "../src/lib/auth/messages";
@@ -38,6 +40,7 @@ async function newOwner(page: Page): Promise<string> {
   return email;
 }
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const main = (page: Page) => page.getByRole("main");
 const preview = (page: Page) => main(page).getByRole("region", { name: "Preview" });
 
@@ -104,14 +107,19 @@ test("Staff get the refusal, not the templates, and no Templates link", async ({
 test.describe("without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
 
-  test("a refused template comes back as typed with its reason; the fixed post saves", async ({ page }, testInfo) => {
+  // The refusal carries no posted text (PR 76 Review R1), so the page shows the saved text again, says the change was
+  // not kept and gives the field's rule; the corrected post saves.
+  test("a refused template names the field and says the draft was not kept; the corrected post saves", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "the form is the same at every width; run once to keep the suite short");
     await newOwner(page);
     await page.goto("/settings/templates?event=quote_sent");
-    await page.getByLabel("Subject").fill("Quote {{quote_no}}");
+    await page.getByLabel("Subject").fill("Quote {{quote_no}} for aisha.private@example.test");
     await page.getByRole("button", { name: TEMPLATE_SAVE }).click();
-    await expect(page.getByLabel("Subject")).toHaveValue("Quote {{quote_no}}");
-    await expect(main(page).getByText(unknownFieldsMessage(["quote_no"])).first()).toBeVisible();
+    await expect(main(page).getByRole("alert")).toHaveText(`${TEMPLATE_INVALID} ${TEMPLATE_DRAFT_NOT_KEPT}`);
+    await expect(page.getByLabel("Subject")).toHaveValue("Quote {{quote_number}} from {{workspace_name}}");
+    await expect(page.getByLabel("Subject")).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByLabel("Subject")).toHaveAccessibleDescription(new RegExp(escapeRegExp(TEMPLATE_SUBJECT_REFUSED)));
+    await expect(main(page)).not.toContainText("aisha.private@example.test");
     await page.getByLabel("Subject").fill("Quote {{quote_number}}");
     await page.getByRole("button", { name: TEMPLATE_SAVE }).click();
     await expect(main(page).getByRole("status")).toHaveText(TEMPLATE_SAVED);

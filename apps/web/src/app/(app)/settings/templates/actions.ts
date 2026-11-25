@@ -5,7 +5,7 @@ import { EMAIL_EVENTS, EMAIL_TEMPLATE_DEFAULTS, isEmailEvent, templateProblems }
 import { z } from "zod";
 import { saveEmailTemplate, StaleTemplateError } from "@/db/templates/email-templates";
 import { ActionRefusedError, action } from "@/lib/auth/action";
-import { echoFields, multilineText, requiredText } from "@/lib/settings-input";
+import { multilineText, requiredText } from "@/lib/settings-input";
 
 // 0: the workspace has no row for the event yet (it shows the default).
 const expectedVersion = z.int().nonnegative();
@@ -52,8 +52,8 @@ export const saveEmailTemplateAction = action({
       body: restore ? EMAIL_TEMPLATE_DEFAULTS[event].body : form.get("body"),
     };
   },
-  // Workspace template text, neither personal data nor a secret.
-  echo: (form) => echoFields(form, ["subject", "body"]),
+  // No echo: a subject or message can hold personal data (a direct contact address), so a refusal returns the field
+  // paths only (PR 76 Review R1). With JavaScript the draft stays in the editor; without it the page says it was not kept.
   idempotent: false,
   // A form rendered for workspace A and posted after the session switched to B is refused before any write: the
   // versions alone cannot tell them apart (both are 0 for a template neither has saved). The write still goes to the

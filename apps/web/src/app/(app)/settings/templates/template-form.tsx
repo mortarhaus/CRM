@@ -12,6 +12,8 @@ import type { ActionResult } from "@/lib/auth/action";
 import {
   TEMPLATE_BODY,
   TEMPLATE_BODY_INVALID,
+  TEMPLATE_BODY_REFUSED,
+  TEMPLATE_DRAFT_NOT_KEPT,
   TEMPLATE_FAILED,
   TEMPLATE_FIELDS_HINT,
   TEMPLATE_INVALID,
@@ -30,6 +32,7 @@ import {
   TEMPLATE_STALE,
   TEMPLATE_SUBJECT,
   TEMPLATE_SUBJECT_INVALID,
+  TEMPLATE_SUBJECT_REFUSED,
   TEMPLATE_WORKSPACE_CHANGED,
   TEMPLATES_FORBIDDEN,
   unknownFieldsMessage,
@@ -107,16 +110,20 @@ function placeholderReason(problems: TemplateProblem[]): string | undefined {
   return problems.some((problem) => problem.kind === "malformed_placeholder") ? TEMPLATE_MALFORMED_PLACEHOLDER : undefined;
 }
 
+type Posted = { subject: string; body: string };
+
 // The subject, the message and their preview. Keyed by the stored version, so a save or a restore shows the stored
-// text; a refusal keeps what was typed (without JavaScript, what the action echoed).
-function Editor({ template, refused }: { template: TemplateValues; refused: { fields: string[]; echo?: Record<string, string> } | null }) {
-  const [subject, setSubject] = useState(refused?.echo?.subject ?? template.subject);
-  const [body, setBody] = useState(refused?.echo?.body ?? template.body);
+// text; a refusal keeps what was typed, in this component's state. The action echoes no text (a template can hold
+// personal data), so without JavaScript a refused page shows the stored text again and says so.
+function Editor({ template, refused, posted }: { template: TemplateValues; refused: { fields: string[] } | null; posted: Posted | null }) {
+  const [subject, setSubject] = useState(template.subject);
+  const [body, setBody] = useState(template.body);
   const fields = EMAIL_TEMPLATE_DEFAULTS[template.event].fields;
-  // Why the posted text was refused (the action echoes what it was given), whatever has been typed since.
+  // Why the posted text was refused, from the copy kept in the browser when it was posted, whatever has been typed
+  // since. Without that copy (no JavaScript), the general rule for the field.
   const fieldError = (part: Part) => {
     if (!refused?.fields.includes(part)) return undefined;
-    const posted = { subject: refused.echo?.subject ?? subject, body: refused.echo?.body ?? body };
+    if (posted === null) return part === "subject" ? TEMPLATE_SUBJECT_REFUSED : TEMPLATE_BODY_REFUSED;
     const reason = placeholderReason(templateProblems(posted, fields).filter((problem) => "part" in problem && problem.part === part));
     return reason ?? (part === "subject" ? TEMPLATE_SUBJECT_INVALID : TEMPLATE_BODY_INVALID);
   };
@@ -182,11 +189,15 @@ function TemplateFields({ action, workspaceId, template, unreachable }: FormProp
   const error = result?.ok === false ? (REFUSALS[result.status] ?? TEMPLATE_FAILED) : unreachable ? TEMPLATE_FAILED : null;
   const refused = result?.ok === false && result.status === "INVALID_INPUT" ? result : null;
   const version = result?.ok ? Math.max(result.data.version, template.version) : template.version;
+  // What this browser posted, so a refusal can say why without the action sending the text back. Null when the page
+  // was rendered from a post made without JavaScript.
+  const [posted, setPosted] = useState<Posted | null>(null);
 
   // The button that posted names the intent (save, or restore the default).
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget, (event.nativeEvent as SubmitEvent).submitter);
+    setPosted({ subject: String(form.get("subject") ?? ""), body: String(form.get("body") ?? "") });
     startTransition(() => formAction(form));
   }
 
@@ -195,10 +206,11 @@ function TemplateFields({ action, workspaceId, template, unreachable }: FormProp
       <input type="hidden" name="workspaceId" value={workspaceId} />
       <input type="hidden" name="event" value={template.event} />
       <input type="hidden" name="expectedVersion" value={version} />
-      <Editor key={template.version} template={template} refused={refused} />
+      <Editor key={template.version} template={template} refused={refused} posted={posted} />
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
+          {refused && posted === null && ` ${TEMPLATE_DRAFT_NOT_KEPT}`}
         </p>
       )}
       {result?.ok && (

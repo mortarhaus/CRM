@@ -119,6 +119,19 @@ describe("saveEmailTemplateAction", () => {
     expect(await rowsOf(workspaceId)).toEqual([]);
   });
 
+  // PR 76 Review R1 P1: a refusal returns field paths only, never the posted text (which can hold personal data).
+  it("refuses an invalid subject and body posted as a form with field errors and none of the posted text", async () => {
+    const workspaceId = await newWorkspace();
+    await signInAs(workspaceId, "admin");
+    const address = `aisha.private-${randomUUID()}@example.test`;
+    const text = { event: "invoice_sent", subject: `Call ${address} {{nope}}`, body: `Direct line ${address} {{client_name` };
+    const result = await saveEmailTemplateAction(null, formFor(workspaceId, 0, "save", text));
+    expect(result).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["subject", "body"] });
+    expect(JSON.stringify(result)).not.toContain(address);
+    expect(JSON.stringify(result)).not.toContain("Direct line");
+    expect(await rowsOf(workspaceId)).toEqual([]);
+  });
+
   it("refuses a stale version; restoring the default writes the default text, audited as restored", async () => {
     const workspaceId = await newWorkspace();
     await signInAs(workspaceId, "owner");

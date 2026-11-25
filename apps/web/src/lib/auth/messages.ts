@@ -321,6 +321,10 @@ export const TEMPLATE_RESTORED = "Default text restored.";
 export const TEMPLATE_INVALID = "Check the fields marked below, then try again.";
 export const TEMPLATE_SUBJECT_INVALID = `Enter a subject of one line and at most ${EMAIL_TEMPLATE_SUBJECT_MAX_LENGTH} characters, without special formatting characters.`;
 export const TEMPLATE_BODY_INVALID = `Enter a message of at most ${EMAIL_TEMPLATE_BODY_MAX_LENGTH} characters, without special formatting characters.`;
+// Without JavaScript the refusal carries no text (a template can hold personal data), so the reason is the field's rule.
+export const TEMPLATE_SUBJECT_REFUSED = `This subject was not saved. Use one line of at most ${EMAIL_TEMPLATE_SUBJECT_MAX_LENGTH} characters, and only the fields listed above, each written as {{field_name}}.`;
+export const TEMPLATE_BODY_REFUSED = `This message was not saved. Use at most ${EMAIL_TEMPLATE_BODY_MAX_LENGTH} characters, and only the fields listed above, each written as {{field_name}}.`;
+export const TEMPLATE_DRAFT_NOT_KEPT = "Your changes were not kept: the subject and message below are the saved text. Make your change again, then save.";
 export const TEMPLATE_STALE = "Someone else changed this template after this page loaded. Reload the page, then save again.";
 export const TEMPLATE_WORKSPACE_CHANGED =
   "This page was opened in another workspace, so nothing was saved. Reload the page to edit this workspace's templates.";
