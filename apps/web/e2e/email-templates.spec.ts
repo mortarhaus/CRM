@@ -8,12 +8,13 @@ import {
   TEMPLATE_RESTORED,
   TEMPLATE_SAVE,
   TEMPLATE_SAVED,
+  TEMPLATE_STALE,
   TEMPLATE_SUBJECT_REFUSED,
   TEMPLATES_FORBIDDEN,
   TEMPLATES_INTRO,
   unknownFieldsMessage,
 } from "../src/lib/auth/messages";
-import { expectAccessible } from "./a11y";
+import { expectAccessible, expectVisibleFocus, tabTo } from "./a11y";
 import { expect, test } from "./fixtures";
 import { createWorkspace, openShellMenu, respectRateLimit, setMemberRole, signIn, signUp, uniqueEmail } from "./helpers";
 
@@ -95,6 +96,76 @@ test("an Owner previews, edits, is refused an unknown field, saves and restores 
   // Saved text is not sent yet, the owner email included (PR 76 Review R1 P2).
   await expect(main(page).getByText(TEMPLATES_INTRO)).toBeVisible();
   await expectAccessible(page, "/settings/templates, owner notification");
+});
+
+// PR 76 Review R1 P1 (A11Y-01, A11Y-03, A11Y-06): the editor by keyboard alone, at every width. Each Tab on the way
+// must show focus (tabTo). After a post, focus returns to Save and the outcome is announced (role alert or status).
+test("by keyboard: choose an email, edit, a refusal, save, a stale save, restore", async ({ page }) => {
+  await newOwner(page);
+  await page.goto("/settings/templates");
+  const subject = page.getByLabel("Subject");
+  const save = page.getByRole("button", { name: TEMPLATE_SAVE });
+  const toSubjectFromSave = async () => {
+    // Back past the message to the subject.
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Shift+Tab");
+    await expectVisibleFocus(subject);
+  };
+  const retype = async (text: string) => {
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.type(text);
+  };
+
+  await tabTo(page, page.getByRole("link", { name: "Quote sent" }));
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\?event=quote_sent$/);
+  await expect(page.getByRole("link", { name: "Quote sent" })).toHaveAttribute("aria-current", "page");
+
+  // A refusal: the reason is announced and linked to the field, the draft stays, focus is back on Save.
+  await tabTo(page, subject);
+  await retype("Quote {{quote_no}}");
+  await tabTo(page, save);
+  await page.keyboard.press("Enter");
+  await expect(main(page).getByRole("alert")).toHaveText(TEMPLATE_INVALID);
+  await expect(save).toBeFocused();
+  await expect(subject).toHaveValue("Quote {{quote_no}}");
+  await expect(subject).toHaveAttribute("aria-invalid", "true");
+  await expect(subject).toHaveAccessibleDescription(new RegExp("\\{\\{quote_no\\}\\} is not a field"));
+
+  // The corrected text saves with Space on Save.
+  await toSubjectFromSave();
+  await retype("Quote {{quote_number}} is ready");
+  await tabTo(page, save);
+  await page.keyboard.press("Space");
+  await expect(main(page).getByRole("status")).toHaveText(TEMPLATE_SAVED);
+  await expect(save).toBeFocused();
+  await expect(subject).not.toHaveAttribute("aria-invalid");
+
+  // Someone else saves the same template in another tab; this tab's save is refused as stale, focus back on Save.
+  const other = await page.context().newPage();
+  await other.goto("/settings/templates?event=quote_sent");
+  await other.getByLabel("Subject").fill("Quote {{quote_number}} from the other tab");
+  await other.getByRole("button", { name: TEMPLATE_SAVE }).click();
+  await expect(other.getByRole("main").getByRole("status")).toHaveText(TEMPLATE_SAVED);
+  await other.close();
+  await toSubjectFromSave();
+  await retype("Quote {{quote_number}} from this tab");
+  await tabTo(page, save);
+  await page.keyboard.press("Enter");
+  await expect(main(page).getByRole("alert")).toHaveText(TEMPLATE_STALE);
+  await expect(save).toBeFocused();
+  await expectAccessible(page, "/settings/templates, stale");
+
+  // After a reload, restore the default by keyboard.
+  await page.reload();
+  await expect(subject).toHaveValue("Quote {{quote_number}} from the other tab");
+  // Through the email links (the current one first), then on to Restore: the tab order follows the page.
+  await tabTo(page, page.getByRole("link", { name: "Quote sent" }));
+  await tabTo(page, page.getByRole("button", { name: TEMPLATE_RESTORE }));
+  await page.keyboard.press("Enter");
+  await expect(main(page).getByRole("status")).toHaveText(TEMPLATE_RESTORED);
+  await expect(save).toBeFocused();
+  await expect(subject).toHaveValue("Quote {{quote_number}} from {{workspace_name}}");
 });
 
 test("Staff get the refusal, not the templates, and no Templates link", async ({ page }) => {
