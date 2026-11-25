@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import {
   TEMPLATE_INVALID,
   TEMPLATE_IS_DEFAULT,
+  TEMPLATE_MALFORMED_PLACEHOLDER,
   TEMPLATE_RESTORE,
   TEMPLATE_RESTORED,
   TEMPLATE_SAVE,
@@ -61,6 +62,10 @@ test("an Owner previews, edits, is refused an unknown field, saves and restores 
   await expect(main(page).getByRole("alert")).toHaveText(TEMPLATE_INVALID);
   await expect(page.getByLabel("Message")).toHaveAccessibleDescription(new RegExp("\\{\\{password\\}\\} is not a field"));
   await expectAccessible(page, "/settings/templates, refused");
+
+  // An unclosed field: no preview, never a half-filled one.
+  await page.getByLabel("Message").fill("Hi {{client_name");
+  await expect(preview(page)).toContainText(TEMPLATE_MALFORMED_PLACEHOLDER);
 
   // A value that looks like markup is shown as text in the preview.
   await page.getByLabel("Subject").fill("<b>Invoice</b> {{invoice_number}}");

@@ -1,6 +1,6 @@
 "use client";
 
-import { EMAIL_TEMPLATE_DEFAULTS, type EmailEvent, renderParts, templateProblems } from "@crm/core/templates";
+import { EMAIL_TEMPLATE_DEFAULTS, type EmailEvent, renderParts, type TemplateProblem, templateProblems } from "@crm/core/templates";
 import { redirect, useRouter } from "next/navigation";
 import { type FormEvent, startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
@@ -16,6 +16,7 @@ import {
   TEMPLATE_FIELDS_HINT,
   TEMPLATE_INVALID,
   TEMPLATE_IS_DEFAULT,
+  TEMPLATE_MALFORMED_PLACEHOLDER,
   TEMPLATE_NO_PREVIEW,
   TEMPLATE_PREVIEW,
   TEMPLATE_PREVIEW_HINT,
@@ -57,11 +58,11 @@ const REFUSALS: Partial<Record<string, string>> = {
 };
 
 // The typed template filled with sample data by the same single pass a send will run (renderParts; every field has a
-// sample, so only an unknown field stops it); React escapes every part. Watermarked "Preview", never stored or sent
+// sample, so only an unknown field or malformed placeholder syntax stops it); React escapes every part. Watermarked "Preview", never stored or sent
 // (REC-12).
 function Preview({ event, subject, body }: { event: EmailEvent; subject: string; body: string }) {
   const fields = EMAIL_TEMPLATE_DEFAULTS[event].fields;
-  const unknown = templateProblems({ subject, body }, fields).flatMap((problem) => (problem.kind === "unknown_field" ? [problem.field] : []));
+  const reason = placeholderReason(templateProblems({ subject, body }, fields));
   const fill = (text: string) =>
     renderParts(text, TEMPLATE_SAMPLE_VALUES, fields)
       .map((part) => part.text)
@@ -79,14 +80,14 @@ function Preview({ event, subject, body }: { event: EmailEvent; subject: string;
         </h3>
         <p className="text-sm text-muted-foreground">{TEMPLATE_PREVIEW_HINT}</p>
       </div>
-      {unknown.length === 0 ? (
+      {reason === undefined ? (
         <div className="flex flex-col gap-3 text-sm break-words">
           <p className="font-semibold">{fill(subject)}</p>
           <p className="whitespace-pre-wrap">{fill(body)}</p>
         </div>
       ) : (
         <p className="text-sm text-destructive">
-          {TEMPLATE_NO_PREVIEW}: {unknownFieldsMessage([...new Set(unknown)])}
+          {TEMPLATE_NO_PREVIEW}: {reason}
         </p>
       )}
     </section>
@@ -94,6 +95,13 @@ function Preview({ event, subject, body }: { event: EmailEvent; subject: string;
 }
 
 type Part = "subject" | "body";
+
+// Why the placeholders of a text cannot be filled (unknown fields first), or undefined when they can.
+function placeholderReason(problems: TemplateProblem[]): string | undefined {
+  const unknown = problems.flatMap((problem) => (problem.kind === "unknown_field" ? [problem.field] : []));
+  if (unknown.length > 0) return unknownFieldsMessage([...new Set(unknown)]);
+  return problems.some((problem) => problem.kind === "malformed_placeholder") ? TEMPLATE_MALFORMED_PLACEHOLDER : undefined;
+}
 
 // The subject, the message and their preview. Keyed by the stored version, so a save or a restore shows the stored
 // text; a refusal keeps what was typed (without JavaScript, what the action echoed).
@@ -105,10 +113,8 @@ function Editor({ template, refused }: { template: TemplateValues; refused: { fi
   const fieldError = (part: Part) => {
     if (!refused?.fields.includes(part)) return undefined;
     const posted = { subject: refused.echo?.subject ?? subject, body: refused.echo?.body ?? body };
-    const unknown = templateProblems(posted, fields).flatMap((problem) =>
-      problem.kind === "unknown_field" && problem.part === part ? [problem.field] : [],
-    );
-    return unknown.length > 0 ? unknownFieldsMessage([...new Set(unknown)]) : part === "subject" ? TEMPLATE_SUBJECT_INVALID : TEMPLATE_BODY_INVALID;
+    const reason = placeholderReason(templateProblems(posted, fields).filter((problem) => "part" in problem && problem.part === part));
+    return reason ?? (part === "subject" ? TEMPLATE_SUBJECT_INVALID : TEMPLATE_BODY_INVALID);
   };
   const describedBy = (part: Part) => ["template-fields-hint", fieldError(part) && `template-${part}-error`].filter(Boolean).join(" ");
 

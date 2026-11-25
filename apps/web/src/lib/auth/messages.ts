@@ -326,6 +326,8 @@ export const TEMPLATE_FAILED = "We couldn't save the template. Try again.";
 export const TEMPLATE_PREVIEW = "Preview";
 export const TEMPLATE_PREVIEW_HINT = "With sample data. Nothing is sent.";
 export const TEMPLATE_NO_PREVIEW = "No preview";
+export const TEMPLATE_MALFORMED_PLACEHOLDER =
+  "Write each field as {{field_name}}, with two braces on each side. Check for a missing, extra or nested brace.";
 export const unknownFieldsMessage = (fields: readonly string[]) =>
   `${fields.map((field) => `{{${field}}}`).join(", ")} ${fields.length === 1 ? "is not a field" : "are not fields"} of this email. Use only the fields listed above.`;
 // Sample values for the preview (REC-12: watermarked, never stored or sent). Dates as the MY default, dd-mmm-yyyy.

@@ -22,7 +22,7 @@ const saveInput = z
   })
   .superRefine((value, context) => {
     for (const problem of templateProblems(value, EMAIL_TEMPLATE_DEFAULTS[value.event].fields)) {
-      context.addIssue({ code: "custom", path: [problem.kind === "unknown_field" ? problem.part : "subject"], message: problem.kind });
+      context.addIssue({ code: "custom", path: ["part" in problem ? problem.part : "subject"], message: problem.kind });
     }
   });
 
@@ -32,7 +32,7 @@ const stale = (error: unknown): never => {
 };
 
 // Email templates are Admin and Owner (spec line 788, "email settings"); Staff are refused with FORBIDDEN. Each change
-// is audited with the text before and after (email-templates.ts). Nothing sends from a template in Phase 2 (Q23).
+// is audited by event, version and the parts changed, never the text (email-templates.ts). Nothing sends from a template in Phase 2 (Q23).
 export const saveEmailTemplateAction = action({
   name: "settings.email_template.update",
   minRole: "admin",

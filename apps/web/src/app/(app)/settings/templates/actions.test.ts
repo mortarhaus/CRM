@@ -70,8 +70,9 @@ describe("saveEmailTemplateAction", () => {
       {
         action: "email_template.updated",
         actor_user_id: actor,
-        before: { event: "invoice_sent", subject: DEFAULT.subject, body: DEFAULT.body, version: 0 },
-        after: { event: "invoice_sent", subject: edited.subject, body, version: 1 },
+        // The change, not the text (PR 8a Review R1).
+        before: { event: "invoice_sent", version: 0, isDefault: true },
+        after: { event: "invoice_sent", version: 1, isDefault: false, changed: ["subject", "body"] },
       },
     ]);
   });
@@ -87,6 +88,8 @@ describe("saveEmailTemplateAction", () => {
     ["an unknown field in the body", { body: "Hi {{client_name}} {{password}}" }, ["body"]],
     ["a field of another event", { subject: "Quote {{quote_number}}" }, ["subject"]],
     ["a malformed field", { body: "Hi {{Client Name}}" }, ["body"]],
+    ["an unclosed field in the body", { body: "Hi {{client_name" }, ["body"]],
+    ["a nested field in the subject", { subject: "{{x {{invoice_number}} }}" }, ["subject"]],
     ["a line break in the subject", { subject: "Invoice\r\nBcc: x@example.test" }, ["subject"]],
     ["an empty body", { body: "  " }, ["body"]],
     ["an unknown event", { event: "invoice_paid" }, ["event"]],
