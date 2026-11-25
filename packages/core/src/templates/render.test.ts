@@ -27,10 +27,12 @@ describe("render (FILE-05, FILE-06; plan Task 24)", () => {
   });
 
   it("keeps text that is not a placeholder as written, and names the parts", () => {
-    expect(renderParts("{{X}} {x} {{client_name}}", { client_name: "A" }, ALLOWED)).toEqual([
-      { field: null, text: "{{X}} {x} " },
+    expect(renderParts("{X} {x} {{client_name}}", { client_name: "A" }, ALLOWED)).toEqual([
+      { field: null, text: "{X} {x} " },
       { field: "client_name", text: "A" },
     ]);
+    // {{X}} is not a field name: refused at save, and not rendered as text either.
+    expect(() => renderParts("{{X}}", {}, ALLOWED)).toThrow(TemplateFieldError);
   });
 });
 
@@ -44,6 +46,32 @@ describe("templateProblems (refused at save time)", () => {
 
   it.each(["A\r\nBcc: x@example.test", "A\nB", "A\rB"])("refuses a line break in the subject: %j", (subject) => {
     expect(templateProblems({ subject, body: "fine" }, ALLOWED)).toEqual([{ kind: "subject_line_break" }]);
+  });
+
+  // Review R1 (PR #75): unclosed and nested placeholders were accepted, and the renderer half-expanded the nested one.
+  it.each(["subject", "body"] as const)("refuses an unclosed placeholder in the %s", (part) => {
+    const template = { subject: "Hi", body: "Hi", [part]: "From {{workspace_name" };
+    expect(templateProblems(template, ["workspace_name"])).toEqual([{ kind: "malformed_placeholder", part, text: "{{" }]);
+    expect(() => renderParts(template[part], { workspace_name: "Studio" }, ["workspace_name"])).toThrow(TemplateFieldError);
+  });
+
+  it.each(["subject", "body"] as const)("refuses a nested placeholder in the %s, and renders none of it", (part) => {
+    const template = { subject: "Hi", body: "Hi", [part]: "{{misspelled {{workspace_name}} }}" };
+    expect(templateProblems(template, ["workspace_name"])).toEqual([
+      { kind: "malformed_placeholder", part, text: "{{" },
+      { kind: "malformed_placeholder", part, text: "}}" },
+    ]);
+    expect(() => renderParts(template[part], { workspace_name: "Studio" }, ["workspace_name"])).toThrow(TemplateFieldError);
+  });
+
+  it.each(["}} after", "{{{client_name}}}"])("refuses stray double braces: %j", (subject) => {
+    expect(templateProblems({ subject, body: "fine" }, ALLOWED)).toContainEqual(expect.objectContaining({ kind: "malformed_placeholder", part: "subject" }));
+  });
+
+  it("keeps single braces as text, and substitutes fields next to them", () => {
+    const template = "Price {in MYR} {x}: {{client_name}}{{x}} {a}b}";
+    expect(templateProblems({ subject: template, body: template }, ALLOWED)).toEqual([]);
+    expect(render(template, { client_name: "A", x: "B" }, ALLOWED)).toBe("Price {in MYR} {x}: AB {a}b}");
   });
 
   it("accepts a body over several lines", () => {
@@ -68,6 +96,9 @@ describe("the Q23 defaults", () => {
   it.each(EMAIL_EVENTS)("%s: its default uses only its own fields and saves as it is", (event) => {
     const { fields, subject, body } = EMAIL_TEMPLATE_DEFAULTS[event];
     expect(templateProblems({ subject, body }, fields)).toEqual([]);
+    // And it renders through the same tokens, every placeholder filled.
+    const values = Object.fromEntries(fields.map((field) => [field, "value"]));
+    expect(render(body, values, fields)).not.toMatch(/\{\{|\}\}/);
     if (event !== "payment_details_changed") expect(fields.slice(0, 3)).toEqual(["client_name", "workspace_name", "sender_name"]);
   });
 
