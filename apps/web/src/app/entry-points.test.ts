@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { FORWARDING_ACTIONS } from "../../eslint/forwarding-actions.mjs";
 
 // AUTH-01 (plan Task 15 Step 3): server actions are covered by the server-action-wrapper lint. Every other HTTP entry
 // point is classified here, by the names it exports. An unlisted route, or a listed one exporting a method not in its
@@ -156,5 +157,80 @@ describe("AUTH-01: every HTTP entry point that is not a server action is classif
       ["export type Shape = string;\nexport interface Other {}\nexport default function proxy() {}", ["default"]],
     ];
     for (const [code, expected] of cases) expect(exportedNames(parse("probe.ts", code))).toEqual([...expected].sort());
+  });
+});
+
+// Workspace binding (PR 76 Review R1 P0; DECISIONS 2026-11-25): every server action has a binding decision. Bound: an
+// action() export, which always compares the workspace the posting page was rendered for with the session's (no
+// opt-out), with its two-workspace case in workspace-binding.test.ts. Exempt: a Better Auth forwarder of the AUTH-01
+// lint (forwarding-actions.mjs), which reads and writes no workspace data. A new export of a "use server" file fails
+// here until it gets a row.
+const FORWARDER = "Better Auth forwarder (forwarding-actions.mjs): no workspace data; ";
+const SERVER_ACTIONS: Record<string, Record<string, { bound: string } | { exempt: string }>> = {
+  "apps/web/src/app/(app)/actions.ts": {
+    setActiveWorkspaceAction: { exempt: `${FORWARDER}it is the switch itself; Better Auth checks membership.` },
+    signOutAction: { exempt: `${FORWARDER}ends the user's own session.` },
+  },
+  "apps/web/src/app/(app)/catalog/actions.ts": {
+    createServiceAction: { bound: "catalog create" },
+    updateServiceAction: { bound: "catalog update" },
+    setServiceArchivedAction: { bound: "catalog archive" },
+  },
+  "apps/web/src/app/(app)/settings/actions.ts": {
+    updateBrandingSettings: { bound: "brand colour" },
+    updateGeneralSettings: { bound: "general settings" },
+  },
+  "apps/web/src/app/(app)/settings/branding/actions.ts": { uploadLogo: { bound: "logo" } },
+  "apps/web/src/app/(app)/settings/email/actions.ts": { sendTestEmail: { bound: "test email" } },
+  "apps/web/src/app/(app)/settings/numbering/actions.ts": { updateNumberingSettings: { bound: "numbering" } },
+  "apps/web/src/app/(app)/settings/payment/actions.ts": {
+    confirmStepUp: { bound: "step-up prompt" },
+    saveBankDetails: { bound: "bank details" },
+    uploadPaymentQr: { bound: "payment QR" },
+  },
+  "apps/web/src/app/(app)/settings/security/actions.ts": {
+    startTwoFactorAction: { exempt: `${FORWARDER}the user's own 2FA enrolment.` },
+    confirmTwoFactorAction: { exempt: `${FORWARDER}the user's own 2FA enrolment.` },
+  },
+  "apps/web/src/app/(app)/settings/templates/actions.ts": { saveEmailTemplateAction: { bound: "email template" } },
+  "apps/web/src/app/(app)/workspaces/actions.ts": {
+    createWorkspaceAction: { exempt: `${FORWARDER}creates a new workspace, rendered for none.` },
+  },
+  "apps/web/src/app/(auth)/sign-in/actions.ts": { signInAction: { exempt: `${FORWARDER}no session yet.` } },
+  "apps/web/src/app/(auth)/sign-up/actions.ts": { signUpAction: { exempt: `${FORWARDER}no session yet.` } },
+  "apps/web/src/app/(auth)/two-factor/actions.ts": { verifyTwoFactorAction: { exempt: `${FORWARDER}sign-in's second step.` } },
+  "apps/web/src/app/(onboarding)/onboarding/actions.ts": { completeOnboarding: { bound: "onboarding" } },
+};
+
+function serverActionFiles(directory: string): string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) found.push(...serverActionFiles(full));
+    else if (/\.(ts|tsx)$/.test(entry.name) && !/\.test\./.test(entry.name) && /^\s*["']use server["']/.test(readFileSync(full, "utf8"))) {
+      found.push(path.relative(REPO_ROOT, full).split(path.sep).join("/"));
+    }
+  }
+  return found.sort();
+}
+
+describe("workspace binding: every server action is bound or exempt (PR 76 Review R1 P0)", () => {
+  const bindingTests = readFileSync(path.join(WEB, "src/app/workspace-binding.test.ts"), "utf8");
+
+  it("finds exactly the files of the table", () => {
+    expect(serverActionFiles(path.join(WEB, "src"))).toEqual(Object.keys(SERVER_ACTIONS).sort());
+  });
+
+  it.each(Object.entries(SERVER_ACTIONS))("%s: every export has its row", (file, rows) => {
+    const names = exportedNames(parse(file, readFileSync(path.join(REPO_ROOT, file), "utf8")));
+    expect(names, `${file}: give each export a binding decision`).toEqual(Object.keys(rows).sort());
+    const forwarders = FORWARDING_ACTIONS[file] ?? [];
+    for (const [name, row] of Object.entries(rows)) {
+      if ("exempt" in row) expect(forwarders, `${file} ${name}: only a forwarder is exempt`).toContain(name);
+      else {
+        expect(forwarders, `${file} ${name}`).not.toContain(name);
+        expect(bindingTests, `${name}: add its case to workspace-binding.test.ts`).toContain(`name: "${row.bound}"`);
+      }
+    }
   });
 });
