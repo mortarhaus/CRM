@@ -1,4 +1,4 @@
-# Handoff — 2026-11-25 · PR #76 Bob R2 Approved (head b2d8395, CI green); awaiting `approved 76`; then follow-up PR: workspace binding on the other forms
+# Handoff — 2026-11-25 · PR #76 approved, review + receipt on agent-logs (head b2d8395); awaiting Charlie's merge, then `merged 76`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -38,7 +38,7 @@ agent-logs worktree at `54b7a1b` plus the handoff-copy commit, clean.
 2026-11-25: Q23 answered; PR 8 built by an Opus 5.5 sub-agent and split into 8a and 8b; PR 75 (8a) R1 Blocked, fixed, R2 Approved, receipted, merged and logged. Removed local branch `feat/p2-email-templates-core` and worktree `build-feat-p2-email-templates` (tip equals PR head, on main). Kept backup branch `feat/p2-email-templates` (`ebb723a`). Repo set private. Artifact republished.
 
 ## 5. Next step (file-level)
-1. PR #76: Bob R2 Approved at b2d8395. Charlie: `approved 76` BEFORE merging, then `merged 76`. Do NOT push to the branch (would void the approval).
+1. `approved 76` done 2026-11-25. Charlie merges, then `merged 76`. Do NOT push to the branch.
 1b. Follow-up PR after #76 merges (Charlie yes, 2026-11-25), before Phase 2 close: workspace binding (shared fix in action()) for brand colour, general, logo, bank details, QR, numbering, onboarding, catalog create; check catalog echo of free text; add the three 2026-11-25 owner approvals (size 487, no-JS draft loss, this follow-up) to docs/DECISIONS.md.
 2. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
 3. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
