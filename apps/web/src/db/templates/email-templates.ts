@@ -47,8 +47,11 @@ export async function getEmailTemplate(tx: Tx, event: EmailEvent): Promise<Email
 }
 
 // A save, to the version the caller read (0: no row yet, so the row is created). The caller has checked the text
-// (templateProblems). Audited with the text before and after; an unchanged save writes nothing. Restoring the default
-// is a save of the default text. StaleTemplateError when someone saved since.
+// (templateProblems). An unchanged save writes nothing. Restoring the default is a save of the default text.
+// StaleTemplateError when someone saved since. The audit entry names the event, the versions, whether each side was
+// the default and which parts changed, never the text: a template is free text an Admin may put personal data in
+// (a direct email address in a signature), and the append-only audit log would keep it after the template drops it
+// (spec "Audit, logging, privacy"; UNI-09).
 export async function saveEmailTemplate(
   tx: Tx,
   event: EmailEvent,
@@ -70,13 +73,14 @@ export async function saveEmailTemplate(
     : // A concurrent first save holds the key: this one is then stale.
       await tx.insert(emailTemplate).values({ workspaceId: workspaceId(), event, ...text }).onConflictDoNothing().returning();
   if (!saved) throw new StaleTemplateError();
+  const changed = (["subject", "body"] as const).filter((part) => before[part] !== text[part]);
   await recordAudit(tx, {
     actorUserId,
     action: sameAsDefault(event, text.subject, text.body) ? "email_template.restored" : "email_template.updated",
     targetType: "email_template",
     targetId: null,
-    before: { event, subject: before.subject, body: before.body, version: current?.version ?? 0 },
-    after: { event, subject: saved.subject, body: saved.body, version: saved.version },
+    before: { event, version: current?.version ?? 0, isDefault: sameAsDefault(event, before.subject, before.body) },
+    after: { event, version: saved.version, isDefault: sameAsDefault(event, saved.subject, saved.body), changed },
   });
   return { event, subject: saved.subject, body: saved.body, version: saved.version, isDefault: sameAsDefault(event, saved.subject, saved.body) };
 }

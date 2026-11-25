@@ -40,7 +40,10 @@ async function newWorkspace(): Promise<string> {
 const rowsOf = async (workspaceId: string) =>
   [...(await admin`select event, subject, body, version from email_template where workspace_id = ${workspaceId}`)];
 const auditOf = async (workspaceId: string) =>
-  [...(await admin`select action, before, after from audit_log where workspace_id = ${workspaceId} order by created_at`)];
+  [...(await admin`select action, actor_user_id, target_type, before, after from audit_log where workspace_id = ${workspaceId} order by created_at`)];
+// Every column of the workspace's audit rows as text: what a later reader of the log could see.
+const auditText = async (workspaceId: string) =>
+  (await admin<{ row: string }[]>`select a::text as row from audit_log a where workspace_id = ${workspaceId}`).map((entry) => entry.row).join("\n");
 
 const DEFAULT = EMAIL_TEMPLATE_DEFAULTS.payment_details_changed;
 const EDITED = { subject: "Bank details changed on {{workspace_name}}", body: "Hi {{owner_name}}, {{what_changed}} changed." };
@@ -67,18 +70,42 @@ describe("email templates, as crm_app", () => {
       saveEmailTemplate(tx, "payment_details_changed", { subject: DEFAULT.subject, body: DEFAULT.body }, 1, actor),
     );
     expect(restored).toMatchObject({ version: 2, isDefault: true });
+    // The entries name the change, not the text (Review R1, UNI-09).
+    const entry = { actor_user_id: actor, target_type: "email_template" };
     expect(await auditOf(workspaceId)).toEqual([
       {
         action: "email_template.updated",
-        before: { event: "payment_details_changed", subject: DEFAULT.subject, body: DEFAULT.body, version: 0 },
-        after: { event: "payment_details_changed", ...EDITED, version: 1 },
+        ...entry,
+        before: { event: "payment_details_changed", version: 0, isDefault: true },
+        after: { event: "payment_details_changed", version: 1, isDefault: false, changed: ["subject", "body"] },
       },
       {
         action: "email_template.restored",
-        before: { event: "payment_details_changed", ...EDITED, version: 1 },
-        after: { event: "payment_details_changed", subject: DEFAULT.subject, body: DEFAULT.body, version: 2 },
+        ...entry,
+        before: { event: "payment_details_changed", version: 1, isDefault: false },
+        after: { event: "payment_details_changed", version: 2, isDefault: true, changed: ["subject", "body"] },
       },
     ]);
+  });
+
+  // Review R1 (PR #75): an Admin puts a direct email address in a signature, then restores the default. The template
+  // row no longer holds it, and the append-only audit log never did.
+  it("keeps a personal email address typed into a template out of the audit log, through a save and a restore", async () => {
+    const workspaceId = await newWorkspace();
+    const address = `aisha.private-${randomUUID()}@example.test`;
+    const invoice = EMAIL_TEMPLATE_DEFAULTS.invoice_sent;
+    const signed = { subject: invoice.subject, body: `${invoice.body}\nDirect line: ${address}` };
+    await runInWorkspace(app.db, workspaceId, (tx) => saveEmailTemplate(tx, "invoice_sent", signed, 0, actor));
+    await runInWorkspace(app.db, workspaceId, (tx) =>
+      saveEmailTemplate(tx, "invoice_sent", { subject: invoice.subject, body: invoice.body }, 1, actor),
+    );
+    expect(await auditOf(workspaceId)).toEqual([
+      expect.objectContaining({ action: "email_template.updated", after: { event: "invoice_sent", version: 1, isDefault: false, changed: ["body"] } }),
+      expect.objectContaining({ action: "email_template.restored", after: { event: "invoice_sent", version: 2, isDefault: true, changed: ["body"] } }),
+    ]);
+    expect(await auditText(workspaceId)).not.toContain(address);
+    expect(await auditText(workspaceId)).not.toContain("Direct line");
+    expect(JSON.stringify(await rowsOf(workspaceId))).not.toContain(address);
   });
 
   it("never reads another workspace's row", async () => {
