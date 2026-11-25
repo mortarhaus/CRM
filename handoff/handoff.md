@@ -1,4 +1,4 @@
-# Handoff — 2026-11-25 · `build`: workspace-binding fix, Opus sub-agent in worktree build-fix-settings-workspace-binding (not pushed)
+# Handoff — 2026-11-25 · PR #77 (workspace binding) open at d80b8cc; awaiting `review 77`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,13 +6,13 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: none (nothing open)
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: 77
 - Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-fix-settings-workspace-binding` (branch `fix/settings-workspace-binding` from 0b7a04c). Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- Branch: `main` = `0b7a04c` (equal to origin/main). Open PRs: 0. Repo `mortarhaus/CRM` is PRIVATE (standing rule: public while a PR needs CI, private after merge).
+- Branch: `main` = `0b7a04c`. Open PR: #77 (`fix/settings-workspace-binding`, head `d80b8cc`). Repo PUBLIC while PR 77 is open; make private after merge.
 - Last merged: PR 76 (Phase 2 PR 8b, email templates page) 2026-11-25T12:58:16Z, no gate breach, log on agent-logs (`1ce4ba0`). Log gate clear.
-- Next: the workspace-binding fix PR (Charlie yes, 2026-11-25).
+- Next: Charlie `review 77`, `approved 77` BEFORE merging, `merged 77`.
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1; all Phase 2 plan PRs (1-8b: last #75 and #76). All logged on agent-logs.
@@ -38,7 +38,7 @@ agent-logs worktree at `1ce4ba0` plus the handoff-copy commit, clean.
 2026-11-25: PR 75 (8a) and PR 76 (8b) reviewed, approved, receipted, merged and logged; local branches and build worktrees removed (backup branch `feat/p2-email-templates` at `ebb723a` kept); repo private; artifact republished.
 
 ## 5. Next step (file-level)
-1. IN PROGRESS (sub-agent started 2026-11-25; next: check its report, push, make repo public, open PR, Charlie `review N`): the workspace-binding fix PR (security, deep tier: Opus sub-agent): shared fix in `action()` so every settings form is bound to the workspace it was rendered for (brand colour, general, logo, bank details, payment QR, numbering, onboarding, catalog create; check catalog update/archive), reuse `WORKSPACE_CHANGED` from PR 76; check catalog echo of free text; add to `docs/DECISIONS.md` the three 2026-11-25 approvals (8b size 487, no-JS draft loss, this follow-up). Tests: two-workspace real-action cases per form. Full rule-by-rule self-check table with A11Y rows. Keep under 400 lines or ask.
+1. PR #77: sub-agent checks at d80b8cc: typecheck, lint, test 1513 passed, build, full e2e 253 passed 14 skipped; 184 added / 61 removed non-test lines; 13 actions bound, 8 Better Auth forwarders exempt; DECISIONS has the three 2026-11-25 approvals. test:gates and image e2e not run. Wait for CI and Bob. ASK: drop or narrow the catalog echo of free text (catalog/actions.ts:72)?
 2. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
 3. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
 
