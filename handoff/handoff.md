@@ -1,4 +1,4 @@
-# Handoff — 2026-11-25 · PR #76 Bob R1 Revision required (1 P0, 2 P1, 1 P2); Opus sub-agent fixing
+# Handoff — 2026-11-25 · PR #76 R1 fixes pushed (head b2d8395), CI running; awaiting `review 76`; ASK: size 487 and cross-workspace follow-up
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -10,7 +10,7 @@
 - Working folder: repo root (`/Users/charlie/Documents/Projects/Personal/CRM`, branch `main`). Build worktree for 8b: `.agent/worktrees/build-feat-p2-email-templates-page`. Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- Branch: `main` = `a65399e`. Open PR: #76 (`feat/p2-email-templates-page`, head `2a5827c`). Repo `mortarhaus/CRM` is PUBLIC while PR 76 is open; make private after merge.
+- Branch: `main` = `a65399e`. Open PR: #76 (`feat/p2-email-templates-page`, head `b2d8395`). Repo `mortarhaus/CRM` is PUBLIC while PR 76 is open; make private after merge.
 - Last merged: PR 75 (Phase 2 PR 8a, email template events, table, renderer) 2026-11-25T09:11:22Z, no gate breach, log on agent-logs (`54b7a1b`). Log gate clear.
 - Next: Charlie runs `review 76`, then `approved 76` BEFORE merging, then `merged 76`.
 
@@ -38,11 +38,14 @@ agent-logs worktree at `54b7a1b` plus the handoff-copy commit, clean.
 2026-11-25: Q23 answered; PR 8 built by an Opus 5.5 sub-agent and split into 8a and 8b; PR 75 (8a) R1 Blocked, fixed, R2 Approved, receipted, merged and logged. Removed local branch `feat/p2-email-templates-core` and worktree `build-feat-p2-email-templates` (tip equals PR head, on main). Kept backup branch `feat/p2-email-templates` (`ebb723a`). Repo set private. Artifact republished.
 
 ## 5. Next step (file-level)
-1. PR #76 `fix` in progress (head was 2a5827c): P0 bind form to workspace; P1 no text echo; P1 keyboard e2e + A11Y rows; P2 intro wording. Agent also checking whether other settings forms on main share the P0/echo issues (report only). Next: verify report, update PR body, Charlie runs `review 76`.
+1. PR #76: R1 fixes pushed (b2d8395: workspace-bound form, no echo, keyboard e2e + A11Y rows, intro). Sub-agent local: typecheck, lint, test 1479 passed, build, e2e 100 passed 14 skipped. PR body updated. Next: Charlie `review 76`, `approved 76` BEFORE merging, `merged 76`.
 2. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
 3. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
 
 ## 6. Open ASK items, blockers, and owner answers
+- ASK: PR 76 is now 487 non-test lines (Charlie accepted about 433): accept?
+- ASK (security, pre-existing on main, read by builder in payment/actions.ts + action.ts): settings forms lack workspace binding: brand colour, general, logo, bank details, QR, numbering, onboarding (version match), catalog create (no check). Catalog echoes free text. Recommend a follow-up PR (shared fix in action()) before Phase 2 close. Report only so far; not yet on a plan.
+- No-JavaScript refused template save loses the typed draft (accepted trade-off to be confirmed; in DECISIONS).
 - Charlie's answers 2026-11-25 ("1 A, 2 ok, then build; 3 b, 4 ok, 5 digits only, yes can clear, admin yes, why is a user details deleted?, 6 ok widen, add 2 decimals 0.00 and drop down list from the settings"). Implementation of 3-6 is NOT in 8b; each needs its own reviewed PR, spec check first (builder s8):
   - 8b: size accepted (A); preview samples "Siti Rahim" / "bank details" approved.
   - DNS: option B (Cloudflare token, DNS edit on mortarhaus.com only, in a gitignored local file, never in chat). Waiting for the token and the Resend records.
@@ -54,7 +57,7 @@ agent-logs worktree at `54b7a1b` plus the handoff-copy commit, clean.
 - When to shard the E2E job (57+ min; limit 90; Bob suggests before about 75 min). Older small items: Q24 proposal_cover, header greeting wording, Urbanist font source, outdated-browser notice wording, no-JS 409 policy, CRM sender name wording.
 
 ## 7. Open review findings (P0/P1) and verdict
-OPEN: PR 76 R1 P0, P1, P1, P2 (being fixed). PR 75 Approved (R2). Optional: limits.ts:90 comment (fix in 8b); no test races two first saves. Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 (DB currency list vs code table test; edit link for a missing service; long name at 320 px e2e); PR 72 (clock option, preview timing, time zone pause); PR 71 (E2E sharding).
+PR 76 R1 P0, P1, P1, P2 fixed in b2d8395, awaiting re-review. PR 75 Approved (R2). Optional: limits.ts:90 comment (fix in 8b); no test races two first saves. Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 (DB currency list vs code table test; edit link for a missing service; long name at 320 px e2e); PR 72 (clock option, preview timing, time zone pause); PR 71 (E2E sharding).
 
 ## 8. Decisions made this session, not yet in the decisions log
 None pending: PR 75 decisions are in docs/DECISIONS.md; the 8b decisions are in the DECISIONS entry on its branch.
