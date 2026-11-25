@@ -31,6 +31,15 @@ export const shortCode = z
   .nullable()
   .optional();
 
+// Text over several lines: line breaks kept (as \n), otherwise as text() (trimmed, no other control or format
+// character, at most `max` code points). Empty stays "".
+export const multilineText = (max: number) =>
+  z
+    .string()
+    .transform((value) => value.replace(/\r\n?/g, "\n").trim())
+    .pipe(z.string().regex(/^(?:\n|[^\p{Cc}\p{Cf}])*$/u))
+    .refine((value) => characterCount(value) <= max);
+
 // As text(), but a value is required: empty, missing or null is refused.
 export const requiredText = (max: number) => text(max).pipe(z.string());
 

@@ -75,7 +75,7 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
     ...table("billing_account", "SELECT", "INSERT"), // system table, no RLS (migration 0005)
     ...table("auth_audit_log", "INSERT"), // system table, no RLS, append-only, no reader (migration 0008)
     ...table("rate_limit", "SELECT", "INSERT", "UPDATE", "DELETE"), // system table, no RLS (migration 0022)
-    // Tenant tables, under RLS (migrations 0003, 0012, 0014, 0020, 0029, 0034 and 0036).
+    // Tenant tables, under RLS (migrations 0003, 0012, 0014, 0020, 0029, 0034, 0036 and 0038).
     ...table("workspace_settings", "SELECT", "INSERT"),
     // Per column since migration 0025: never workspace_id or created_at.
     ...columns("workspace_settings", "UPDATE", ...WORKSPACE_SETTINGS_UPDATE_COLUMNS),
@@ -105,6 +105,9 @@ export const EXPECTED_PRIVILEGES: Record<ManifestRole, readonly string[]> = {
       "version",
       "updated_at",
     ),
+    // Migration 0038: no DELETE, restoring a default writes its text; never workspace_id, event or created_at.
+    ...table("email_template", "SELECT", "INSERT"),
+    ...columns("email_template", "UPDATE", "subject", "body", "version", "updated_at"),
     // The web send-only pg-boss instance: enqueue only, never a payload column (migration 0016, install.test.ts).
     "schema:pgboss:USAGE",
     ...table("pgboss.version", "SELECT"),
