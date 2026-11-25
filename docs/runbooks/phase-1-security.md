@@ -110,6 +110,10 @@ could be used once more, by a user who must sign in again anyway. The IP counter
   `TWO_FACTOR_REQUIRED` by every action and admin settings page, and the pages send them to `/settings/security`.
   Staff are not affected, and nobody is signed out: the check runs on each request. No page sets the flag yet
   (Charlie 2026-11-22: only the Owner may switch it on, with step-up; the toggle is a later PR).
+- **Workspace binding** (DECISIONS 2026-11-25): every form and bound action posts the workspace its page was rendered
+  for, and `action()` refuses `WORKSPACE_CHANGED` when that is not the session's active workspace (a tab left open
+  across a switch in another tab). Nothing is written, uploaded, queued or spent; a step-up code is not checked. The
+  user reloads the page. Frequent reports mean users work in two workspaces in one browser; they are not an attack.
 
 ## Better Auth paths
 
