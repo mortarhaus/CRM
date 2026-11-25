@@ -3,6 +3,7 @@
 import { EMAIL_TEMPLATE_DEFAULTS, type EmailEvent, renderParts, type TemplateProblem, templateProblems } from "@crm/core/templates";
 import { redirect, useRouter } from "next/navigation";
 import { type FormEvent, startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,9 +34,9 @@ import {
   TEMPLATE_SUBJECT,
   TEMPLATE_SUBJECT_INVALID,
   TEMPLATE_SUBJECT_REFUSED,
-  TEMPLATE_WORKSPACE_CHANGED,
   TEMPLATES_FORBIDDEN,
   unknownFieldsMessage,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 
 type SaveResult = ActionResult<{ version: number; isDefault: boolean }>;
@@ -60,7 +61,7 @@ interface FormProps {
 const REFUSALS: Partial<Record<string, string>> = {
   INVALID_INPUT: TEMPLATE_INVALID,
   STALE_VERSION: TEMPLATE_STALE,
-  WORKSPACE_CHANGED: TEMPLATE_WORKSPACE_CHANGED,
+  WORKSPACE_CHANGED: WORKSPACE_CHANGED_MESSAGE,
   FORBIDDEN: TEMPLATES_FORBIDDEN,
 };
 
@@ -203,7 +204,7 @@ function TemplateFields({ action, workspaceId, template, unreachable }: FormProp
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="flex min-w-0 flex-col gap-6">
-      <input type="hidden" name="workspaceId" value={workspaceId} />
+      <RenderedWorkspace id={workspaceId} />
       <input type="hidden" name="event" value={template.event} />
       <input type="hidden" name="expectedVersion" value={version} />
       <Editor key={template.version} template={template} refused={refused} posted={posted} />

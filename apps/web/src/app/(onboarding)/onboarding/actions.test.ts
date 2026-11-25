@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { startDatabase, type TestDatabase } from "@/test/postgres";
+import { rendered } from "@/test/rendered";
 
 // Phase 2 plan Task 8: the onboarding action through action() on the real crm_app role, Owner only.
 let databaseUrl = "";
@@ -22,7 +23,8 @@ vi.mock("@/lib/auth/session", () => ({
     signedIn && { user: { id: signedIn.userId }, session: { activeOrganizationId: signedIn.workspaceId } },
 }));
 
-const { completeOnboarding } = await import("./actions");
+const actions = await import("./actions");
+const completeOnboarding = rendered(actions.completeOnboarding, () => signedIn?.workspaceId);
 
 let database: TestDatabase;
 let admin: postgres.Sql;

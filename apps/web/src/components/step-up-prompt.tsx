@@ -2,6 +2,7 @@
 
 import { redirect, useRouter } from "next/navigation";
 import { useActionState, useEffect } from "react";
+import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import {
   STEP_UP_LABEL,
   STEP_UP_RATE_LIMITED,
   STEP_UP_SUBMIT,
+  WORKSPACE_CHANGED_MESSAGE,
   WRONG_CODE,
 } from "@/lib/auth/messages";
 
@@ -23,6 +25,8 @@ type StepUpResult = ActionResult<{ verified: boolean }>;
 interface PromptProps {
   // verifyStepUp, called as (previous state, form data) by the page's actions file.
   action: (previous: StepUpResult | null, form: FormData) => Promise<StepUpResult>;
+  // The workspace the page was rendered for: step-up is recorded for that workspace only (RenderedWorkspace).
+  workspaceId: string;
 }
 
 // Exported so a form refused for step-up can move focus here once the prompt is shown.
@@ -35,12 +39,13 @@ const MESSAGES: Partial<Record<Exclude<StepUpResult, { ok: true }>["status"], st
   INVALID_INPUT: WRONG_CODE,
   WRONG_CODE,
   RATE_LIMITED: STEP_UP_RATE_LIMITED,
+  WORKSPACE_CHANGED: WORKSPACE_CHANGED_MESSAGE,
 };
 
 // The step-up prompt (AUTH-09; spec "Authorization"): a fresh TOTP code unlocks the page's high-risk actions for the
 // step-up window. Done, the page is rendered again (it then shows that the session is confirmed); without JavaScript
 // the post renders the page again anyway. A refused code keeps focus in the field (A11Y-01).
-function PromptFields({ action, unreachable }: PromptProps & { unreachable: boolean }) {
+function PromptFields({ action, workspaceId, unreachable }: PromptProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<StepUpResult | null, FormData>(action, null);
   const router = useRouter();
 
@@ -59,6 +64,7 @@ function PromptFields({ action, unreachable }: PromptProps & { unreachable: bool
         {STEP_UP_HEADING}
       </h2>
       <form action={formAction} className="flex flex-col gap-4">
+        <RenderedWorkspace id={workspaceId} />
         <div className="flex max-w-xs flex-col gap-2">
           <Label htmlFor={INPUT_ID}>{STEP_UP_LABEL}</Label>
           <p id={HINT_ID} className="text-sm text-muted-foreground">

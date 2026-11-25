@@ -11,3 +11,7 @@ export function textField(form: FormData, name: string): string {
   const value = form.get(name);
   return typeof value === "string" ? value : "";
 }
+
+// The hidden field (or input key) that names the workspace a page was rendered for; action() refuses a post whose
+// value is not the session's active workspace (WORKSPACE_CHANGED).
+export const RENDERED_WORKSPACE_FIELD = "workspaceId";

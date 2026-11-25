@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { createS3Adapter, type StorageAdapter } from "@/adapters/storage";
 import { startMinio, type TestMinio } from "@/test/minio";
 import { startDatabase, type TestDatabase } from "@/test/postgres";
+import { rendered } from "@/test/rendered";
 
 // Phase 2 plan Task 12: uploadLogo through action() on the real crm_app role and a real MinIO. The signed-in user and
 // their active workspace are what action() reads through getCurrentSession().
@@ -29,7 +30,8 @@ vi.mock("@/adapters/storage", async (original) => ({
     },
 }));
 
-const { uploadLogo } = await import("./actions");
+const actions = await import("./actions");
+const uploadLogo = rendered(actions.uploadLogo, () => signedIn?.workspaceId);
 
 let database: TestDatabase;
 let minio: TestMinio;

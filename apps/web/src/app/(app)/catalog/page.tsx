@@ -40,7 +40,15 @@ export const metadata: Metadata = { title: "Catalog · CRM" };
 type Loaded =
   | { kind: "forbidden" }
   | { kind: "pending" }
-  | { kind: "ready"; services: Service[]; editing: Service | null; defaultCurrency: string; taxRegistered: boolean; locale: string };
+  | {
+      kind: "ready";
+      workspaceId: string;
+      services: Service[];
+      editing: Service | null;
+      defaultCurrency: string;
+      taxRegistered: boolean;
+      locale: string;
+    };
 
 // The query is a view choice only (which list, which service to edit); the role and workspace come from the session.
 const query = z.object({
@@ -62,6 +70,7 @@ async function load(archived: boolean, editId: string | undefined): Promise<Load
       ]);
       return {
         kind: "ready",
+        workspaceId,
         services,
         editing,
         defaultCurrency: settings.defaultCurrency,
@@ -120,13 +129,17 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
               <h2 id="edit-heading" className="text-lg font-semibold">
                 {CATALOG_EDIT_HEADING}
               </h2>
+              {/* Keyed by workspace (as every bound form): a workspace switch starts fresh forms, never ones holding
+                  another workspace's values. */}
               <ServiceForm
+                key={loaded.workspaceId}
+                workspaceId={loaded.workspaceId}
                 mode="edit"
                 action={updateServiceAction}
                 values={formValues(loaded.editing)}
                 currencies={currencyOptions(loaded.locale)}
               />
-              <ArchiveForm action={setServiceArchivedAction} values={formValues(loaded.editing)} />
+              <ArchiveForm key={loaded.workspaceId} workspaceId={loaded.workspaceId} action={setServiceArchivedAction} values={formValues(loaded.editing)} />
               <Link href={listHref} className="self-start text-sm underline underline-offset-4">
                 {CATALOG_BACK}
               </Link>
@@ -137,6 +150,8 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                 {CATALOG_NEW_HEADING}
               </h2>
               <ServiceForm
+                key={loaded.workspaceId}
+                workspaceId={loaded.workspaceId}
                 mode="create"
                 action={createServiceAction}
                 values={{ name: "", description: "", price: "", currency: loaded.defaultCurrency, unit: "", taxable: loaded.taxRegistered }}

@@ -14,6 +14,7 @@ import {
 import Link from "next/link";
 import { redirect, useRouter } from "next/navigation";
 import { type FormEvent, startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ import {
   patternErrorMessage,
   RESET_RULE_LABELS,
   SETUP_PENDING,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 
 type SaveResult = ActionResult<{ version: number }>;
@@ -61,6 +63,8 @@ interface FormProps {
   // updateNumberingSettings: called as (previous state, form data), it reads the form (action() fromForm).
   action: (previous: SaveResult | null, form: FormData) => Promise<SaveResult>;
   values: NumberingValues;
+  // The workspace the page was rendered for (RenderedWorkspace).
+  workspaceId: string;
 }
 
 const REFUSALS: Partial<Record<string, string>> = {
@@ -69,6 +73,7 @@ const REFUSALS: Partial<Record<string, string>> = {
   FORBIDDEN: NUMBERING_FORBIDDEN,
   NOT_ONBOARDED: SETUP_PENDING,
   PERIOD_BEHIND: NUMBERING_PERIOD_BEHIND,
+  WORKSPACE_CHANGED: WORKSPACE_CHANGED_MESSAGE,
 };
 
 type Preview = { ok: true; number: string } | { ok: false; reason: "pattern" | "code" | "behind"; message: string };
@@ -91,7 +96,7 @@ function previewOf(pattern: string, resetRule: ResetRule, values: NumberingValue
   }
 }
 
-function NumberingFields({ action, values, unreachable }: FormProps & { unreachable: boolean }) {
+function NumberingFields({ action, values, workspaceId, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
   const router = useRouter();
   const button = useRef<HTMLButtonElement>(null);
@@ -123,6 +128,7 @@ function NumberingFields({ action, values, unreachable }: FormProps & { unreacha
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="flex flex-col gap-6">
+      <RenderedWorkspace id={workspaceId} />
       <input type="hidden" name="expectedVersion" value={version} />
       <div className="flex max-w-sm flex-col gap-2">
         <Label htmlFor="number-pattern">{NUMBERING_PATTERN}</Label>

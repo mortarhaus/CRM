@@ -4,6 +4,7 @@ import type { Country } from "@crm/core/settings";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { type FormEvent, startTransition, useActionState, useEffect, useRef } from "react";
+import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { TextField } from "@/components/settings/settings-field";
 import { TAX_FIELD_ERRORS, TaxFields } from "@/components/settings/tax-fields";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
@@ -23,6 +24,7 @@ import {
   ONBOARDING_STALE,
   ONBOARDING_TAX_HINT,
   TAX_SCHEMES,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 
 type SaveResult = ActionResult<{ version: number }>;
@@ -38,15 +40,18 @@ interface FormProps {
   taxName: string;
   taxRate: string;
   version: number;
+  // The workspace the page was rendered for (RenderedWorkspace).
+  workspaceId: string;
 }
 
 function formError(result: SaveResult): string {
   if (result.ok) return "";
   if (result.status === "INVALID_INPUT") return ONBOARDING_INVALID;
+  if (result.status === "WORKSPACE_CHANGED") return WORKSPACE_CHANGED_MESSAGE;
   return result.status === "STALE_VERSION" ? ONBOARDING_STALE : ONBOARDING_FAILED;
 }
 
-function OnboardingFields({ action, country, taxName, taxRate, version, unreachable }: FormProps & { unreachable: boolean }) {
+function OnboardingFields({ action, country, taxName, taxRate, version, workspaceId, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
   const button = useRef<HTMLButtonElement>(null);
   const scheme = TAX_SCHEMES[country];
@@ -77,6 +82,7 @@ function OnboardingFields({ action, country, taxName, taxRate, version, unreacha
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="group flex flex-col gap-8">
+      <RenderedWorkspace id={workspaceId} />
       <input type="hidden" name="expectedVersion" value={version} />
       <input type="hidden" name="country" value={country} />
       <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">

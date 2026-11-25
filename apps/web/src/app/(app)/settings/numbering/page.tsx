@@ -12,7 +12,7 @@ import { NumberingForm, type NumberingValues } from "./numbering-form";
 
 export const metadata: Metadata = { title: "Document numbering · CRM" };
 
-type Loaded = { kind: "forbidden" } | { kind: "pending" } | { kind: "ready"; values: NumberingValues };
+type Loaded = { kind: "forbidden" } | { kind: "pending" } | { kind: "ready"; values: NumberingValues; workspaceId: string };
 
 // Admin and Owner (spec line 792). Staff see the refusal instead of the form; the action checks the role again on
 // every post (AUTH-02). The invoice counter of a workspace onboarded before it existed is created from the country's
@@ -27,6 +27,7 @@ async function load(): Promise<Loaded> {
       if (!sequence || !isResetRule(sequence.resetRule)) return { kind: "pending" };
       return {
         kind: "ready",
+        workspaceId,
         values: {
           version: sequence.version,
           pattern: sequence.pattern,
@@ -64,7 +65,7 @@ export default async function NumberingSettingsPage() {
         ) : (
           <>
             <p className="text-sm text-muted-foreground">{NUMBERING_INTRO}</p>
-            <NumberingForm action={updateNumberingSettings} values={loaded.values} />
+            <NumberingForm key={loaded.workspaceId} action={updateNumberingSettings} values={loaded.values} workspaceId={loaded.workspaceId} />
           </>
         )}
       </div>

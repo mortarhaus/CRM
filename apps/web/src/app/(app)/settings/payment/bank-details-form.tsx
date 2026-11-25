@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { type FormEvent, startTransition, useActionState, useState } from "react";
+import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ import {
   BANK_SWIFT_INVALID,
   ONBOARDING_INVALID,
   PAYMENT_FORBIDDEN,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 import { stepUpRefusal } from "./save-follow-up";
 import { useSaveFollowUp, useStepUpRefusal } from "./use-save-follow-up";
@@ -42,11 +44,14 @@ interface FormProps {
   saved: BankDetails;
   // The page showed "Confirmed" (step-up fresh when it was rendered).
   steppedUp: boolean;
+  // The workspace the page was rendered for (RenderedWorkspace).
+  workspaceId: string;
 }
 
 const MESSAGES: Partial<Record<Exclude<SaveResult, { ok: true }>["status"], string>> = {
   STALE_VERSION: BANK_STALE,
   FORBIDDEN: PAYMENT_FORBIDDEN,
+  WORKSPACE_CHANGED: WORKSPACE_CHANGED_MESSAGE,
 };
 
 // Plan Q17 (Charlie 2026-11-22): these three are required; the SWIFT code is optional.
@@ -58,7 +63,7 @@ const FIELDS = [
 
 const ERROR_ID = "bank-details-error";
 
-function BankFields({ action, version, saved, steppedUp, unreachable }: FormProps & { unreachable: boolean }) {
+function BankFields({ action, version, saved, steppedUp, workspaceId, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
   const [confirmedAtSubmit, setConfirmedAtSubmit] = useState(false);
   const button = useSaveFollowUp(result, unreachable);
@@ -85,6 +90,7 @@ function BankFields({ action, version, saved, steppedUp, unreachable }: FormProp
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="flex flex-col gap-4">
+      <RenderedWorkspace id={workspaceId} />
       <input type="hidden" name="expectedVersion" value={currentVersion} />
       {FIELDS.map((field) => (
         <div key={field.name} className="flex max-w-sm flex-col gap-2">
