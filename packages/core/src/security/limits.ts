@@ -87,7 +87,7 @@ export const SERVICE_NAME_MAX_LENGTH = 200;
 export const SERVICE_DESCRIPTION_MAX_LENGTH = 2000;
 export const SERVICE_UNIT_MAX_LENGTH = 20;
 
-// Email templates (Phase 2 plan Task 25). Builder proposals pending Charlie: they bound storage and input (UNI-03),
-// they are not business rules. Enforced by Zod and by a char_length CHECK, both in code points. A subject is one line.
+// Email templates (Phase 2 plan Task 25). Approved by Charlie on 2026-11-25 (DECISIONS): they bound storage and
+// input (UNI-03), they are not business rules. Enforced by Zod and by a char_length CHECK, both in code points. A subject is one line.
 export const EMAIL_TEMPLATE_SUBJECT_MAX_LENGTH = 200;
 export const EMAIL_TEMPLATE_BODY_MAX_LENGTH = 5000;
