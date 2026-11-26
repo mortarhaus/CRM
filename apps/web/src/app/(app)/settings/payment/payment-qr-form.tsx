@@ -3,6 +3,7 @@
 import { PAYMENT_QR_MAX_BYTES } from "@crm/core/security";
 import { redirect } from "next/navigation";
 import { type FormEvent, useActionState, useState } from "react";
+import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import {
   PAYMENT_QR_UPLOAD,
   PAYMENT_QR_UPLOADING,
   paymentQrLabel,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 import type { SaveResult } from "./bank-details-form";
 import { stepUpRefusal } from "./save-follow-up";
@@ -33,6 +35,8 @@ interface FormProps {
   name: string;
   // The page showed "Confirmed" (step-up fresh when it was rendered).
   steppedUp: boolean;
+  // The workspace the page was rendered for (RenderedWorkspace).
+  workspaceId: string;
 }
 
 const ERROR_ID = "qr-error";
@@ -46,11 +50,12 @@ const MESSAGES: Partial<Record<Exclude<SaveResult, { ok: true }>["status"], stri
   STORAGE_UNAVAILABLE: PAYMENT_QR_UNAVAILABLE,
   STALE_VERSION: BANK_STALE,
   FORBIDDEN: PAYMENT_FORBIDDEN,
+  WORKSPACE_CHANGED: WORKSPACE_CHANGED_MESSAGE,
 };
 
 // As the logo form (settings/branding): a file over the limit is refused here before it is sent; the server checks
 // the size, the bytes and step-up again.
-function QrFields({ action, version, name, steppedUp, unreachable }: FormProps & { unreachable: boolean }) {
+function QrFields({ action, version, name, steppedUp, workspaceId, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
   const [tooLarge, setTooLarge] = useState(false);
   const [confirmedAtSubmit, setConfirmedAtSubmit] = useState(false);
@@ -79,6 +84,7 @@ function QrFields({ action, version, name, steppedUp, unreachable }: FormProps &
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="flex flex-col gap-4">
+      <RenderedWorkspace id={workspaceId} />
       <input type="hidden" name="expectedVersion" value={currentVersion} />
       <div className="flex max-w-sm flex-col gap-2">
         <Label htmlFor="qr">{paymentQrLabel(name)}</Label>

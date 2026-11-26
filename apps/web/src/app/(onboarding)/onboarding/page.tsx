@@ -16,11 +16,11 @@ export const metadata: Metadata = { title: "Set up your workspace · CRM" };
 // The Owner of the active workspace, while it has no country (plan Task 8). Anyone else, or a workspace already set up,
 // goes back to the app, whose layout shows Admin and Staff that setup is not finished. The action checks all of this
 // again on every post (AUTH-02). action() heals a missing settings row on the way (requireWorkspaceMember).
-async function loadVersion(): Promise<number | null> {
+async function loadVersion(): Promise<{ version: number; workspaceId: string } | null> {
   try {
     const { workspaceId } = await requireWorkspaceMember("owner");
     const settings = await withWorkspace(workspaceId, (tx) => getSettings(tx));
-    return settings.country === null ? settings.version : null;
+    return settings.country === null ? { version: settings.version, workspaceId } : null;
   } catch (error) {
     if (!(error instanceof ActionRefusedError)) throw error;
     if (error.status === "UNAUTHENTICATED") redirect("/sign-in");
@@ -50,8 +50,8 @@ function CountryStep() {
 }
 
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ country?: string | string[] }> }) {
-  const version = await loadVersion();
-  if (version === null) redirect("/");
+  const loaded = await loadVersion();
+  if (loaded === null) redirect("/");
   const requested = (await searchParams).country;
   const country: Country | null = typeof requested === "string" && isSupportedCountry(requested) ? requested : null;
 
@@ -60,11 +60,13 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
       <h1 className="text-2xl font-semibold">{ONBOARDING_TITLE}</h1>
       {country ? (
         <OnboardingForm
+          key={loaded.workspaceId}
           action={completeOnboarding}
           country={country}
           taxName={COUNTRY_DEFAULTS[country].taxName}
           taxRate={bpsToPercent(COUNTRY_DEFAULTS[country].taxRateBps)}
-          version={version}
+          version={loaded.version}
+          workspaceId={loaded.workspaceId}
         />
       ) : (
         <CountryStep />

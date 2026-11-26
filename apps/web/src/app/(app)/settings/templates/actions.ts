@@ -15,8 +15,6 @@ const expectedVersion = z.int().nonnegative();
 // (FILE-05), on the field it is in.
 const saveInput = z
   .strictObject({
-    // The workspace the form was rendered for: a precondition only, never the write target (TEN-11).
-    workspaceId: z.uuid(),
     event: z.enum(EMAIL_EVENTS),
     expectedVersion,
     subject: requiredText(EMAIL_TEMPLATE_SUBJECT_MAX_LENGTH),
@@ -45,7 +43,6 @@ export const saveEmailTemplateAction = action({
     const event = form.get("event");
     const restore = form.get("intent") === "restore" && isEmailEvent(event);
     return {
-      workspaceId: form.get("workspaceId"),
       event,
       expectedVersion: Number(form.get("expectedVersion")),
       subject: restore ? EMAIL_TEMPLATE_DEFAULTS[event].subject : form.get("subject"),
@@ -55,12 +52,6 @@ export const saveEmailTemplateAction = action({
   // No echo: a subject or message can hold personal data (a direct contact address), so a refusal returns the field
   // paths only (PR 76 Review R1). With JavaScript the draft stays in the editor; without it the page says it was not kept.
   idempotent: false,
-  // A form rendered for workspace A and posted after the session switched to B is refused before any write: the
-  // versions alone cannot tell them apart (both are 0 for a template neither has saved). The write still goes to the
-  // session's workspace (action(), TEN-11); the posted id is only compared with it.
-  beforeTransaction: async (member, input) => {
-    if (input.workspaceId !== member.workspaceId) throw new ActionRefusedError("WORKSPACE_CHANGED");
-  },
   handler: async (ctx, { event, expectedVersion: version, subject, body }) => {
     try {
       const saved = await saveEmailTemplate(ctx.tx, event, { subject, body }, version, ctx.userId);

@@ -12,6 +12,7 @@ import { startWorker, type WorkerHandle } from "../worker/start";
 import { getSendBoss } from "./boss";
 import { emailSendHandler } from "./email-send";
 import { enqueueJob } from "./enqueue";
+import { rendered } from "../test/rendered";
 
 // Plan Task 27 Steps 1-2: the settings action enqueues email.send with IDs only, and the worker's handler sends the
 // test email to the member's own address through the SMTP adapter into a real Mailpit.
@@ -26,7 +27,8 @@ vi.mock("../lib/auth/session", () => ({
     signedIn && { user: { id: signedIn.userId }, session: { activeOrganizationId: signedIn.workspaceId } },
 }));
 
-const { sendTestEmail } = await import("../app/(app)/settings/email/actions");
+const email = await import("../app/(app)/settings/email/actions");
+const sendTestEmail = rendered(email.sendTestEmail, () => signedIn?.workspaceId);
 
 const FROM = "CRM Test <crm@mail.example.test>";
 

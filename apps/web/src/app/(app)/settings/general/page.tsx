@@ -72,7 +72,9 @@ export default async function GeneralSettingsPage() {
           <>
             <p className="text-sm text-muted-foreground">{GENERAL_INTRO}</p>
             <GeneralForm
+              key={settings.workspaceId}
               action={updateGeneralSettings}
+              workspaceId={settings.workspaceId}
               values={values}
               timeZones={Intl.supportedValuesOf("timeZone")}
               dateFormats={DATE_FORMATS.map((value) => ({ value, label: DATE_FORMAT_EXAMPLES[value] }))}

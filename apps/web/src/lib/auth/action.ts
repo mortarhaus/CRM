@@ -6,6 +6,7 @@ import type { z } from "zod";
 import { requiresTwoFactor } from "../../db/settings/workspace-settings";
 import { findMembership, healWorkspaceSettings, type WorkspaceRole } from "../../db/system";
 import { type Tx, withWorkspace } from "../../db/workspace";
+import { RENDERED_WORKSPACE_FIELD } from "../forms";
 import { getCurrentSession } from "./session";
 
 export type Role = WorkspaceRole;
@@ -19,8 +20,8 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 // time zone: PeriodBehindError); so are CURRENCY_LOCKED (a service's currency change while it has a default price,
 // spec Money rules "Service currency edit") and NOT_FOUND (no such row in the workspace); the others by the checks below. TWO_FACTOR_REQUIRED (the user has no 2FA: enrol first) comes from the
 // require_2fa check below or from step-up; STEP_UP_REQUIRED (no step-up of this session in the last
-// STEP_UP_WINDOW_SECONDS) from requireStepUp; WRONG_CODE from verifyStepUp (step-up.ts). WORKSPACE_CHANGED: a form
-// rendered for another workspace than the session's active one (the email templates form, PR 76 Review R1).
+// STEP_UP_WINDOW_SECONDS) from requireStepUp; WRONG_CODE from verifyStepUp (step-up.ts). WORKSPACE_CHANGED: a post
+// from a page rendered for another workspace than the session's active one, or one that names none (step 2 below).
 type Refusal =
   | "UNAUTHENTICATED"
   | "NO_WORKSPACE"
@@ -70,6 +71,8 @@ const RANK: Record<Role, number> = { staff: 1, admin: 2, owner: 3 };
 // workspace_settings row is healed here (Task 7, plan Risk 6). In a workspace with require_2fa, an Admin or Owner
 // without 2FA is refused with TWO_FACTOR_REQUIRED whatever the minimum role (spec "Authentication and sessions":
 // "`require_2fa` per workspace for owner/admin"; ASK 9, DECISIONS 2026-11-15); a page sends them to enrol.
+// `rendered` (action() always passes it) is the workspace the posting page was rendered for: anything but the
+// session's workspace is refused before membership is read, so nothing is read or written for either workspace.
 export interface WorkspaceMember {
   userId: string;
   sessionId: string;
@@ -78,11 +81,13 @@ export interface WorkspaceMember {
   role: Role;
 }
 
-export async function requireWorkspaceMember(minRole: Role): Promise<WorkspaceMember> {
+// `rendered` reads the workspace the posting page was rendered for; it is called only once the session is read.
+export async function requireWorkspaceMember(minRole: Role, rendered?: () => string | null): Promise<WorkspaceMember> {
   const current = await getCurrentSession();
   if (!current) throw new ActionRefusedError("UNAUTHENTICATED");
   const workspaceId = current.session.activeOrganizationId;
   if (!workspaceId) throw new ActionRefusedError("NO_WORKSPACE");
+  if (rendered !== undefined && rendered() !== workspaceId) throw new ActionRefusedError("WORKSPACE_CHANGED");
   const membership = await findMembership(current.user.id, workspaceId);
   if (!membership || RANK[membership.role] < RANK[minRole]) throw new ActionRefusedError("FORBIDDEN");
   await healWorkspaceSettings(workspaceId);
@@ -122,6 +127,20 @@ const requestHash = (input: unknown) => createHash("sha256").update(canonical(in
 const validKey = (key: unknown): key is string =>
   typeof key === "string" && key.length >= 1 && key.length <= IDEMPOTENCY_KEY_MAX_LENGTH;
 
+const isRecord = (raw: unknown): raw is Record<string, unknown> => typeof raw === "object" && raw !== null && !Array.isArray(raw);
+
+// Step 2's precondition, read after the session: the workspace the posting page was rendered for, from its form
+// (RENDERED_WORKSPACE_FIELD) or, for a caller that passes an object, from that one key. No other input value is read
+// here (PR 77 Review R1 P1). Never a destination (TEN-11): it is only compared with the session's workspace.
+function renderedOf(raw: unknown, form: FormData | null): string | null {
+  const value = form ? form.get(RENDERED_WORKSPACE_FIELD) : isRecord(raw) ? raw[RENDERED_WORKSPACE_FIELD] : null;
+  return typeof value === "string" ? value : null;
+}
+
+// After step 3, right before Zod: an object input without the rendered workspace, which Zod never sees.
+const withoutRendered = (raw: unknown): unknown =>
+  isRecord(raw) ? Object.fromEntries(Object.entries(raw).filter(([key]) => key !== RENDERED_WORKSPACE_FIELD)) : raw;
+
 const fieldPaths = (error: z.ZodError) => [...new Set(error.issues.map((issue) => issue.path.map(String).join(".")))];
 
 // The transaction's workspace, as the policies read it; the RESTRICTIVE policy checks it again.
@@ -149,10 +168,12 @@ async function claimKey(tx: Tx, name: string, key: string, hash: string): Promis
 }
 
 // The one wrapper for every mutating server action (spec "Validation"; AUTH-01). The order is fixed: (1) session,
-// (2) the session's active workspace, (3) role, (4) Zod, (5) idempotency, (6) the handler, in the same transaction
-// as the claimed key, then its response is stored. An action's beforeTransaction runs between steps 4 and 5, outside
-// the transaction. No input value is read before step 4. A handler that throws
-// ActionRefusedError rolls the transaction back, claimed key included, and the refusal is the result.
+// (2) the session's active workspace, which must be the one the posting page was rendered for (renderedOf; there is
+// no opt-out, so every action is bound: PR 76 Review R1 P0, DECISIONS 2026-11-25), (3) role, (4) Zod,
+// (5) idempotency, (6) the handler, in the same transaction as the claimed key, then its response is stored. An
+// action's beforeTransaction runs between steps 4 and 5, outside the transaction. No input value but the rendered
+// workspace is read before step 4, and that one only after the session (PR 77 Review R1 P1). A handler that throws ActionRefusedError rolls the transaction back, claimed key
+// included, and the refusal is the result.
 export function action<I, O extends Json>(spec: {
   name: string;
   minRole: Role;
@@ -177,16 +198,17 @@ export function action<I, O extends Json>(spec: {
   beforeTransaction?: (member: WorkspaceMember, input: I) => Promise<void>;
 }): (raw: unknown, idempotencyKey?: string | FormData) => Promise<ActionResult<O>> {
   return async (raw, keyOrForm) => {
+    const idempotencyKey = typeof keyOrForm === "string" ? keyOrForm : undefined;
+    const form = keyOrForm instanceof FormData ? keyOrForm : null;
+    const posted = form && spec.fromForm ? form : null;
     let member: WorkspaceMember;
     try {
-      member = await requireWorkspaceMember(spec.minRole);
+      member = await requireWorkspaceMember(spec.minRole, () => renderedOf(raw, posted));
     } catch (error) {
       if (error instanceof ActionRefusedError) return { ok: false, status: error.status };
       throw error;
     }
-    const idempotencyKey = typeof keyOrForm === "string" ? keyOrForm : undefined;
-    const form = keyOrForm instanceof FormData ? keyOrForm : null;
-    const parsed = spec.input.safeParse(form && spec.fromForm ? spec.fromForm(form) : raw);
+    const parsed = spec.input.safeParse(posted && spec.fromForm ? spec.fromForm(posted) : withoutRendered(raw));
     if (!parsed.success) {
       const fields = fieldPaths(parsed.error);
       return form && spec.echo ? { ok: false, status: "INVALID_INPUT", fields, echo: spec.echo(form) } : { ok: false, status: "INVALID_INPUT", fields };

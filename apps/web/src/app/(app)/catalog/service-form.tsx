@@ -4,6 +4,7 @@ import { currencyExponent, formatMinor, isCurrency, MoneyParseError, parseDecima
 import { MONEY_MAX_MINOR } from "@crm/core/security";
 import { redirect, useRouter } from "next/navigation";
 import { type FormEvent, startTransition, useActionState, useEffect, useRef } from "react";
+import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { type SelectOption, SelectField, TextField } from "@/components/settings/settings-field";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import {
   CATALOG_UNIT_HINT,
   CATALOG_UNIT_INVALID,
   priceErrorMessage,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 
 type Saved = { id: string; version: number };
@@ -70,6 +72,7 @@ const REFUSALS: Partial<Record<string, string>> = {
   FORBIDDEN: CATALOG_FORBIDDEN,
   NOT_FOUND: CATALOG_NOT_FOUND,
   CURRENCY_LOCKED: CATALOG_CURRENCY_LOCKED,
+  WORKSPACE_CHANGED: WORKSPACE_CHANGED_MESSAGE,
 };
 
 const FIELD_ERRORS: Record<string, string> = {
@@ -117,9 +120,11 @@ interface ServiceFormProps {
   action: FormAction;
   values: ServiceValues;
   currencies: readonly SelectOption[];
+  // The workspace the page was rendered for (RenderedWorkspace).
+  workspaceId: string;
 }
 
-function ServiceFields({ mode, action, values, currencies, unreachable }: ServiceFormProps & { unreachable: boolean }) {
+function ServiceFields({ mode, action, values, currencies, workspaceId, unreachable }: ServiceFormProps & { unreachable: boolean }) {
   const { result, formAction, pending, button, error, onSubmit } = useSaveResult(action, unreachable);
   const refused = result?.ok === false && result.status === "INVALID_INPUT" ? result : null;
   const echoed: Partial<Record<string, string>> = refused?.echo ?? {};
@@ -134,6 +139,7 @@ function ServiceFields({ mode, action, values, currencies, unreachable }: Servic
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="flex flex-col gap-6">
+      <RenderedWorkspace id={workspaceId} />
       {mode === "edit" && (
         <>
           <input type="hidden" name="id" value={values.id} />
@@ -211,10 +217,11 @@ export function ServiceForm(props: ServiceFormProps) {
 interface ArchiveFormProps {
   action: FormAction<Saved & { archived: boolean }>;
   values: ServiceValues;
+  workspaceId: string;
 }
 
 // Archive or restore: archived_at is set or cleared, nothing is deleted (plan Q22).
-function ArchiveFields({ action, values, unreachable }: ArchiveFormProps & { unreachable: boolean }) {
+function ArchiveFields({ action, values, workspaceId, unreachable }: ArchiveFormProps & { unreachable: boolean }) {
   const { result, formAction, pending, button, error, onSubmit } = useSaveResult(action, unreachable);
   const version = result?.ok ? Math.max(result.data.version, values.version ?? 0) : values.version;
   // Until the refresh arrives, the result says what the service now is.
@@ -222,6 +229,7 @@ function ArchiveFields({ action, values, unreachable }: ArchiveFormProps & { unr
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="flex flex-col gap-3 border-t border-border pt-6">
+      <RenderedWorkspace id={workspaceId} />
       <input type="hidden" name="id" value={values.id} />
       <input type="hidden" name="expectedVersion" value={version} />
       <input type="hidden" name="archived" value={archived ? "false" : "true"} />

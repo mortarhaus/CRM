@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createDb, type DbHandle } from "@/db/client";
 import { runInWorkspace } from "@/db/workspace";
 import { startDatabase, type TestDatabase } from "@/test/postgres";
+import { rendered } from "@/test/rendered";
 
 // Phase 2 plan Task 22: the catalog actions through action() on the real crm_app role.
 let databaseUrl = "";
@@ -14,7 +15,10 @@ vi.mock("@/lib/auth/session", () => ({
     signedIn && { user: { id: signedIn.userId }, session: { activeOrganizationId: signedIn.workspaceId } },
 }));
 
-const { createServiceAction, setServiceArchivedAction, updateServiceAction } = await import("./actions");
+const actions = await import("./actions");
+const createServiceAction = rendered(actions.createServiceAction, () => signedIn?.workspaceId);
+const setServiceArchivedAction = rendered(actions.setServiceArchivedAction, () => signedIn?.workspaceId);
+const updateServiceAction = rendered(actions.updateServiceAction, () => signedIn?.workspaceId);
 const { listServices } = await import("@/db/catalog/services");
 
 let database: TestDatabase;

@@ -3,6 +3,7 @@
 import { LOGO_MAX_BYTES } from "@crm/core/security";
 import { redirect, useRouter } from "next/navigation";
 import { type FormEvent, useActionState, useEffect, useRef, useState } from "react";
+import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import {
   LOGO_UNAVAILABLE,
   UPLOAD_LOGO,
   UPLOADING_LOGO,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 
 type UploadResult = ActionResult<{ version: number }>;
@@ -30,6 +32,8 @@ interface FormProps {
   action: (previous: UploadResult | null, form: FormData) => Promise<UploadResult>;
   // The settings version the page was read at (optimistic concurrency, shared with the colour form).
   version: number;
+  // The workspace the page was rendered for (RenderedWorkspace).
+  workspaceId: string;
 }
 
 const ERROR_ID = "logo-error";
@@ -43,9 +47,10 @@ const MESSAGES: Partial<Record<Exclude<UploadResult, { ok: true }>["status"], st
   STORAGE_UNAVAILABLE: LOGO_UNAVAILABLE,
   STALE_VERSION: BRANDING_STALE,
   FORBIDDEN: BRANDING_FORBIDDEN,
+  WORKSPACE_CHANGED: WORKSPACE_CHANGED_MESSAGE,
 };
 
-function LogoFields({ action, version, unreachable }: FormProps & { unreachable: boolean }) {
+function LogoFields({ action, version, workspaceId, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<UploadResult | null, FormData>(action, null);
   // A file over the limit is refused here before it is sent (with JavaScript); the server checks again.
   const [tooLarge, setTooLarge] = useState(false);
@@ -75,6 +80,7 @@ function LogoFields({ action, version, unreachable }: FormProps & { unreachable:
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="flex flex-col gap-4">
+      <RenderedWorkspace id={workspaceId} />
       <input type="hidden" name="expectedVersion" value={currentVersion} />
       <div className="flex max-w-sm flex-col gap-2">
         <Label htmlFor="logo">{LOGO_LABEL}</Label>

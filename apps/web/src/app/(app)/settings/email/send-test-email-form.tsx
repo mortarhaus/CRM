@@ -12,20 +12,22 @@ import {
   TEST_EMAIL_FORBIDDEN,
   TEST_EMAIL_QUEUED,
   TEST_EMAIL_RATE_LIMITED,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 
 type SendResult = ActionResult<{ queued: boolean }>;
 
 interface FormProps {
-  // sendTestEmail with its input and idempotency key bound by the page.
+  // sendTestEmail with its input (the rendered workspace) and idempotency key bound by the page.
   action: () => Promise<SendResult>;
 }
 
-// Every refusal but Staff's and the limit's is one the user can only retry (a stale workspace, a reused key, a
+// Every refusal but Staff's, the limit's and a switched workspace's is one the user can only retry (a stale workspace, a reused key, a
 // malformed post).
 function errorFor(result: SendResult): string | null {
   if (result.ok) return null;
   if (result.status === "FORBIDDEN") return TEST_EMAIL_FORBIDDEN;
+  if (result.status === "WORKSPACE_CHANGED") return WORKSPACE_CHANGED_MESSAGE;
   return result.status === "RATE_LIMITED" ? TEST_EMAIL_RATE_LIMITED : TEST_EMAIL_FAILED;
 }
 

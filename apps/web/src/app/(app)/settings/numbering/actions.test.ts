@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { startDatabase, type TestDatabase } from "@/test/postgres";
+import { rendered } from "@/test/rendered";
 
 // Phase 2 plan Task 19: the numbering action through action() on the real crm_app role.
 let databaseUrl = "";
@@ -12,7 +13,8 @@ vi.mock("@/lib/auth/session", () => ({
     signedIn && { user: { id: signedIn.userId }, session: { activeOrganizationId: signedIn.workspaceId } },
 }));
 
-const { updateNumberingSettings } = await import("./actions");
+const actions = await import("./actions");
+const updateNumberingSettings = rendered(actions.updateNumberingSettings, () => signedIn?.workspaceId);
 
 let database: TestDatabase;
 let admin: postgres.Sql;

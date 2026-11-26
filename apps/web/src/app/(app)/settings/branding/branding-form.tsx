@@ -3,6 +3,7 @@
 import { type Hsv, hexToHsv, hsvToHex, isHexColour } from "@crm/core/branding";
 import { redirect, useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { ColourPicker } from "@/components/settings/colour-picker";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import {
   BRANDING_STALE,
   SAVE_BRANDING,
   SAVING_BRANDING,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 import { BrandPreview } from "./brand-preview";
 
@@ -29,6 +31,8 @@ interface FormProps {
   // The stored colour (or the default) and the settings version it was read at.
   saved: string;
   version: number;
+  // The workspace the page was rendered for (RenderedWorkspace).
+  workspaceId: string;
 }
 
 const ERROR_ID = "branding-error";
@@ -38,6 +42,7 @@ function errorFor(result: SaveResult): string | null {
   if (result.ok) return null;
   if (result.status === "INVALID_INPUT") return BRANDING_INVALID;
   if (result.status === "STALE_VERSION") return BRANDING_STALE;
+  if (result.status === "WORKSPACE_CHANGED") return WORKSPACE_CHANGED_MESSAGE;
   return result.status === "FORBIDDEN" ? BRANDING_FORBIDDEN : BRANDING_FAILED;
 }
 
@@ -50,7 +55,7 @@ function pickerValue(hex: string): Hsv {
 }
 const subscribeToNothing = () => () => {};
 
-function BrandingFields({ action, saved, version, unreachable }: FormProps & { unreachable: boolean }) {
+function BrandingFields({ action, saved, version, workspaceId, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
   const router = useRouter();
   const button = useRef<HTMLButtonElement>(null);
@@ -89,6 +94,7 @@ function BrandingFields({ action, saved, version, unreachable }: FormProps & { u
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
+      <RenderedWorkspace id={workspaceId} />
       <input type="hidden" name="expectedVersion" value={currentVersion} />
       <div className="flex max-w-xs flex-col gap-2">
         <Label htmlFor="brand-colour">Brand colour</Label>

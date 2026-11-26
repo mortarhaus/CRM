@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { z } from "zod";
 import { createDb, type DbHandle } from "../../db/client";
 import { startDatabase, type TestDatabase } from "../../test/postgres";
+import { rendered } from "../../test/rendered";
 import { totpFromUri, wrongTotpCode } from "../../test/totp";
 import { type Auth, createAuth } from "./config";
 
@@ -37,7 +38,11 @@ vi.mock("../env", async (importOriginal) => ({
 }));
 
 const { action } = await import("./action");
-const { requireStepUp, verifyStepUp } = await import("./step-up");
+const stepUp = await import("./step-up");
+const { requireStepUp } = stepUp;
+// The workspace the posting page was rendered for: the newest party's, unless a test switches it.
+let page = "";
+const verifyStepUp = rendered(stepUp.verifyStepUp, () => page);
 
 let database: TestDatabase;
 let admin: postgres.Sql;
@@ -113,6 +118,7 @@ async function newParty(label: string, enrol = true): Promise<Party> {
     secondCookie = cookieOf(passed);
   }
   await admin`update session set active_organization_id = ${workspaceId} where user_id = ${row.id}`;
+  page = workspaceId;
   return { userId: row.id, workspaceId, first: await sessionOf(cookie), second: await sessionOf(secondCookie), totp };
 }
 
@@ -127,7 +133,7 @@ function codeAt(totp: TOTP | null, steps = 0): string {
 }
 
 // A high-risk action as Phase 2 PR 5b will write one: the handler asks for step-up first.
-const highRisk = action({
+const highRisk = rendered(action({
   name: "test.highRisk",
   minRole: "staff",
   input: z.object({}),
@@ -136,7 +142,7 @@ const highRisk = action({
     await requireStepUp(ctx.tx, { id: ctx.sessionId });
     return { done: true };
   },
-});
+}), () => page);
 
 async function sessionCount(userId: string): Promise<number> {
   const [row] = await admin<{ n: number }[]>`select count(*)::int as n from session where user_id = ${userId}`;
@@ -205,6 +211,7 @@ describe("requireStepUp", () => {
     expect(response.status).toBe(200);
     const { id: secondWorkspace } = (await response.json()) as { id: string };
     await admin`update session set active_organization_id = ${secondWorkspace} where id = ${party.first.id}`;
+    page = secondWorkspace;
     signedInAs(party.first);
     expect(await highRisk({})).toEqual({ ok: false, status: "STEP_UP_REQUIRED" });
     const rows = await admin<{ workspace_id: string }[]>`select workspace_id from step_up where session_id = ${party.first.id}`;
@@ -330,7 +337,10 @@ describe("require_2fa (ASK 9)", () => {
   async function setRole(party: Party, role: string): Promise<void> {
     await admin`update member set "role" = ${role} where user_id = ${party.userId} and organization_id = ${party.workspaceId}`;
   }
-  const plain = action({ name: "test.plain", minRole: "staff", input: z.object({}), idempotent: false, handler: async () => ({ done: true }) });
+  const plain = rendered(
+    action({ name: "test.plain", minRole: "staff", input: z.object({}), idempotent: false, handler: async () => ({ done: true }) }),
+    () => page,
+  );
 
   it("refuses an Owner or Admin without 2FA with TWO_FACTOR_REQUIRED only while the workspace requires it", async () => {
     const party = await newParty("req", false);

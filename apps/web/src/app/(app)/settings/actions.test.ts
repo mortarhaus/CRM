@@ -3,6 +3,7 @@ import { ADDRESS_LINE_MAX_LENGTH } from "@crm/core/security";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { startDatabase, type TestDatabase } from "@/test/postgres";
+import { rendered } from "@/test/rendered";
 
 // Phase 2 plan Task 5: the settings actions through action() on the real crm_app role. The signed-in user and their
 // active workspace are what action() reads through getCurrentSession().
@@ -14,7 +15,9 @@ vi.mock("@/lib/auth/session", () => ({
     signedIn && { user: { id: signedIn.userId }, session: { activeOrganizationId: signedIn.workspaceId } },
 }));
 
-const { updateBrandingSettings, updateGeneralSettings } = await import("./actions");
+const actions = await import("./actions");
+const updateBrandingSettings = rendered(actions.updateBrandingSettings, () => signedIn?.workspaceId);
+const updateGeneralSettings = rendered(actions.updateGeneralSettings, () => signedIn?.workspaceId);
 
 let database: TestDatabase;
 let admin: postgres.Sql;

@@ -16,11 +16,11 @@ export const metadata: Metadata = { title: "Branding · CRM" };
 // Branding is Admin and Owner (plan Q2). Staff see the refusal instead of the form; this check and the hidden nav link
 // are for the page only, and the action checks the role again on every post (AUTH-02). The version is the one the
 // form saves against (optimistic concurrency).
-async function loadBranding(): Promise<{ colour: string; logoKey: string | null; version: number } | null> {
+async function loadBranding(): Promise<{ colour: string; logoKey: string | null; version: number; workspaceId: string } | null> {
   try {
     const { workspaceId } = await requireWorkspaceMember("admin");
     const settings = await withWorkspace(workspaceId, (tx) => getSettings(tx));
-    return { colour: settings.brandColour ?? DEFAULT_ACCENT, logoKey: settings.logoKey, version: settings.version };
+    return { colour: settings.brandColour ?? DEFAULT_ACCENT, logoKey: settings.logoKey, version: settings.version, workspaceId };
   } catch (error) {
     if (!(error instanceof ActionRefusedError)) throw error;
     if (error.status === "UNAUTHENTICATED") redirect("/sign-in");
@@ -41,7 +41,15 @@ export default async function BrandingSettingsPage() {
         {branding ? (
           <>
             <p className="text-sm text-muted-foreground">{BRANDING_INTRO}</p>
-            <BrandingForm action={updateBrandingSettings} saved={branding.colour} version={branding.version} />
+            {/* Keyed by workspace (as every bound form): a workspace switch starts a fresh form, never one holding another
+                workspace's values. */}
+            <BrandingForm
+              key={branding.workspaceId}
+              action={updateBrandingSettings}
+              saved={branding.colour}
+              version={branding.version}
+              workspaceId={branding.workspaceId}
+            />
             <section aria-labelledby="logo-heading" className="flex flex-col gap-4 border-t border-border pt-6">
               <h2 id="logo-heading" className="text-lg font-semibold">
                 {LOGO_HEADING}
@@ -60,7 +68,7 @@ export default async function BrandingSettingsPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">{LOGO_NONE}</p>
               )}
-              <LogoForm action={uploadLogo} version={branding.version} />
+              <LogoForm key={branding.workspaceId} action={uploadLogo} version={branding.version} workspaceId={branding.workspaceId} />
             </section>
           </>
         ) : (

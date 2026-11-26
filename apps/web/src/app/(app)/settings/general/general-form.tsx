@@ -2,6 +2,7 @@
 
 import { redirect, useRouter } from "next/navigation";
 import { type FormEvent, startTransition, useActionState, useEffect, useRef } from "react";
+import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { type SelectOption, SelectField, TextField } from "@/components/settings/settings-field";
 import { TAX_FIELD_ERRORS, TaxFields } from "@/components/settings/tax-fields";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
@@ -37,6 +38,7 @@ import {
   ONBOARDING_INVALID,
   ONBOARDING_TEXT_INVALID,
   SETUP_PENDING,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 
 type SaveResult = ActionResult<{ version: number; newDocumentsOnly: boolean }>;
@@ -70,6 +72,8 @@ interface FormProps {
   timeZones: readonly string[];
   dateFormats: readonly SelectOption[];
   currencies: readonly string[];
+  // The workspace the page was rendered for (RenderedWorkspace).
+  workspaceId: string;
 }
 
 const FIELD_ERRORS: Record<string, string> = {
@@ -91,9 +95,10 @@ const REFUSALS: Partial<Record<string, string>> = {
   STALE_VERSION: GENERAL_STALE,
   FORBIDDEN: GENERAL_FORBIDDEN,
   NOT_ONBOARDED: SETUP_PENDING,
+  WORKSPACE_CHANGED: WORKSPACE_CHANGED_MESSAGE,
 };
 
-function GeneralFields({ action, values, timeZones, dateFormats, currencies, unreachable }: FormProps & { unreachable: boolean }) {
+function GeneralFields({ action, values, timeZones, dateFormats, currencies, workspaceId, unreachable }: FormProps & { unreachable: boolean }) {
   const [result, formAction, pending] = useActionState<SaveResult | null, FormData>(action, null);
   const router = useRouter();
   const button = useRef<HTMLButtonElement>(null);
@@ -133,6 +138,7 @@ function GeneralFields({ action, values, timeZones, dateFormats, currencies, unr
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="group flex flex-col gap-8">
+      <RenderedWorkspace id={workspaceId} />
       <input type="hidden" name="expectedVersion" value={version} />
       <p>
         <span className="text-sm text-muted-foreground">{GENERAL_COUNTRY}: </span>

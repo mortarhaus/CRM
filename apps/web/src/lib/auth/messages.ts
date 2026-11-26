@@ -100,6 +100,9 @@ export const ONBOARDING_TAX_RATE_INVALID = "Enter the rate as a percentage, for 
 export const ONBOARDING_TEXT_INVALID = `Use at most ${SETTINGS_TEXT_MAX_LENGTH} characters, without special formatting characters.`;
 export const ONBOARDING_STALE = "This workspace was set up after this page loaded. Reload the page.";
 export const ONBOARDING_FAILED = "We couldn't save your answers. Try again.";
+// Any form whose page was rendered for another workspace than the session's active one (action(), WORKSPACE_CHANGED).
+export const WORKSPACE_CHANGED_MESSAGE =
+  "This page was opened in another workspace, so nothing was saved. Reload the page to see the active workspace.";
 // Shown to an Admin or Staff member while the Owner has not finished onboarding (plan Task 8).
 export const SETUP_PENDING = "The owner has not finished setting up this workspace.";
 export const SETUP_PENDING_HINT = "You can switch to another workspace or sign out.";
@@ -328,8 +331,6 @@ export const TEMPLATE_SUBJECT_REFUSED = `This subject was not saved. Use one lin
 export const TEMPLATE_BODY_REFUSED = `This message was not saved. Use at most ${EMAIL_TEMPLATE_BODY_MAX_LENGTH} characters, and only the fields listed above, each written as {{field_name}}.`;
 export const TEMPLATE_DRAFT_NOT_KEPT = "Your changes were not kept: the subject and message below are the saved text. Make your change again, then save.";
 export const TEMPLATE_STALE = "Someone else changed this template after this page loaded. Reload the page, then save again.";
-export const TEMPLATE_WORKSPACE_CHANGED =
-  "This page was opened in another workspace, so nothing was saved. Reload the page to edit this workspace's templates.";
 export const TEMPLATE_FAILED = "We couldn't save the template. Try again.";
 export const TEMPLATE_PREVIEW = "Preview";
 export const TEMPLATE_PREVIEW_HINT = "With sample data. Nothing is sent.";

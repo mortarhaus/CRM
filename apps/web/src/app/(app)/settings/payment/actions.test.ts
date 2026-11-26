@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { createS3Adapter, type StorageAdapter } from "@/adapters/storage";
 import { startMinio, type TestMinio } from "@/test/minio";
 import { startDatabase, type TestDatabase } from "@/test/postgres";
+import { rendered } from "@/test/rendered";
 
 // Phase 2 plan Tasks 14 and 15: bank details and the payment QR through action() on the real crm_app role and a real
 // MinIO. Step-up is a step_up row for the signed-in session, as verifyStepUp writes it (its code check is tested
@@ -31,7 +32,10 @@ vi.mock("@/adapters/storage", async (original) => ({
   }),
 }));
 
-const { confirmStepUp, saveBankDetails, uploadPaymentQr } = await import("./actions");
+const actions = await import("./actions");
+const confirmStepUp = rendered(actions.confirmStepUp, () => signedIn?.workspaceId);
+const saveBankDetails = rendered(actions.saveBankDetails, () => signedIn?.workspaceId);
+const uploadPaymentQr = rendered(actions.uploadPaymentQr, () => signedIn?.workspaceId);
 const { stableJobId } = await import("@/jobs/enqueue");
 const { GET } = await import("../../files/payment-qr/route");
 

@@ -108,8 +108,14 @@ async function newParty(label: string): Promise<Party> {
   return { userId, cookie, workspaceId: id };
 }
 
-function signedInAs(cookie: string | null): void {
+// The workspace the "page" a test posts from was rendered for: the signed-in party's active one unless a test says
+// otherwise. b() adds it to an input, as a page that binds an action's input does.
+let active = "";
+const b = <T extends object>(input: T) => ({ workspaceId: active, ...input });
+
+function signedInAs(cookie: string | null, workspaceId = owner.workspaceId): void {
   requestHeaders = new Headers(cookie === null ? {} : { cookie });
+  active = workspaceId;
 }
 
 function reset(): void {
@@ -181,7 +187,7 @@ describe("action(): session", () => {
     const input = z.object({ note: z.string() });
     const parse = vi.spyOn(input, "safeParse");
     const run = action({ name: "test.note", minRole: "staff", input, idempotent: true, handler });
-    expect(await run({ note: "x" }, randomUUID())).toEqual({ ok: false, status: "UNAUTHENTICATED" });
+    expect(await run(b({ note: "x" }), randomUUID())).toEqual({ ok: false, status: "UNAUTHENTICATED" });
     expect(handler).not.toHaveBeenCalled();
     expect(parse).not.toHaveBeenCalled();
     // Better Auth's own request transaction (Task 31) still runs for the session read; nothing past it does.
@@ -195,47 +201,38 @@ describe("action(): session", () => {
     reset();
     const { handler } = recordingHandler();
     const run = noteAction("test.note", "staff", handler);
-    expect(await run({ note: "x" })).toEqual({ ok: false, status: "NO_WORKSPACE" });
+    expect(await run(b({ note: "x" }))).toEqual({ ok: false, status: "NO_WORKSPACE" });
     expect(handler).not.toHaveBeenCalled();
     expect(steps).toEqual(["session"]);
   });
 });
 
 describe("action(): workspace and role", () => {
-  it("takes the workspace from the session only: a workspaceId in the input is never used", async () => {
+  it("takes the workspace from the session only: the posted workspaceId is compared, never used, and Zod never sees it", async () => {
     const { handler, seen } = recordingHandler();
-    const input = z.looseObject({ note: z.string() });
+    const input = z.strictObject({ note: z.string() });
     const run = action({ name: "test.note", minRole: "staff", input, idempotent: false, handler });
-    const result = await run({ note: "x", workspaceId: other.workspaceId });
-    expect(result).toEqual({ ok: true, status: "DONE", data: { done: true, n: 1 } });
-    expect(seen).toEqual([
-      {
-        workspaceId: owner.workspaceId,
-        userId: owner.userId,
-        role: "owner",
-        setting: owner.workspaceId,
-        input: { note: "x", workspaceId: other.workspaceId },
-      },
-    ]);
+    expect(await run({ note: "x", workspaceId: owner.workspaceId })).toEqual({ ok: true, status: "DONE", data: { done: true, n: 1 } });
+    expect(seen).toEqual([{ workspaceId: owner.workspaceId, userId: owner.userId, role: "owner", setting: owner.workspaceId, input: { note: "x" } }]);
   });
 
   it("runs a staff-level action for an owner, and an admin-level one for an admin", async () => {
     const { handler, seen } = recordingHandler();
-    expect((await noteAction("test.staff", "staff", handler)({ note: "x" })).ok).toBe(true);
+    expect((await noteAction("test.staff", "staff", handler)(b({ note: "x" }))).ok).toBe(true);
     await setRole(owner, "admin");
-    expect((await noteAction("test.admin", "admin", handler)({ note: "x" })).ok).toBe(true);
+    expect((await noteAction("test.admin", "admin", handler)(b({ note: "x" }))).ok).toBe(true);
     expect(seen.map((entry) => entry.role)).toEqual(["owner", "admin"]);
   });
 
   it("returns FORBIDDEN for an owner-level action by a stored admin, and an admin-level one by staff", async () => {
     const { handler } = recordingHandler();
     await setRole(owner, "admin");
-    expect(await noteAction("test.owner", "owner", handler)({ note: "x" })).toEqual({
+    expect(await noteAction("test.owner", "owner", handler)(b({ note: "x" }))).toEqual({
       ok: false,
       status: "FORBIDDEN",
     });
     await setRole(owner, "staff");
-    expect(await noteAction("test.admin", "admin", handler)({ note: "x" })).toEqual({
+    expect(await noteAction("test.admin", "admin", handler)(b({ note: "x" }))).toEqual({
       ok: false,
       status: "FORBIDDEN",
     });
@@ -245,7 +242,7 @@ describe("action(): workspace and role", () => {
   it.each(["member", "OWNER", ""])("returns FORBIDDEN for the unknown stored role %j", async (role) => {
     const { handler } = recordingHandler();
     await setRole(owner, role);
-    expect(await noteAction("test.staff", "staff", handler)({ note: "x" })).toEqual({
+    expect(await noteAction("test.staff", "staff", handler)(b({ note: "x" }))).toEqual({
       ok: false,
       status: "FORBIDDEN",
     });
@@ -254,11 +251,12 @@ describe("action(): workspace and role", () => {
 
   it("returns FORBIDDEN for a stale active workspace (the user is not a member) before Zod runs", async () => {
     await admin`update session set active_organization_id = ${other.workspaceId} where user_id = ${owner.userId}`;
+    active = other.workspaceId;
     const { handler } = recordingHandler();
     const input = z.object({ note: z.string() });
     const parse = vi.spyOn(input, "safeParse");
     const run = action({ name: "test.note", minRole: "staff", input, idempotent: true, handler });
-    expect(await run({ note: "x" }, randomUUID())).toEqual({ ok: false, status: "FORBIDDEN" });
+    expect(await run(b({ note: "x" }), randomUUID())).toEqual({ ok: false, status: "FORBIDDEN" });
     expect(parse).not.toHaveBeenCalled();
     expect(handler).not.toHaveBeenCalled();
     expect(steps).toEqual(["session", "membership"]);
@@ -286,12 +284,142 @@ describe("action(): workspace and role", () => {
   });
 });
 
+// PR 76 Review R1 P0, made shared (DECISIONS 2026-11-25): a page rendered for workspace A, posted after the session
+// switched to B. Every action() is bound; there is no opt-out.
+describe("action(): the workspace the posting page was rendered for", () => {
+  const spied = () => {
+    const input = z.object({ note: z.string() });
+    const parse = vi.spyOn(input, "safeParse");
+    const before = vi.fn(async () => {});
+    return { input, parse, before };
+  };
+
+  it.each([
+    ["another workspace", () => ({ workspaceId: other.workspaceId })],
+    ["no workspace", () => ({})],
+    ["a workspace that is not text", () => ({ workspaceId: 42 })],
+  ])("refuses an input naming %s with WORKSPACE_CHANGED before membership, Zod, beforeTransaction or a key", async (_label, extra) => {
+    const { handler } = recordingHandler();
+    const { input, parse, before } = spied();
+    const run = action({ name: "test.bound", minRole: "staff", input, idempotent: true, handler, beforeTransaction: before });
+    const key = randomUUID();
+    expect(await run({ note: "x", ...extra() }, key)).toEqual({ ok: false, status: "WORKSPACE_CHANGED" });
+    expect(steps).toEqual(["session"]);
+    expect(queries.filter((query) => /member|idempotency_key|workspace_settings|app\.workspace_id/.test(query))).toEqual([]);
+    expect(parse).not.toHaveBeenCalled();
+    expect(before).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+    expect(await keyRows(owner.workspaceId, key)).toEqual([]);
+  });
+
+  it("refuses a form posted from another workspace's page, or one with no such field, and never echoes it", async () => {
+    const { handler } = recordingHandler();
+    const { input, parse } = spied();
+    const fromForm = (form: FormData) => ({ note: form.get("note") });
+    const echo = (form: FormData) => ({ shown: String(form.get("note")) });
+    const run = action({ name: "test.bound.form", minRole: "staff", input, idempotent: false, handler, fromForm, echo });
+    for (const workspaceId of [other.workspaceId, null]) {
+      const form = new FormData();
+      if (workspaceId !== null) form.append("workspaceId", workspaceId);
+      form.append("note", "typed in the other workspace");
+      // The previous state (the first argument) is never read for the binding: only the form is.
+      expect(await run({ workspaceId: owner.workspaceId }, form)).toEqual({ ok: false, status: "WORKSPACE_CHANGED" });
+    }
+    expect(parse).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("acts in the session's workspace after a switch, for a page rendered there", async () => {
+    await admin`insert into member (organization_id, user_id, role, created_at) values (${other.workspaceId}, ${owner.userId}, 'admin', now())`;
+    await admin`update session set active_organization_id = ${other.workspaceId} where user_id = ${owner.userId}`;
+    const { handler, seen } = recordingHandler();
+    const run = noteAction("test.bound.switched", "staff", handler);
+    expect(await run({ note: "x", workspaceId: owner.workspaceId })).toEqual({ ok: false, status: "WORKSPACE_CHANGED" });
+    expect(await run({ note: "x", workspaceId: other.workspaceId })).toMatchObject({ ok: true, status: "DONE" });
+    expect(seen.map(({ workspaceId, setting, role }) => ({ workspaceId, setting, role }))).toEqual([
+      { workspaceId: other.workspaceId, setting: other.workspaceId, role: "admin" },
+    ]);
+    await admin`delete from member where organization_id = ${other.workspaceId} and user_id = ${owner.userId}`;
+  });
+
+  it("leaves requireWorkspaceMember() unbound for a page, which reads the session's workspace", async () => {
+    expect((await requireWorkspaceMember("staff")).workspaceId).toBe(owner.workspaceId);
+    await expect(requireWorkspaceMember("staff", () => other.workspaceId)).rejects.toMatchObject({ status: "WORKSPACE_CHANGED" });
+    await expect(requireWorkspaceMember("staff", () => null)).rejects.toMatchObject({ status: "WORKSPACE_CHANGED" });
+  });
+});
+
+// PR 77 Review R1 P1: the session is read first; then only the rendered workspace; every other input value only once
+// the role check passed. Each read of the input is recorded in `steps`, beside the session and membership steps.
+describe("action(): what is read of the input, and when", () => {
+  const readLogged = (name: string, value: unknown) => {
+    steps.push(`read:${name}`);
+    return value;
+  };
+  // A raw input whose every property read is recorded.
+  const rawInput = (workspaceId: string | null) => {
+    const input = {};
+    if (workspaceId !== null) Object.defineProperty(input, "workspaceId", { enumerable: true, get: () => readLogged("workspaceId", workspaceId) });
+    Object.defineProperty(input, "note", { enumerable: true, get: () => readLogged("note", "x") });
+    return input;
+  };
+  // A posted form whose every field read is recorded.
+  class LoggedForm extends FormData {
+    override get(name: string) {
+      return readLogged(name, super.get(name)) as FormDataEntryValue | null;
+    }
+  }
+  const formInput = (workspaceId: string | null) => {
+    const form = new LoggedForm();
+    if (workspaceId !== null) form.append("workspaceId", workspaceId);
+    form.append("note", "x");
+    return form;
+  };
+  const fromForm = (form: FormData) => ({ note: form.get("note") });
+  const call = async (kind: "raw" | "form", workspaceId: string | null, minRole: Role = "staff") => {
+    const { handler, seen } = recordingHandler();
+    const run = action({ name: `test.order.${kind}`, minRole, input: noteInput, idempotent: false, handler, fromForm });
+    reset();
+    const result = kind === "raw" ? await run(rawInput(workspaceId)) : await run(null, formInput(workspaceId));
+    return { result, seen, steps: [...steps] };
+  };
+
+  it.each(["raw", "form"] as const)("%s: a request with no session reads nothing of the input", async (kind) => {
+    signedInAs(null);
+    expect(await call(kind, owner.workspaceId)).toMatchObject({ result: { ok: false, status: "UNAUTHENTICATED" }, steps: ["session"] });
+  });
+
+  it.each(["raw", "form"] as const)("%s: a stale page's post reads only the rendered workspace, after the session", async (kind) => {
+    for (const workspaceId of [other.workspaceId, null]) {
+      const { result, seen, steps: order } = await call(kind, workspaceId);
+      expect(result).toEqual({ ok: false, status: "WORKSPACE_CHANGED" });
+      expect(order).toEqual(workspaceId === null && kind === "raw" ? ["session"] : ["session", "read:workspaceId"]);
+      expect(seen).toEqual([]);
+    }
+  });
+
+  it.each(["raw", "form"] as const)("%s: a role refusal reads the rendered workspace only, never the payload", async (kind) => {
+    await setRole(owner, "staff");
+    const { result, steps: order } = await call(kind, owner.workspaceId, "admin");
+    expect(result).toEqual({ ok: false, status: "FORBIDDEN" });
+    expect(order).toEqual(["session", "read:workspaceId", "membership"]);
+  });
+
+  it.each(["raw", "form"] as const)("%s: an allowed post reads the payload after the role check and acts in the session's workspace", async (kind) => {
+    const { result, seen, steps: order } = await call(kind, owner.workspaceId);
+    expect(result).toEqual({ ok: true, status: "DONE", data: { done: true, n: 1 } });
+    expect(order.slice(0, 3)).toEqual(["session", "read:workspaceId", "membership"]);
+    expect(order.slice(3)).toContain("read:note");
+    expect(seen).toEqual([{ workspaceId: owner.workspaceId, userId: owner.userId, role: "owner", setting: owner.workspaceId, input: { note: "x" } }]);
+  });
+});
+
 describe("action(): input", () => {
   it("returns INVALID_INPUT with the field paths and no values, and does not call the handler", async () => {
     const { handler } = recordingHandler();
     const input = z.object({ note: z.string().min(1), amount: z.number().int(), nested: z.object({ email: z.email() }) });
     const run = action({ name: "test.input", minRole: "staff", input, idempotent: false, handler });
-    const result = await run({ note: "", amount: 1.5, nested: { email: "secret value not an email" } });
+    const result = await run(b({ note: "", amount: 1.5, nested: { email: "secret value not an email" } }));
     expect(result).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note", "amount", "nested.email"] });
     expect(JSON.stringify(result)).not.toContain("secret value");
     expect(handler).not.toHaveBeenCalled();
@@ -304,7 +432,7 @@ describe("action(): input", () => {
   ])("returns INVALID_INPUT on idempotencyKey for an idempotent action with a %s key", async (_label, key) => {
     const { handler } = recordingHandler();
     const run = noteAction("test.key", "staff", handler, true);
-    expect(await run({ note: "x" }, key)).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["idempotencyKey"] });
+    expect(await run(b({ note: "x" }), key)).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["idempotencyKey"] });
     expect(handler).not.toHaveBeenCalled();
   });
 });
@@ -312,6 +440,7 @@ describe("action(): input", () => {
 describe("action(): a form posted through useActionState, called as (previous state, form data)", () => {
   const noteForm = (note: string) => {
     const form = new FormData();
+    form.append("workspaceId", active);
     form.append("note", note);
     return form;
   };
@@ -320,7 +449,7 @@ describe("action(): a form posted through useActionState, called as (previous st
     const { handler, seen } = recordingHandler();
     const fromForm = (form: FormData) => ({ note: form.get("note") });
     const run = action({ name: "test.form", minRole: "staff", input: noteInput, idempotent: false, handler, fromForm });
-    expect(await run({ note: "previous state" }, noteForm("from the form"))).toMatchObject({ ok: true, status: "DONE" });
+    expect(await run(b({ note: "previous state" }), noteForm("from the form"))).toMatchObject({ ok: true, status: "DONE" });
     expect(seen.map(({ input }) => input)).toEqual([{ note: "from the form" }]);
     expect(await run(null, noteForm(""))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"] });
   });
@@ -331,17 +460,17 @@ describe("action(): a form posted through useActionState, called as (previous st
     const echo = (form: FormData) => ({ shown: String(form.get("note")) });
     const run = action({ name: "test.echo", minRole: "staff", input: noteInput, idempotent: false, handler, fromForm, echo });
     expect(await run(null, noteForm(""))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"], echo: { shown: "" } });
-    expect(await run({ note: "" })).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"] });
+    expect(await run(b({ note: "" }))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["note"] });
     expect(await run(null, noteForm("fine"))).toEqual({ ok: true, status: "DONE", data: { done: true, n: 1 } });
   });
 
   it("an action without fromForm takes only its first argument, and a form is never an idempotency key", async () => {
     const { handler, seen } = recordingHandler();
     const run = noteAction("test.no-form", "staff", handler);
-    expect(await run({ note: "first argument" }, noteForm("ignored"))).toMatchObject({ ok: true });
+    expect(await run(b({ note: "first argument" }), noteForm("ignored"))).toMatchObject({ ok: true });
     expect(seen.map(({ input }) => input)).toEqual([{ note: "first argument" }]);
     const keyed = noteAction("test.no-form.keyed", "staff", handler, true);
-    expect(await keyed({ note: "x" }, noteForm("x"))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["idempotencyKey"] });
+    expect(await keyed(b({ note: "x" }), noteForm("x"))).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["idempotencyKey"] });
   });
 });
 
@@ -350,8 +479,8 @@ describe("action(): idempotency", () => {
     const { handler } = recordingHandler();
     const run = noteAction("test.replay", "staff", handler, true);
     const key = randomUUID();
-    expect(await run({ note: "x" }, key)).toEqual({ ok: true, status: "DONE", data: { done: true, n: 1 } });
-    expect(await run({ note: "x" }, key)).toEqual({ ok: true, status: "REPLAYED", data: { done: true, n: 1 } });
+    expect(await run(b({ note: "x" }), key)).toEqual({ ok: true, status: "DONE", data: { done: true, n: 1 } });
+    expect(await run(b({ note: "x" }), key)).toEqual({ ok: true, status: "REPLAYED", data: { done: true, n: 1 } });
     expect(handler).toHaveBeenCalledTimes(1);
     expect(await keyRows(owner.workspaceId, key)).toEqual([{ action: "test.replay", response: { done: true, n: 1 } }]);
   });
@@ -362,9 +491,9 @@ describe("action(): idempotency", () => {
     const input = z.object({ tags: z.record(z.string(), z.record(z.string(), z.number())) });
     const run = action({ name: "test.order", minRole: "staff", input, idempotent: true, handler });
     const key = randomUUID();
-    expect((await run({ tags: { a: { c: 1, d: 2 }, b: { e: 3 } } }, key)).status).toBe("DONE");
-    expect((await run({ tags: { b: { e: 3 }, a: { d: 2, c: 1 } } }, key)).status).toBe("REPLAYED");
-    expect((await run({ tags: { a: { c: 1, d: 3 }, b: { e: 3 } } }, key)).status).toBe("IDEMPOTENCY_KEY_REUSED");
+    expect((await run(b({ tags: { a: { c: 1, d: 2 }, b: { e: 3 } } }), key)).status).toBe("DONE");
+    expect((await run(b({ tags: { b: { e: 3 }, a: { d: 2, c: 1 } } }), key)).status).toBe("REPLAYED");
+    expect((await run(b({ tags: { a: { c: 1, d: 3 }, b: { e: 3 } } }), key)).status).toBe("IDEMPOTENCY_KEY_REUSED");
   });
 
   it("refuses to hash a Set, a Map, a Blob, a File or a class instance (TypeError), and claims no key", async () => {
@@ -383,7 +512,7 @@ describe("action(): idempotency", () => {
       const input = z.object({ field: z.custom<unknown>(() => true) });
       const run = action({ name: `test.unhashable.${label}`, minRole: "staff", input, idempotent: true, handler });
       const key = randomUUID();
-      await expect(run({ field: value }, key), label).rejects.toThrow(TypeError);
+      await expect(run(b({ field: value }), key), label).rejects.toThrow(TypeError);
       expect(handler, label).not.toHaveBeenCalled();
       expect(await keyRows(owner.workspaceId, key), label).toEqual([]);
     }
@@ -392,8 +521,8 @@ describe("action(): idempotency", () => {
     const input = z.object({ field: z.custom<unknown>(() => true) });
     const run = action({ name: "test.unhashable.null-prototype", minRole: "staff", input, idempotent: true, handler });
     const key = randomUUID();
-    expect((await run({ field: Object.assign(Object.create(null), { a: 1 }) }, key)).status).toBe("DONE");
-    expect((await run({ field: { a: 1 } }, key)).status).toBe("REPLAYED");
+    expect((await run(b({ field: Object.assign(Object.create(null), { a: 1 }) }), key)).status).toBe("DONE");
+    expect((await run(b({ field: { a: 1 } }), key)).status).toBe("REPLAYED");
   });
 
   it("returns a refusal the handler throws, rolls back its key, and runs the same key again later", async () => {
@@ -404,20 +533,20 @@ describe("action(): idempotency", () => {
       return { done: true };
     }, true);
     const key = randomUUID();
-    expect(await run({ note: "x" }, key)).toEqual({ ok: false, status: "RATE_LIMITED" });
+    expect(await run(b({ note: "x" }), key)).toEqual({ ok: false, status: "RATE_LIMITED" });
     expect(await keyRows(owner.workspaceId, key)).toEqual([]);
     refuse = false;
-    expect(await run({ note: "x" }, key)).toEqual({ ok: true, status: "DONE", data: { done: true } });
+    expect(await run(b({ note: "x" }), key)).toEqual({ ok: true, status: "DONE", data: { done: true } });
   });
 
   it("returns IDEMPOTENCY_KEY_REUSED for the same key with other input, or for another action", async () => {
     const { handler } = recordingHandler();
     const run = noteAction("test.reuse", "staff", handler, true);
     const key = randomUUID();
-    await run({ note: "x" }, key);
-    expect(await run({ note: "y" }, key)).toEqual({ ok: false, status: "IDEMPOTENCY_KEY_REUSED" });
+    await run(b({ note: "x" }), key);
+    expect(await run(b({ note: "y" }), key)).toEqual({ ok: false, status: "IDEMPOTENCY_KEY_REUSED" });
     const otherAction = noteAction("test.other", "staff", handler, true);
-    expect(await otherAction({ note: "x" }, key)).toEqual({ ok: false, status: "IDEMPOTENCY_KEY_REUSED" });
+    expect(await otherAction(b({ note: "x" }), key)).toEqual({ ok: false, status: "IDEMPOTENCY_KEY_REUSED" });
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
@@ -425,9 +554,9 @@ describe("action(): idempotency", () => {
     const { handler } = recordingHandler();
     const run = noteAction("test.scope", "staff", handler, true);
     const key = randomUUID();
-    expect((await run({ note: "x" }, key)).status).toBe("DONE");
-    signedInAs(other.cookie);
-    expect((await run({ note: "x" }, key)).status).toBe("DONE");
+    expect((await run(b({ note: "x" }), key)).status).toBe("DONE");
+    signedInAs(other.cookie, other.workspaceId);
+    expect((await run(b({ note: "x" }), key)).status).toBe("DONE");
     expect(handler).toHaveBeenCalledTimes(2);
   });
 
@@ -436,28 +565,28 @@ describe("action(): idempotency", () => {
       throw new Error("handler failed");
     });
     const key = randomUUID();
-    await expect(noteAction("test.fail", "staff", failing, true)({ note: "x" }, key)).rejects.toThrow(
+    await expect(noteAction("test.fail", "staff", failing, true)(b({ note: "x" }), key)).rejects.toThrow(
       "handler failed",
     );
     expect(await keyRows(owner.workspaceId, key)).toEqual([]);
     const { handler } = recordingHandler();
-    expect((await noteAction("test.fail", "staff", handler, true)({ note: "x" }, key)).status).toBe("DONE");
+    expect((await noteAction("test.fail", "staff", handler, true)(b({ note: "x" }), key)).status).toBe("DONE");
   });
 
   it("reclaims an expired key as a new request", async () => {
     const { handler } = recordingHandler();
     const run = noteAction("test.expiry", "staff", handler, true);
     const key = randomUUID();
-    await run({ note: "x" }, key);
+    await run(b({ note: "x" }), key);
     await admin`update idempotency_key set expires_at = now() - interval '1 second' where key = ${key}`;
-    expect(await run({ note: "y" }, key)).toEqual({ ok: true, status: "DONE", data: { done: true, n: 2 } });
+    expect(await run(b({ note: "y" }), key)).toEqual({ ok: true, status: "DONE", data: { done: true, n: 2 } });
     expect(await keyRows(owner.workspaceId, key)).toEqual([{ action: "test.expiry", response: { done: true, n: 2 } }]);
   });
 
   it("stores the key with the expiry from IDEMPOTENCY_KEY_EXPIRY_SECONDS", async () => {
     const { handler } = recordingHandler();
     const key = randomUUID();
-    await noteAction("test.ttl", "staff", handler, true)({ note: "x" }, key);
+    await noteAction("test.ttl", "staff", handler, true)(b({ note: "x" }), key);
     const [row] = await admin<{ seconds: number }[]>`
       select round(extract(epoch from expires_at - created_at))::int as seconds from idempotency_key where key = ${key}`;
     expect(row?.seconds).toBe(24 * 60 * 60);
@@ -467,8 +596,8 @@ describe("action(): idempotency", () => {
     const { handler } = recordingHandler();
     const key = randomUUID();
     const run = noteAction("test.plain", "staff", handler);
-    expect((await run({ note: "x" }, key)).status).toBe("DONE");
-    expect((await run({ note: "x" }, key)).status).toBe("DONE");
+    expect((await run(b({ note: "x" }), key)).status).toBe("DONE");
+    expect((await run(b({ note: "x" }), key)).status).toBe("DONE");
     expect(handler).toHaveBeenCalledTimes(2);
     expect(await keyRows(owner.workspaceId, key)).toEqual([]);
   });
@@ -483,9 +612,9 @@ describe("action(): redirectTo", () => {
     const { handler } = recordingHandler();
     const key = randomUUID();
     const run = action({ name: "test.redirect", minRole: "staff", input: noteInput, idempotent: true, handler, redirectTo: "/done" });
-    await expect(run({ note: "x" }, key)).rejects.toEqual(redirectTo("/done"));
+    await expect(run(b({ note: "x" }), key)).rejects.toEqual(redirectTo("/done"));
     expect(await keyRows(owner.workspaceId, key)).toEqual([{ action: "test.redirect", response: { done: true, n: 1 } }]);
-    await expect(run({ note: "x" }, key)).rejects.toEqual(redirectTo("/done"));
+    await expect(run(b({ note: "x" }), key)).rejects.toEqual(redirectTo("/done"));
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
@@ -494,10 +623,10 @@ describe("action(): redirectTo", () => {
       throw new ActionRefusedError("STALE_VERSION");
     };
     const run = action({ name: "test.redirect", minRole: "staff", input: noteInput, idempotent: false, handler: refuse, redirectTo: "/done" });
-    expect(await run({ note: "x" })).toEqual({ ok: false, status: "STALE_VERSION" });
-    expect(await run({ note: "" })).toMatchObject({ ok: false, status: "INVALID_INPUT" });
+    expect(await run(b({ note: "x" }))).toEqual({ ok: false, status: "STALE_VERSION" });
+    expect(await run(b({ note: "" }))).toMatchObject({ ok: false, status: "INVALID_INPUT" });
     signedInAs(null);
-    expect(await run({ note: "x" })).toEqual({ ok: false, status: "UNAUTHENTICATED" });
+    expect(await run(b({ note: "x" }))).toEqual({ ok: false, status: "UNAUTHENTICATED" });
   });
 });
 
@@ -511,7 +640,7 @@ describe("action(): order", () => {
       return parse(value);
     });
     const run = action({ name: "test.order", minRole: "staff", input, idempotent: true, handler });
-    expect((await run({ note: "x" }, randomUUID())).status).toBe("DONE");
+    expect((await run(b({ note: "x" }), randomUUID())).status).toBe("DONE");
     expect(steps).toEqual(["session", "membership", "zod", "idempotency", "handler", "store"]);
   });
 
@@ -529,7 +658,7 @@ describe("action(): order", () => {
       seen.push({ userId: member.userId, workspaceId: member.workspaceId, input: value });
     };
     const run = action({ name: "test.before", minRole: "staff", input, idempotent: true, handler, beforeTransaction });
-    expect((await run({ note: "x" }, randomUUID())).status).toBe("DONE");
+    expect((await run(b({ note: "x" }), randomUUID())).status).toBe("DONE");
     expect(steps).toEqual(["session", "membership", "zod", "before", "idempotency", "handler", "store"]);
     expect(seen).toEqual([{ userId: owner.userId, workspaceId: owner.workspaceId, input: { note: "x" } }]);
   });
@@ -546,7 +675,7 @@ describe("action(): order", () => {
         throw new ActionRefusedError("RATE_LIMITED");
       },
     });
-    expect(await run({ note: "x" }, randomUUID())).toEqual({ ok: false, status: "RATE_LIMITED" });
+    expect(await run(b({ note: "x" }), randomUUID())).toEqual({ ok: false, status: "RATE_LIMITED" });
     expect(handler).not.toHaveBeenCalled();
     expect(queries.filter((query) => /idempotency_key/.test(query))).toEqual([]);
   });

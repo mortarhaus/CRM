@@ -78,10 +78,14 @@ export default async function PaymentSettingsPage() {
                 {STEP_UP_CONFIRMED}
               </p>
             ) : (
-              <StepUpPrompt action={confirmStepUp} />
+              <StepUpPrompt key={`step-up:${settings.workspaceId}`} action={confirmStepUp} workspaceId={settings.workspaceId} />
             )}
+            {/* Keyed by workspace (as every bound form): a workspace switch starts fresh forms, never ones holding
+                another workspace's values. Sibling keys differ, or the prompt's return would remount this form. */}
             <BankDetailsForm
+              key={`bank:${settings.workspaceId}`}
               action={saveBankDetails}
+              workspaceId={settings.workspaceId}
               version={settings.version}
               saved={{
                 bankName: settings.bankName,
@@ -110,7 +114,14 @@ export default async function PaymentSettingsPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">{PAYMENT_QR_NONE}</p>
               )}
-              <PaymentQrForm action={uploadPaymentQr} version={settings.version} name={qrName} steppedUp={steppedUp} />
+              <PaymentQrForm
+                key={settings.workspaceId}
+                action={uploadPaymentQr}
+                version={settings.version}
+                name={qrName}
+                steppedUp={steppedUp}
+                workspaceId={settings.workspaceId}
+              />
             </section>
           </>
         )}
