@@ -2,7 +2,10 @@ import { MONEY_INPUT_MAX_LENGTH, MONEY_MAX_MINOR } from "../security/limits";
 import { currencyExponent } from "./currency";
 
 // Why a typed amount was refused. Nothing is ever rounded: more decimals than the currency has is a refusal.
-export type MoneyParseReason = "empty" | "invalid" | "negative" | "too_many_decimals" | "too_large";
+export const MONEY_PARSE_REASONS = ["empty", "invalid", "negative", "too_many_decimals", "too_large"] as const;
+export type MoneyParseReason = (typeof MONEY_PARSE_REASONS)[number];
+
+export const isMoneyParseReason = (value: unknown): value is MoneyParseReason => (MONEY_PARSE_REASONS as readonly unknown[]).includes(value);
 
 export class MoneyParseError extends Error {
   constructor(

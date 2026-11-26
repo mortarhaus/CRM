@@ -1,6 +1,6 @@
 "use server";
 
-import { isCurrency, MoneyParseError, parseDecimalToMinor } from "@crm/core/money";
+import { isCurrency, MoneyParseError, type MoneyParseReason, parseDecimalToMinor } from "@crm/core/money";
 import { SERVICE_DESCRIPTION_MAX_LENGTH, SERVICE_NAME_MAX_LENGTH, SERVICE_UNIT_MAX_LENGTH } from "@crm/core/security";
 import { z } from "zod";
 import {
@@ -13,7 +13,7 @@ import {
   updateService,
 } from "@/db/catalog/services";
 import { ActionRefusedError, action } from "@/lib/auth/action";
-import { echoFields, expectedVersion, multilineText, requiredText, text } from "@/lib/settings-input";
+import { expectedVersion, multilineText, requiredText, text } from "@/lib/settings-input";
 
 // A description may run over several lines; empty is none.
 const description = multilineText(SERVICE_DESCRIPTION_MAX_LENGTH).transform((value) => (value === "" ? null : value));
@@ -32,20 +32,25 @@ const serviceShape = {
 
 type ServiceInput = { name: string; description: string | null; price: string; currency: string; unit?: string | null; taxable: boolean };
 
-function toFields(value: ServiceInput, context: z.RefinementCtx): ServiceFields {
-  let price: bigint | null = null;
-  if (value.price.trim() !== "" && isCurrency(value.currency)) {
-    try {
-      price = parseDecimalToMinor(value.price, value.currency);
-    } catch (error) {
-      if (!(error instanceof MoneyParseError)) throw error;
-      context.addIssue({ code: "custom", path: ["price"], message: error.reason });
-    }
+// The typed price in the currency's exponent: none when empty (or when the currency is refused on its own), else the
+// minor units or the core parser's reason for refusing it.
+function parsePrice(price: string, currency: string): { minor: bigint | null } | { refused: MoneyParseReason } {
+  if (price.trim() === "" || !isCurrency(currency)) return { minor: null };
+  try {
+    return { minor: parseDecimalToMinor(price, currency) };
+  } catch (error) {
+    if (!(error instanceof MoneyParseError)) throw error;
+    return { refused: error.reason };
   }
+}
+
+function toFields(value: ServiceInput, context: z.RefinementCtx): ServiceFields {
+  const price = parsePrice(value.price, value.currency);
+  if ("refused" in price) context.addIssue({ code: "custom", path: ["price"], message: price.refused });
   return {
     name: value.name,
     defaultDescription: value.description,
-    defaultUnitPriceMinor: price,
+    defaultUnitPriceMinor: "minor" in price ? price.minor : null,
     currency: value.currency,
     unit: value.unit ?? null,
     defaultTaxable: value.taxable,
@@ -68,8 +73,16 @@ const serviceFromForm = (form: FormData) => ({
   taxable: form.get("taxable") === "on",
 });
 
-// Shown again on a refused form posted without JavaScript: none is personal data or a secret.
-const echo = (form: FormData) => echoFields(form, ["name", "description", "price", "currency", "unit", "taxable"]);
+// A refused form gets back none of the typed text (Charlie, 2026-11-26, DECISIONS): a name, description, unit or price
+// can hold personal data. Only why the price was refused, as the parser's closed reason, with the currency it was read
+// in, which parsePrice has checked is an offered code. With JavaScript the browser keeps what was typed.
+function echo(form: FormData): Record<string, string> {
+  const price = form.get("price");
+  const currency = form.get("currency");
+  if (typeof price !== "string" || typeof currency !== "string") return {};
+  const parsed = parsePrice(price, currency);
+  return "refused" in parsed ? { priceRefused: parsed.refused, priceCurrency: currency } : {};
+}
 
 function refuse(error: unknown): never {
   if (error instanceof StaleServiceError) throw new ActionRefusedError("STALE_VERSION");

@@ -219,3 +219,62 @@ describe("Staff", () => {
     expect((await auditOf(workspaceId)).map((entry) => entry.action)).toEqual(["service.created"]);
   });
 });
+
+// Charlie, 2026-11-26 ("2a"): a refused form post gets back none of the typed text (it can hold personal data), only
+// the field paths and, for a refused price, the parser's closed reason with the offered currency it was read in.
+describe("a refused form post", () => {
+  const personal = {
+    name: "Aisha Rahman private coaching",
+    description: "Call Aisha on +60 12-345 6789 or aisha.rahman@example.test",
+    unit: "Aisha hr",
+  };
+  const formOf = (fields: Record<string, string>, extra: Record<string, string> = {}) => {
+    const form = new FormData();
+    for (const [key, value] of Object.entries({ ...extra, ...personal, currency: "MYR", taxable: "on", ...fields })) form.set(key, value);
+    return form;
+  };
+  const expectNoTypedText = (result: unknown, typed: readonly string[]) => {
+    const sent = JSON.stringify(result);
+    for (const value of [...Object.values(personal), ...typed]) expect(sent).not.toContain(value);
+  };
+
+  it.each([
+    ["more decimals than MYR has", { price: "1.005" }, { priceRefused: "too_many_decimals", priceCurrency: "MYR" }],
+    ["a decimal in JPY", { price: "1500.5", currency: "JPY" }, { priceRefused: "too_many_decimals", priceCurrency: "JPY" }],
+    ["a negative price", { price: "-10.25" }, { priceRefused: "negative", priceCurrency: "MYR" }],
+    ["a price that is not a number", { price: "60123456789abc" }, { priceRefused: "invalid", priceCurrency: "MYR" }],
+    ["a price above the bound", { price: "10,000,000,000,000" }, { priceRefused: "too_large", priceCurrency: "MYR" }],
+  ])("create, %s: the price reason and currency only", async (_, fields, echo) => {
+    const workspaceId = await newWorkspace();
+    await signInAs(workspaceId, "admin");
+    const result = await createServiceAction(null, formOf(fields));
+    expect(result).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["price"], echo });
+    expectNoTypedText(result, [fields.price]);
+    expect(await rowsOf(workspaceId)).toEqual([]);
+  });
+
+  it("create: a code that is not offered is not returned, nor is any other field", async () => {
+    const workspaceId = await newWorkspace();
+    await signInAs(workspaceId, "admin");
+    const result = await createServiceAction(null, formOf({ price: "1.005", currency: "ZZQ" }));
+    expect(result).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["currency"], echo: {} });
+    expectNoTypedText(result, ["1.005", "ZZQ"]);
+  });
+
+  it("update: a refused price or unit returns none of the typed text, and the stored row is unchanged", async () => {
+    const workspaceId = await newWorkspace();
+    await signInAs(workspaceId, "owner");
+    const { id } = await created();
+    const ids = { id, expectedVersion: "1" };
+
+    const price = await updateServiceAction(null, formOf({ price: "99.999" }, ids));
+    expect(price).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["price"], echo: { priceRefused: "too_many_decimals", priceCurrency: "MYR" } });
+    expectNoTypedText(price, ["99.999"]);
+
+    const unit = await updateServiceAction(null, formOf({ price: "99.90", unit: "Aisha Rahman's hourly rate" }, ids));
+    expect(unit).toEqual({ ok: false, status: "INVALID_INPUT", fields: ["unit"], echo: {} });
+    expectNoTypedText(unit, ["99.90", "Aisha Rahman's hourly rate"]);
+
+    expect(await rowsOf(workspaceId)).toEqual([{ name: "Design sprint", price: "123450", currency: "MYR", archived: false, version: 1 }]);
+  });
+});

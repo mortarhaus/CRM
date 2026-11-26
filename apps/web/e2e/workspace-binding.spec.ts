@@ -1,17 +1,7 @@
-import type { Page } from "@playwright/test";
 import { GENERAL_SAVE, GENERAL_SAVED, WORKSPACE_CHANGED_MESSAGE } from "../src/lib/auth/messages";
 import { expectAccessible } from "./a11y";
 import { expect, test } from "./fixtures";
-import { closeShellMenu, createWorkspace, openShellMenu, respectRateLimit, signIn, signUp, uniqueEmail, workspaceSwitcher } from "./helpers";
-
-// Switches from /workspaces and waits for the server-rendered marker, so the switch is saved.
-async function switchTo(page: Page, name: string): Promise<void> {
-  await page.goto("/workspaces");
-  await openShellMenu(page);
-  await workspaceSwitcher(page).selectOption({ label: name });
-  await expect(page.getByRole("listitem").filter({ hasText: name })).toContainText("(active)");
-  await closeShellMenu(page);
-}
+import { createWorkspace, respectRateLimit, signIn, signUp, switchTo, uniqueEmail } from "./helpers";
 
 // PR 76 Review R1 P0, made shared (DECISIONS 2026-11-25): a settings form opened in one workspace and saved after
 // another tab switched the session to another workspace saves nothing in either; reloading shows the active one.

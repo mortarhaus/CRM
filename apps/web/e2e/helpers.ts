@@ -103,6 +103,15 @@ export function workspaceSwitcher(page: Page): Locator {
   return page.getByRole("combobox", { name: "Active workspace" });
 }
 
+// Switches from /workspaces and waits for the server-rendered marker, so the switch is saved.
+export async function switchTo(page: Page, name: string): Promise<void> {
+  await page.goto("/workspaces");
+  await openShellMenu(page);
+  await workspaceSwitcher(page).selectOption({ label: name });
+  await expect(page.getByRole("listitem").filter({ hasText: name })).toContainText("(active)");
+  await closeShellMenu(page);
+}
+
 export async function signOut(page: Page): Promise<void> {
   await openShellMenu(page);
   await page.getByRole("button", { name: "Sign out" }).click();
