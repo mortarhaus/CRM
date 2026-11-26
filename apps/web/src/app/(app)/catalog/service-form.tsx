@@ -158,8 +158,9 @@ function ServiceFields({ mode, action, values, currencies, workspaceId, unreacha
   const version = result?.ok ? Math.max(result.data.version, values.version ?? 0) : values.version;
   // The fields are mounted again only by a save (a created service starts the form again empty; a saved edit shows the
   // stored row and, after the refresh, its new version) or by another service. A refusal keeps them, as typed.
-  const [saves, setSaves] = useState({ result, count: 0 });
-  if (saves.result !== result) setSaves({ result, count: saves.count + (result?.ok ? 1 : 0) });
+  // A currency-lock refusal puts the currency back to the stored one (Charlie, 2026-11-26, "B"); the other fields stay.
+  const [saves, setSaves] = useState({ result, count: 0, locks: 0 });
+  if (saves.result !== result) setSaves({ result, count: saves.count + (result?.ok ? 1 : 0), locks: saves.locks + (locked ? 1 : 0) });
   const fieldsKey = `${values.id ?? "new"}-${values.version ?? 0}-${saves.count}`;
   // After a save, the stored or initial values; otherwise this service's posted draft, if any.
   const kept = draft !== null && draft.id === values.id && draft.version === values.version ? draft : null;
@@ -204,12 +205,13 @@ function ServiceFields({ mode, action, values, currencies, workspaceId, unreacha
           error={priceMessage}
         />
         <SelectField
+          key={`currency-${saves.locks}`}
           id="service-currency"
           name="currency"
           label={CATALOG_CURRENCY}
           hint={values.priceSet ? CATALOG_CURRENCY_LOCKED_HINT : undefined}
           options={currencies}
-          defaultValue={shown.currency}
+          defaultValue={locked ? values.currency : shown.currency}
           error={locked ? CATALOG_CURRENCY_LOCKED : fieldError("currency")}
         />
         <TextField id="service-unit" name="unit" label={CATALOG_UNIT} hint={CATALOG_UNIT_HINT} defaultValue={shown.unit} error={fieldError("unit")} />

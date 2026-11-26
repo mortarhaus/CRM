@@ -207,8 +207,11 @@ test("with JavaScript a draft survives every refusal after a save, and the corre
   const stored: Draft = { ...edited, price: "30.00" };
   await expectDraft(page, stored);
   await fillDraft(page, { ...stored, name: "Retainer two" });
+  // The refresh after this save must land before the other tab saves, or this page would load the newer version.
+  const refreshed = page.waitForResponse((r) => r.request().method() === "GET" && r.url().includes("edit=") && r.request().headers().rsc === "1");
   await save.click();
   await expect(status(page, CATALOG_SAVED)).toBeVisible();
+  await refreshed;
   await expectDraft(page, { ...stored, name: "Retainer two" });
 
   const other = await context.newPage();
@@ -227,14 +230,9 @@ test("with JavaScript a draft survives every refusal after a save, and the corre
   await fillDraft(page, { ...late, currency: "MYR" });
   await save.click();
   await expect(alert).toHaveText(CATALOG_CURRENCY_LOCKED);
-  // The currency select is not asserted after this refusal: its behaviour is an open owner question (PR #78).
-  await expect(page.getByLabel("Name")).toHaveValue(late.name);
-  await expect(page.getByLabel("Default description")).toHaveValue(late.description);
-  await expect(page.getByLabel("Default unit price")).toHaveValue(late.price);
-  await expect(page.getByLabel("Unit", { exact: true })).toHaveValue(late.unit);
-  await expect(page.getByLabel("Taxable by default")).toBeChecked();
+  // The currency goes back to the stored one (Charlie, 2026-11-26, "B"); the rest stays as typed.
+  await expectDraft(page, late);
 
-  await page.getByLabel("Currency").selectOption("SGD");
   await switchTo(other, "Catalog Elsewhere");
   await save.click();
   await expect(alert).toHaveText(WORKSPACE_CHANGED_MESSAGE);
@@ -245,6 +243,49 @@ test("with JavaScript a draft survives every refusal after a save, and the corre
   await expect(status(page, CATALOG_SAVED)).toBeVisible();
   await page.goto("/catalog");
   await expect(row(page, "Retainer late")).toContainText(/SGD\s30\.00/);
+});
+
+// Charlie, 2026-11-26 ("B"): with JavaScript, every currency-lock refusal puts the currency select back to the stored
+// currency and keeps the other fields as typed, whatever came before it; the next save then posts the stored currency.
+test("with JavaScript a currency-lock refusal puts the stored currency back and keeps the rest", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "the form is the same at every width; run once to keep the suite short");
+  await newOwner(page);
+  await page.goto("/catalog");
+  const alert = main(page).getByRole("alert");
+  const save = page.getByRole("button", { name: CATALOG_SAVE });
+  await fillDraft(page, { ...EMPTY, name: "Lock audit", price: "100" });
+  await page.getByRole("button", { name: CATALOG_CREATE }).click();
+  await expect(status(page, CATALOG_CREATED)).toBeVisible();
+  await row(page, "Lock audit").getByRole("link", { name: "Edit Lock audit" }).click();
+  await expectDraft(page, { ...EMPTY, name: "Lock audit", price: "100.00" });
+
+  const refusedLock = async (draft: Draft) => {
+    await fillDraft(page, { ...draft, currency: "SGD" });
+    await save.click();
+    await expect(alert).toHaveText(CATALOG_CURRENCY_LOCKED);
+    await expectDraft(page, { ...draft, currency: "MYR" });
+  };
+  const typed: Draft = { name: "Lock one", description: "Kept.", price: "100.00", currency: "MYR", unit: "audit", taxable: true };
+  // Straight after the Edit link (from a created service), then again in a row.
+  await refusedLock(typed);
+  await refusedLock({ ...typed, name: "Lock again" });
+  // After another refusal.
+  await page.getByLabel("Default unit price").fill("-1");
+  await save.click();
+  await expect(alert).toHaveText(CATALOG_INVALID);
+  await refusedLock({ ...typed, name: "Lock after invalid", price: "100" });
+  // After a save.
+  await save.click();
+  await expect(status(page, CATALOG_SAVED)).toBeVisible();
+  await expectDraft(page, { ...typed, name: "Lock after invalid", price: "100.00" });
+  await refusedLock({ ...typed, name: "Lock after save", price: "100.00" });
+  // After a page load; the next save posts the stored currency.
+  await page.reload();
+  await refusedLock({ ...typed, name: "Lock after load" });
+  await save.click();
+  await expect(status(page, CATALOG_SAVED)).toBeVisible();
+  await page.goto("/catalog");
+  await expect(row(page, "Lock after load")).toContainText(/MYR\s100\.00/);
 });
 
 // Charlie, 2026-11-26 ("2a"): a refusal returns none of the typed text, so without JavaScript the form shows the saved
