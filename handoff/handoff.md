@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · Phase 2 CLOSED (PR 79 merged 8c75b01, logged); next on `build`: split the E2E CI job
+# Handoff — 2026-11-26 · `build`: split the E2E CI job, Opus sub-agent in worktree build-ci-split-e2e-job (not pushed)
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -7,12 +7,12 @@
 
 ## 0. Active target
 - Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: none (nothing open)
-- Working folder: repo root (`/Users/charlie/Documents/Projects/Personal/CRM`, branch `main`). No build worktree. Log worktree: `.agent/worktrees/agent-logs`.
+- Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-ci-split-e2e-job` (branch `ci/split-e2e-job` from 8c75b01). Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
 - Branch: `main` = `8c75b01` (equal to origin/main). Open PRs: 0. Repo `mortarhaus/CRM` is PRIVATE (standing rule: public while a PR needs CI, private after merge).
 - Last merged: PR 79 (close Phase 2) 2026-11-26T13:01:13Z, no gate breach, log on agent-logs (`210c5ca`). Log gate clear.
-- main CI run 45825088288 (merge commit) was still running when the repo went private; its image job is expected not to start (billing), as on earlier merges. The tree equals PR 79 head; the code equals PR 78 head, whose E2E passed.
+- main CI run 45825088288 (merge commit): checks passed; image job failed to start (billing, repo private), as on earlier merges.
 - GitHub order: push first, then make public (a push right after the switch returned 403 "Repository is disabled" twice on 2026-11-26; cause unverified).
 
 ## 2. Milestones
@@ -38,7 +38,7 @@ Uncommitted files — fingerprint:
 2026-11-26: `merged 79`: logged (`210c5ca`), `main` fast-forwarded to 8c75b01, removed worktree `build-docs-phase-2-close` and local branch `docs/phase-2-close` (tip e432717, on main), repo private, progress artifact republished. Backup branches `feat/p2-email-templates` and `chore/setup-reconcile-v4-6` kept.
 
 ## 5. Next step (file-level)
-1. On `build`: split the "Image, Trivy, E2E" CI job (about 69 of 90 minutes; for example Playwright projects in parallel).
+1. IN PROGRESS (sub-agent ab865e0e0b35f6679, started 2026-11-26): split the CI browser tests by Playwright project (measured 22.0 / 20.9 / 22.0 min). Next: check its report, push, then repo public, open PR, `review N`.
 2. Then the spec PR (PROJECT.md s11): line 803 drops "SHA-256"; revision 9 "draft" label. "Admin may view the QR" also needs a spec revision before it is built (could share that PR; ask).
 3. Then the Phase 3 plan (customers and team, includes the require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 4. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
