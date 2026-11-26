@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · PR #78 Bob R1 Revision required (P1 draft lost after a success, P3 wording); sub-agent fixing
+# Handoff — 2026-11-26 · PR #78: R1 fixes local (5682b64, not pushed); waiting for Charlie: currency after a lock refusal, A or B
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -38,14 +38,14 @@ agent-logs worktree at `4146f41` plus the handoff-copy commit, clean.
 2026-11-26: PR 77 opened, reviewed (R1 fixed, R2 Approved), receipted, merged and logged; removed worktree `build-fix-settings-workspace-binding` and local branch `fix/settings-workspace-binding` (tip 9ad66d8, on main); `main` fast-forwarded; repo private; artifact republished. Bob's review worktrees: none left. Backup branches `feat/p2-email-templates` and `chore/setup-reconcile-v4-6` kept.
 
 ## 5. Next step (file-level)
-1. PR #78 `fix` in progress (was a1bb96b): P1 catalog form key drops the JavaScript draft when a refusal follows a success; P3 alert says 'below'; PR body WCAG wording. Review archived. Next: verify report, update PR body, Charlie `review 78`. ANSWERED: currency select reset after a currency-locked refusal stays as it is (sent to the sub-agent: preserve it, assert it, record it in DECISIONS).
+1. PR #78 `fix` paused (sub-agent a065b6292b326bc97). Local commits 70d5991 (P3), 5682b64 (P1), not pushed; PR head still a1bb96b. My description of the 'currency reset' was WRONG: on main a lock refusal reverts EVERY field (only after arriving via Edit link or straight after a successful save; not after a page load or another refusal) = the same remount as P1. Waiting for Charlie: A keep typed currency (R1 as is) or B reset only the currency to saved after every lock refusal (about 5 lines + e2e; recommended). Then: DECISIONS + PR body, typecheck, lint, test, build, full e2e at final head, push, update PR body, `review 78`.
 2. Then the Phase 2 close-out docs PR: record the FILE-03 exception review (answer 1A: keep, next review Phase 4 gate; Bob reviews), refresh the CLAUDE.md Status section; spec line 803 goes in a spec PR.
 3. E2E sharding is due: image E2E job took ~67.5 min (limit 90).
 4. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
 5. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
 
 ## 6. Open ASK items, blockers, and owner answers
-- ANSWERED 2026-11-26 (Charlie: "No, keep the currency reset for currency-lock refusals"), asked: add the currency drop-down jumping back after a currency-locked refusal to the fix list? Answer: no, keep the behaviour.
+- ANSWERED 2026-11-26 (Charlie: "No, keep the currency reset for currency-lock refusals"), asked: add the currency drop-down jumping back after a currency-locked refusal to the fix list? Answer: no, keep the behaviour. SUPERSEDED/REOPENED: based on a wrong description; re-asked as A/B.
 - ANSWERED 2026-11-26 (Charlie, "1a"), asked: keep the FILE-03 QR exception (content-named QR images, never deleted) and review again at the Phase 4 gate (A), or drop it (B)? Answer: A. Record in docs/DECISIONS.md in the Phase 2 close-out PR; Bob reviews.
 - ANSWERED 2026-11-26 (Charlie, "2a"), asked: should refused catalog saves stop sending the typed text back (A, accepting that without JavaScript the user retypes) or keep it (B)? Answer: A. Separate small PR; record in docs/DECISIONS.md there. Keep the price error message useful (service-form.tsx:85 uses the echoed price); with JavaScript typed text stays (onSubmit prevents reset).
 - ANSWERED 2026-11-25 ("1 yes, 2 yes, 3 yes"): size 487 accepted; follow-up PR for the other forms: yes; no-JS draft loss accepted.
