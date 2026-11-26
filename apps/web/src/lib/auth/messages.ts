@@ -100,10 +100,10 @@ export const ONBOARDING_TAX_RATE_INVALID = "Enter the rate as a percentage, for 
 export const ONBOARDING_TEXT_INVALID = `Use at most ${SETTINGS_TEXT_MAX_LENGTH} characters, without special formatting characters.`;
 export const ONBOARDING_STALE = "This workspace was set up after this page loaded. Reload the page.";
 export const ONBOARDING_FAILED = "We couldn't save your answers. Try again.";
-// Shown to an Admin or Staff member while the Owner has not finished onboarding (plan Task 8).
 // Any form whose page was rendered for another workspace than the session's active one (action(), WORKSPACE_CHANGED).
 export const WORKSPACE_CHANGED_MESSAGE =
   "This page was opened in another workspace, so nothing was saved. Reload the page to see the active workspace.";
+// Shown to an Admin or Staff member while the Owner has not finished onboarding (plan Task 8).
 export const SETUP_PENDING = "The owner has not finished setting up this workspace.";
 export const SETUP_PENDING_HINT = "You can switch to another workspace or sign out.";
 
