@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · `build`: Phase 2 close-out docs PR, Opus sub-agent in worktree build-docs-phase-2-close (not pushed)
+# Handoff — 2026-11-26 · PR 79 (Phase 2 close, docs) open, head 94080df; waiting for `review 79`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,13 +6,13 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: none (nothing open)
-- Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-docs-phase-2-close` (branch `docs/phase-2-close` from ffa616e). Log worktree: `.agent/worktrees/agent-logs`.
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: 79
+- Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-docs-phase-2-close` (branch `docs/phase-2-close`, head `94080dfd72b911c38ccaccb7a3a5e01ccfd9c5d2`). Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- Branch: `main` = `ffa616e` (equal to origin/main). Open PRs: 0. Repo `mortarhaus/CRM` is PRIVATE (standing rule: public while a PR needs CI, private after merge).
-- Last merged: PR 78 (catalog refusals return no typed text) 2026-11-26T11:58:10Z, no gate breach, log on agent-logs (`3545fa1`). Log gate clear.
-- Next: Phase 2 close-out.
+- `main` = `ffa616e` (equal to origin/main). Open PR: #79 "docs: close Phase 2" (CLAUDE.md and docs/DECISIONS.md only). Repo is PUBLIC while PR 79 needs CI; set private after merge.
+- Last merged: PR 78, log on agent-logs (`3545fa1`).
+- GitHub order: push first, then make public (a push right after the switch returned 403 "Repository is disabled" twice on 2026-11-26; the same push worked in the usual order; cause unverified).
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1; all Phase 2 plan PRs (1-8b) and the follow-ups PR 77 and PR 78. All logged on agent-logs.
@@ -32,16 +32,16 @@ Uncommitted files — fingerprint:
 | `.playwright-mcp/` | untracked, not mine | directory |
 | `docker/sync-export.sh` | untracked, not mine | `51dcde23b372ecaaf041cea716ec3f95fa70226a` |
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
-agent-logs worktree at `3545fa1` plus the handoff-copy commit, clean.
+Build worktree clean at `94080df` (pushed).
 
 ## 4. Just finished
-2026-11-26: PR 77 and PR 78 merged and logged. PR 78: removed worktree `build-fix-catalog-refusal-echo` and local branch `fix/catalog-refusal-echo` (tip 6d11ee3, on main); `main` fast-forwarded; repo private; artifact republished. Backup branches `feat/p2-email-templates` and `chore/setup-reconcile-v4-6` kept.
+2026-11-26 `build`: Phase 2 close-out docs PR #79 (Opus sub-agent a27b062 + builder correction 94080df). Gate evidence: all four done-when items met on ffa616e. Local checks ran at a27b062 (typecheck, lint, 1529 tests, build); 94080df edits DECISIONS text only.
 
 ## 5. Next step (file-level)
-1. IN PROGRESS (sub-agent abfe10db6d2daeb23, started 2026-11-26): Phase 2 close-out docs PR. It first verifies every Phase 2 gate item, then records the FILE-03 review, the 2026-11-25 owner answers and the status. Next: check its report, push, repo public, open PR, `review N`. Spec line 803 stays for a separate spec PR.
-2. E2E sharding is due: image E2E job ~69 min (limit 90).
-3. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
-4. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
+1. Charlie runs `review 79` in Bob's window; then `fix` or `approved 79`. Tell Charlie to run `approved 79` BEFORE merging.
+2. Before merge: Charlie confirms Q24 (proposal cover options wait for Phase 6). If not, Phase 2 is not closed and the record changes.
+3. E2E sharding is due (image job ~69 min, limit 90). Then the spec PR for line 803, and the Phase 3 plan (customers and team; builder s8 ask; deep tier).
+4. Phase 4 items are listed in the PR 79 DECISIONS entry (carried forward).
 
 ## 6. Open ASK items, blockers, and owner answers
 - ANSWERED 2026-11-26 (Charlie, "B"), asked after the corrected description: after a currency-lock refusal on edit, A keep the typed currency or B put the currency back to the saved one (other typed boxes kept in both)? Answer: B. Recorded in docs/DECISIONS.md (merged with PR 78).
@@ -58,6 +58,7 @@ agent-logs worktree at `3545fa1` plus the handoff-copy commit, clean.
   - E2E sharding: unanswered.
 - Note from the 8b run: Next dev mode logs arguments of the existing 2FA actions, incl. setup keys of throwaway e2e accounts (dev only, not from 8b; local logs deleted). Raise with Bob.
 - When to shard the E2E job (57+ min; limit 90; Bob suggests before about 75 min). Older small items: Q24 proposal_cover, header greeting wording, Urbanist font source, outdated-browser notice wording, no-JS 409 policy, CRM sender name wording.
+- 2026-11-26 asked with PR 79: (a) Q24 confirm proposal cover options wait for Phase 6; (b) which phase builds the require_2fa switch (recommended Phase 3). Still open (recorded in PR 79): Admin viewing the QR needs a spec clarification; account-number separators; DuitNow/PayNow ID text field; deleted-user wording; both Q6 parts; Cloudflare token not saved.
 
 ## 7. Open review findings (P0/P1) and verdict
 None open (P0/P1). PR 78 Approved (R2). Residual: pre-existing, from source reading only: catalog form action state keyed by workspace may carry to another service across Edit links (error/saved message, version number); two unexplained CATALOG_FAILED results in flaky local runs; new catalog browser tests desktop Chromium only. PR 77: no stale-workspace e2e with JavaScript disabled; no test races two first template saves; cold-dev-server accessibility.spec failures unverified. Dev only: Next dev mode logs 2FA action arguments (raise with Bob). Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 (DB currency list vs code table test; edit link for a missing service; long name at 320 px e2e); PR 72 (clock option, preview timing, time zone pause).
