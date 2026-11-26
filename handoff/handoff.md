@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · PR #78 R1 fixes + decision B pushed (6d11ee3), CI running; awaiting `review 78`
+# Handoff — 2026-11-26 · PR #78 approved (R2) and receipted at 6d11ee3, all CI passed; awaiting Charlie's merge, then `merged 78`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -38,7 +38,7 @@ agent-logs worktree at `4146f41` plus the handoff-copy commit, clean.
 2026-11-26: PR 77 opened, reviewed (R1 fixed, R2 Approved), receipted, merged and logged; removed worktree `build-fix-settings-workspace-binding` and local branch `fix/settings-workspace-binding` (tip 9ad66d8, on main); `main` fast-forwarded; repo private; artifact republished. Bob's review worktrees: none left. Backup branches `feat/p2-email-templates` and `chore/setup-reconcile-v4-6` kept.
 
 ## 5. Next step (file-level)
-1. PR #78: R1 fixed and decision B done (70d5991, 5682b64, 6d11ee3), pushed, PR body updated. Next: Charlie `review 78`; `approved 78` BEFORE merging; `merged 78`. Sub-agent checks at 6d11ee3: typecheck, lint, test 1529 passed 1 skipped, build, full e2e 255 passed 18 skipped on a warmed dev server; new catalog tests Chromium only. Not run: image e2e, new tests at 768/320, axe no-JS, screen reader. Unverified: one unexplained CATALOG_FAILED seen in two flaky runs before the test fix (not reproduced); from code reading only (pre-existing): create/edit forms share one React instance, so the last result, incl. its version number, carries to the next service's form.
+1. PR #78 APPROVED (R2), receipt on agent-logs (head 6d11ee3), all five CI jobs SUCCESS. Next: Charlie merges, `merged 78`. Residual (R2): new browser tests desktop Chromium only; cause of two earlier CATALOG_FAILED test results unverified; shared form action state across services (pre-existing, source review only, not reproduced); no screen-reader check.
 2. Then the Phase 2 close-out docs PR: record the FILE-03 exception review (answer 1A: keep, next review Phase 4 gate; Bob reviews), refresh the CLAUDE.md Status section; spec line 803 goes in a spec PR.
 3. E2E sharding is due: image E2E job took ~67.5 min (limit 90).
 4. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
