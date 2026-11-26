@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · PR 77 merged and logged; FILE-03 answered (keep, review at Phase 4 gate); catalog echo question being explained
+# Handoff — 2026-11-26 · PR 77 merged; Charlie answered 1A, 2A; awaiting `build` (catalog echo PR first, then Phase 2 close-out)
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -38,15 +38,15 @@ agent-logs worktree at `4146f41` plus the handoff-copy commit, clean.
 2026-11-26: PR 77 opened, reviewed (R1 fixed, R2 Approved), receipted, merged and logged; removed worktree `build-fix-settings-workspace-binding` and local branch `fix/settings-workspace-binding` (tip 9ad66d8, on main); `main` fast-forwarded; repo private; artifact republished. Bob's review worktrees: none left. Backup branches `feat/p2-email-templates` and `chore/setup-reconcile-v4-6` kept.
 
 ## 5. Next step (file-level)
-1. On `build`: the Phase 2 close-out docs PR: record the FILE-03 exception review (Charlie: keep, next review Phase 4 gate; Bob reviews), refresh the CLAUDE.md Status section; spec line 803 goes in a spec PR.
-2. If Charlie says yes: separate small PR so catalog refusals return only allow-listed choices and booleans (`catalog/actions.ts:72`, `:88`, `:101`).
+1. On `build`: first the catalog echo PR (answer 2A: refusals return no free text; `catalog/actions.ts:72`, `:88`, `:101`; return only allow-listed choices and booleans; deep tier, Opus sub-agent).
+2. Then the Phase 2 close-out docs PR: record the FILE-03 exception review (answer 1A: keep, next review Phase 4 gate; Bob reviews), refresh the CLAUDE.md Status section; spec line 803 goes in a spec PR.
 3. E2E sharding is due: image E2E job took ~67.5 min (limit 90).
 4. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
 5. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
 
 ## 6. Open ASK items, blockers, and owner answers
 - ANSWERED 2026-11-26 (Charlie, "1a"), asked: keep the FILE-03 QR exception (content-named QR images, never deleted) and review again at the Phase 4 gate (A), or drop it (B)? Answer: A. Record in docs/DECISIONS.md in the Phase 2 close-out PR; Bob reviews.
-- OPEN 2026-11-26: catalog echo: should refused catalog saves stop returning typed name/description/unit? (recommended A = yes, separate small PR). Charlie asked what it means; explained. Note: with JavaScript typed text stays (service-form.tsx onSubmit); only no-JavaScript posts rely on the echo; the price error text uses the echoed price (service-form.tsx:85).
+- ANSWERED 2026-11-26 (Charlie, "2a"), asked: should refused catalog saves stop sending the typed text back (A, accepting that without JavaScript the user retypes) or keep it (B)? Answer: A. Separate small PR; record in docs/DECISIONS.md there. Keep the price error message useful (service-form.tsx:85 uses the echoed price); with JavaScript typed text stays (onSubmit prevents reset).
 - ANSWERED 2026-11-25 ("1 yes, 2 yes, 3 yes"): size 487 accepted; follow-up PR for the other forms: yes; no-JS draft loss accepted.
 - Charlie's answers 2026-11-25 ("1 A, 2 ok, then build; 3 b, 4 ok, 5 digits only, yes can clear, admin yes, why is a user details deleted?, 6 ok widen, add 2 decimals 0.00 and drop down list from the settings"). Implementation of 3-6 is NOT in 8b; each needs its own reviewed PR, spec check first (builder s8):
   - 8b: size accepted (A); preview samples "Siti Rahim" / "bank details" approved.
