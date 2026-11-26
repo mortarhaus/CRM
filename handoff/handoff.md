@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · PR #77 Bob R1 Revision required (2 P1, 1 P2); sub-agent fixing; ASK catalog echo (Bob recommends dropping it)
+# Handoff — 2026-11-26 · PR #77 R1 fixes pushed (9ad66d8), CI running; awaiting `review 77`; ASK: catalog echo
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -10,7 +10,7 @@
 - Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-fix-settings-workspace-binding` (branch `fix/settings-workspace-binding` from 0b7a04c). Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- Branch: `main` = `0b7a04c`. Open PR: #77 (`fix/settings-workspace-binding`, head `d80b8cc`). Repo PUBLIC while PR 77 is open; make private after merge.
+- Branch: `main` = `0b7a04c`. Open PR: #77 (`fix/settings-workspace-binding`, head `9ad66d8`). Repo PUBLIC while PR 77 is open; make private after merge.
 - Last merged: PR 76 (Phase 2 PR 8b, email templates page) 2026-11-25T12:58:16Z, no gate breach, log on agent-logs (`1ce4ba0`). Log gate clear.
 - Next: Charlie `review 77`, `approved 77` BEFORE merging, `merged 77`.
 
@@ -35,10 +35,10 @@ Uncommitted files — fingerprint:
 agent-logs worktree at `1ce4ba0` plus the handoff-copy commit, clean.
 
 ## 4. Just finished
-2026-11-25: PR 75 (8a) and PR 76 (8b) reviewed, approved, receipted, merged and logged; local branches and build worktrees removed (backup branch `feat/p2-email-templates` at `ebb723a` kept); repo private; artifact republished.
+2026-11-26: PR 77 opened, Bob R1 archived, three findings fixed and pushed (9ad66d8). Earlier: 2026-11-25: PR 75 (8a) and PR 76 (8b) reviewed, approved, receipted, merged and logged; local branches and build worktrees removed (backup branch `feat/p2-email-templates` at `ebb723a` kept); repo private; artifact republished.
 
 ## 5. Next step (file-level)
-1. PR #77 `fix` in progress (was d80b8cc): session-first ordering in action(), self-check rows, runbook. Review archived. Next: verify report, update PR body, Charlie `review 77`. OPEN ASK: catalog echo of name/description (catalog/actions.ts:72,88,101): builder said keep, Bob says drop free text, keep allow-listed choices/booleans; Charlie to decide (separate change).
+1. PR #77: R1 findings fixed and pushed (a94f415, 705133c, 9ad66d8), PR body updated. Next: Charlie `review 77`; then `approved 77` BEFORE merging; `merged 77`. Sub-agent checks at 9ad66d8: typecheck, lint, test 1521 passed 1 skipped, build, e2e 253 passed 14 skipped on a warm dev server; the two earlier runs on a fresh dev server each failed the same first 8 chromium accessibility.spec tests (they passed alone and warm; likely next dev recompiles, not proven). test:gates, image e2e not run locally; CI on 9ad66d8 was running. OPEN ASK: catalog echo of name/description (catalog/actions.ts:72,88,101): Bob and builder now recommend dropping free text (separate PR); Charlie to decide.
 2. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
 3. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
 
@@ -55,7 +55,7 @@ agent-logs worktree at `1ce4ba0` plus the handoff-copy commit, clean.
 - When to shard the E2E job (57+ min; limit 90; Bob suggests before about 75 min). Older small items: Q24 proposal_cover, header greeting wording, Urbanist font source, outdated-browser notice wording, no-JS 409 policy, CRM sender name wording.
 
 ## 7. Open review findings (P0/P1) and verdict
-OPEN: PR 77 R1 P1, P1, P2 (being fixed). PR 76 Approved (R2). Residual: no browser test switches the active workspace with a form open; no test races two first template saves. Dev only: Next dev mode logs 2FA action arguments (raise with Bob). Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 (DB currency list vs code table test; edit link for a missing service; long name at 320 px e2e); PR 72 (clock option, preview timing, time zone pause); PR 71 (E2E sharding).
+PR 77 R1 (Revision required: P1, P1, P2) fixed at 9ad66d8, awaiting R2. PR 76 Approved (R2). Residual: no browser test switches the active workspace with a form open; no test races two first template saves. Dev only: Next dev mode logs 2FA action arguments (raise with Bob). Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 (DB currency list vs code table test; edit link for a missing service; long name at 320 px e2e); PR 72 (clock option, preview timing, time zone pause); PR 71 (E2E sharding).
 
 ## 8. Decisions made this session, not yet in the decisions log
 - The three 2026-11-25 approvals above are not yet in docs/DECISIONS.md (go into the fix PR).
