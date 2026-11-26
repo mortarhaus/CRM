@@ -1,4 +1,4 @@
-# Handoff — 2026-11-25 · PR #77 (workspace binding) open at d80b8cc; awaiting `review 77`
+# Handoff — 2026-11-26 · PR #77 Bob R1 Revision required (2 P1, 1 P2); sub-agent fixing; ASK catalog echo (Bob recommends dropping it)
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -38,7 +38,7 @@ agent-logs worktree at `1ce4ba0` plus the handoff-copy commit, clean.
 2026-11-25: PR 75 (8a) and PR 76 (8b) reviewed, approved, receipted, merged and logged; local branches and build worktrees removed (backup branch `feat/p2-email-templates` at `ebb723a` kept); repo private; artifact republished.
 
 ## 5. Next step (file-level)
-1. PR #77: sub-agent checks at d80b8cc: typecheck, lint, test 1513 passed, build, full e2e 253 passed 14 skipped; 184 added / 61 removed non-test lines; 13 actions bound, 8 Better Auth forwarders exempt; DECISIONS has the three 2026-11-25 approvals. test:gates and image e2e not run. Wait for CI and Bob. ASK: drop or narrow the catalog echo of free text (catalog/actions.ts:72)?
+1. PR #77 `fix` in progress (was d80b8cc): session-first ordering in action(), self-check rows, runbook. Review archived. Next: verify report, update PR body, Charlie `review 77`. OPEN ASK: catalog echo of name/description (catalog/actions.ts:72,88,101): builder said keep, Bob says drop free text, keep allow-listed choices/booleans; Charlie to decide (separate change).
 2. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
 3. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
 
@@ -55,7 +55,7 @@ agent-logs worktree at `1ce4ba0` plus the handoff-copy commit, clean.
 - When to shard the E2E job (57+ min; limit 90; Bob suggests before about 75 min). Older small items: Q24 proposal_cover, header greeting wording, Urbanist font source, outdated-browser notice wording, no-JS 409 policy, CRM sender name wording.
 
 ## 7. Open review findings (P0/P1) and verdict
-None open. PR 76 Approved (R2). Residual: no browser test switches the active workspace with a form open; no test races two first template saves. Dev only: Next dev mode logs 2FA action arguments (raise with Bob). Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 (DB currency list vs code table test; edit link for a missing service; long name at 320 px e2e); PR 72 (clock option, preview timing, time zone pause); PR 71 (E2E sharding).
+OPEN: PR 77 R1 P1, P1, P2 (being fixed). PR 76 Approved (R2). Residual: no browser test switches the active workspace with a form open; no test races two first template saves. Dev only: Next dev mode logs 2FA action arguments (raise with Bob). Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 (DB currency list vs code table test; edit link for a missing service; long name at 320 px e2e); PR 72 (clock option, preview timing, time zone pause); PR 71 (E2E sharding).
 
 ## 8. Decisions made this session, not yet in the decisions log
 - The three 2026-11-25 approvals above are not yet in docs/DECISIONS.md (go into the fix PR).
