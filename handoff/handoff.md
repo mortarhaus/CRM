@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · PR 78 merged (ffa616e) and logged; next on `build`: Phase 2 close-out docs PR
+# Handoff — 2026-11-26 · `build`: Phase 2 close-out docs PR, Opus sub-agent in worktree build-docs-phase-2-close (not pushed)
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -7,7 +7,7 @@
 
 ## 0. Active target
 - Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: none (nothing open)
-- Working folder: repo root (`/Users/charlie/Documents/Projects/Personal/CRM`, branch `main`). No build worktree. Log worktree: `.agent/worktrees/agent-logs`.
+- Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-docs-phase-2-close` (branch `docs/phase-2-close` from ffa616e). Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
 - Branch: `main` = `ffa616e` (equal to origin/main). Open PRs: 0. Repo `mortarhaus/CRM` is PRIVATE (standing rule: public while a PR needs CI, private after merge).
@@ -38,7 +38,7 @@ agent-logs worktree at `3545fa1` plus the handoff-copy commit, clean.
 2026-11-26: PR 77 and PR 78 merged and logged. PR 78: removed worktree `build-fix-catalog-refusal-echo` and local branch `fix/catalog-refusal-echo` (tip 6d11ee3, on main); `main` fast-forwarded; repo private; artifact republished. Backup branches `feat/p2-email-templates` and `chore/setup-reconcile-v4-6` kept.
 
 ## 5. Next step (file-level)
-1. On `build`: the Phase 2 close-out docs PR: record the FILE-03 exception review in docs/DECISIONS.md (keep; next review Phase 4 gate), refresh the CLAUDE.md Status section; the spec line 803 correction goes in a separate spec PR.
+1. IN PROGRESS (sub-agent abfe10db6d2daeb23, started 2026-11-26): Phase 2 close-out docs PR. It first verifies every Phase 2 gate item, then records the FILE-03 review, the 2026-11-25 owner answers and the status. Next: check its report, push, repo public, open PR, `review N`. Spec line 803 stays for a separate spec PR.
 2. E2E sharding is due: image E2E job ~69 min (limit 90).
 3. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
 4. Phase 4 plan items: unique (workspace_id, number) index per issued document type; show PeriodBehindError clearly; no caller passes the allocator's `clock` option; the first email sender must replace CR/LF that a value brings into a subject.
