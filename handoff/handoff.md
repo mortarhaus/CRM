@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · `build`: catalog echo fix, Opus sub-agent in worktree build-fix-catalog-refusal-echo (not pushed)
+# Handoff — 2026-11-26 · PR #78 (catalog echo) open at a1bb96b; awaiting `review 78`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,13 +6,13 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: none (nothing open)
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: 78
 - Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-fix-catalog-refusal-echo` (branch `fix/catalog-refusal-echo` from 6926c5d). Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- Branch: `main` = `6926c5d` (equal to origin/main). Open PRs: 0. Repo `mortarhaus/CRM` is PRIVATE (standing rule: public while a PR needs CI, private after merge).
+- Branch: `main` = `6926c5d`. Open PR: #78 (`fix/catalog-refusal-echo`, head `a1bb96b`). Repo PUBLIC while PR 78 is open; make private after merge.
 - Last merged: PR 77 (workspace binding) 2026-11-26T04:26:41Z, no gate breach, log on agent-logs (`4146f41`). Log gate clear.
-- Next: Phase 2 close-out.
+- Next: Charlie `review 78`, `approved 78` BEFORE merging, `merged 78`; then the Phase 2 close-out.
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1; all Phase 2 plan PRs (1-8b) and the workspace-binding follow-up (PR 77). All logged on agent-logs.
@@ -38,7 +38,7 @@ agent-logs worktree at `4146f41` plus the handoff-copy commit, clean.
 2026-11-26: PR 77 opened, reviewed (R1 fixed, R2 Approved), receipted, merged and logged; removed worktree `build-fix-settings-workspace-binding` and local branch `fix/settings-workspace-binding` (tip 9ad66d8, on main); `main` fast-forwarded; repo private; artifact republished. Bob's review worktrees: none left. Backup branches `feat/p2-email-templates` and `chore/setup-reconcile-v4-6` kept.
 
 ## 5. Next step (file-level)
-1. IN PROGRESS (sub-agent started 2026-11-26; next: check its report, push, repo public, open PR, `review N`): the catalog echo PR (answer 2A: refusals return no free text; `catalog/actions.ts:72`, `:88`, `:101`; return only allow-listed choices and booleans; deep tier, Opus sub-agent).
+1. PR #78: sub-agent checks at a1bb96b: typecheck, lint, test 1529 passed 1 skipped, build, full e2e 253 passed 14 skipped on a warmed dev server; 76 added / 47 deleted non-test lines. Not run: image e2e, test:gates, axe on the no-JavaScript page, screen reader. Wait for CI and Bob. ASK (pre-existing): after a currency-locked refusal on edit, with JavaScript the currency select jumps back to the saved currency; follow-up fix? Note: numbering form still echoes the typed pattern (not changed).
 2. Then the Phase 2 close-out docs PR: record the FILE-03 exception review (answer 1A: keep, next review Phase 4 gate; Bob reviews), refresh the CLAUDE.md Status section; spec line 803 goes in a spec PR.
 3. E2E sharding is due: image E2E job took ~67.5 min (limit 90).
 4. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
