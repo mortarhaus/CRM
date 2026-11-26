@@ -94,7 +94,7 @@ function priceError(echoed: Partial<Record<string, string>>, formCurrency: strin
 
 // Common to both forms: a result after a post (with JavaScript or without), focus back on the button, a refresh after
 // a save so the page shows the stored row and its new version.
-function useSaveResult<D extends Saved>(action: FormAction<D>, unreachable: boolean) {
+function useSaveResult<D extends Saved>(action: FormAction<D>, unreachable: boolean, onPost?: (form: FormData) => void) {
   const [result, formAction, pending] = useActionState<SaveResult<D> | null, FormData>(action, null);
   const router = useRouter();
   const button = useRef<HTMLButtonElement>(null);
@@ -111,6 +111,7 @@ function useSaveResult<D extends Saved>(action: FormAction<D>, unreachable: bool
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setPostedHere(true);
+    onPost?.(form);
     startTransition(() => formAction(form));
   }
   return { result, formAction, pending, button, error, onSubmit, notKept: result?.ok === false && !postedHere };
@@ -125,16 +126,47 @@ interface ServiceFormProps {
   workspaceId: string;
 }
 
-function ServiceFields({ mode, action, values, currencies, workspaceId, unreachable }: ServiceFormProps & { unreachable: boolean }) {
-  const { result, formAction, pending, button, error, onSubmit, notKept } = useSaveResult(action, unreachable);
+const posted = (form: FormData, name: string) => {
+  const value = form.get(name);
+  return typeof value === "string" ? value : "";
+};
+
+interface DraftProps {
+  // The values last posted from this browser (with JavaScript), or null. Kept above the failure boundary, so they
+  // outlive its remount after an unreachable server; the action never sends typed text back.
+  draft: ServiceValues | null;
+  onDraft: (draft: ServiceValues | null) => void;
+}
+
+function ServiceFields({ mode, action, values, currencies, workspaceId, unreachable, draft, onDraft }: ServiceFormProps & DraftProps & { unreachable: boolean }) {
+  const onPost = (form: FormData) =>
+    onDraft({
+      ...values,
+      name: posted(form, "name"),
+      description: posted(form, "description"),
+      price: posted(form, "price"),
+      currency: posted(form, "currency"),
+      unit: posted(form, "unit"),
+      taxable: form.get("taxable") === "on",
+    });
+  const { result, formAction, pending, button, error, onSubmit, notKept } = useSaveResult(action, unreachable, onPost);
   const refused = result?.ok === false && result.status === "INVALID_INPUT" ? result : null;
   const invalid = new Set(refused?.fields ?? []);
   const fieldError = (name: string) => (invalid.has(name) ? FIELD_ERRORS[name] : undefined);
   const priceMessage = invalid.has("price") ? priceError(refused?.echo ?? {}, values.currency) : undefined;
   const locked = result?.ok === false && result.status === "CURRENCY_LOCKED";
-  // A created service starts the form again empty; a saved edit shows the stored row (its new version).
   const version = result?.ok ? Math.max(result.data.version, values.version ?? 0) : values.version;
-  const fieldsKey = `${values.version ?? "new"}-${result?.ok ? result.data.id : ""}`;
+  // The fields are mounted again only by a save (a created service starts the form again empty; a saved edit shows the
+  // stored row and, after the refresh, its new version) or by another service. A refusal keeps them, as typed.
+  const [saves, setSaves] = useState({ result, count: 0 });
+  if (saves.result !== result) setSaves({ result, count: saves.count + (result?.ok ? 1 : 0) });
+  const fieldsKey = `${values.id ?? "new"}-${values.version ?? 0}-${saves.count}`;
+  // After a save, the stored or initial values; otherwise this service's posted draft, if any.
+  const kept = draft !== null && draft.id === values.id && draft.version === values.version ? draft : null;
+  const shown = result?.ok || kept === null ? values : kept;
+  useEffect(() => {
+    if (result?.ok) onDraft(null);
+  }, [result, onDraft]);
 
   return (
     <form action={formAction} onSubmit={onSubmit} className="flex flex-col gap-6">
@@ -146,13 +178,13 @@ function ServiceFields({ mode, action, values, currencies, workspaceId, unreacha
         </>
       )}
       <div key={fieldsKey} className="flex flex-col gap-6">
-        <TextField id="service-name" name="name" label={CATALOG_NAME} defaultValue={values.name} error={fieldError("name")} />
+        <TextField id="service-name" name="name" label={CATALOG_NAME} defaultValue={shown.name} error={fieldError("name")} />
         <div className="flex max-w-sm flex-col gap-2">
           <Label htmlFor="service-description">{CATALOG_DESCRIPTION}</Label>
           <Textarea
             id="service-description"
             name="description"
-            defaultValue={values.description}
+            defaultValue={shown.description}
             aria-invalid={fieldError("description") ? true : undefined}
             aria-describedby={fieldError("description") ? "service-description-error" : undefined}
           />
@@ -168,7 +200,7 @@ function ServiceFields({ mode, action, values, currencies, workspaceId, unreacha
           label={CATALOG_PRICE}
           hint={CATALOG_PRICE_HINT}
           inputMode="decimal"
-          defaultValue={values.price}
+          defaultValue={shown.price}
           error={priceMessage}
         />
         <SelectField
@@ -177,16 +209,16 @@ function ServiceFields({ mode, action, values, currencies, workspaceId, unreacha
           label={CATALOG_CURRENCY}
           hint={values.priceSet ? CATALOG_CURRENCY_LOCKED_HINT : undefined}
           options={currencies}
-          defaultValue={values.currency}
+          defaultValue={shown.currency}
           error={locked ? CATALOG_CURRENCY_LOCKED : fieldError("currency")}
         />
-        <TextField id="service-unit" name="unit" label={CATALOG_UNIT} hint={CATALOG_UNIT_HINT} defaultValue={values.unit} error={fieldError("unit")} />
+        <TextField id="service-unit" name="unit" label={CATALOG_UNIT} hint={CATALOG_UNIT_HINT} defaultValue={shown.unit} error={fieldError("unit")} />
         <div className="flex items-center gap-2">
           <input
             id="service-taxable"
             name="taxable"
             type="checkbox"
-            defaultChecked={values.taxable}
+            defaultChecked={shown.taxable}
             className="size-4 accent-primary"
           />
           <Label htmlFor="service-taxable">{CATALOG_TAXABLE}</Label>
@@ -211,7 +243,12 @@ function ServiceFields({ mode, action, values, currencies, workspaceId, unreacha
 }
 
 export function ServiceForm(props: ServiceFormProps) {
-  return <SubmitFailureBoundary>{(unreachable) => <ServiceFields {...props} unreachable={unreachable} />}</SubmitFailureBoundary>;
+  const [draft, setDraft] = useState<ServiceValues | null>(null);
+  return (
+    <SubmitFailureBoundary>
+      {(unreachable) => <ServiceFields {...props} unreachable={unreachable} draft={draft} onDraft={setDraft} />}
+    </SubmitFailureBoundary>
+  );
 }
 
 interface ArchiveFormProps {

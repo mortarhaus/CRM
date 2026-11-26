@@ -7,16 +7,19 @@ import {
   CATALOG_CREATED,
   CATALOG_CURRENCY_LOCKED,
   CATALOG_EDIT_NOT_KEPT,
+  CATALOG_FAILED,
   CATALOG_FORBIDDEN,
   CATALOG_INVALID,
   CATALOG_RESTORE,
   CATALOG_RESTORED,
   CATALOG_SAVE,
   CATALOG_SAVED,
+  CATALOG_STALE,
+  WORKSPACE_CHANGED_MESSAGE,
 } from "../src/lib/auth/messages";
 import { expectAccessible } from "./a11y";
 import { expect, test } from "./fixtures";
-import { createWorkspace, openShellMenu, respectRateLimit, setMemberRole, signIn, signUp, uniqueEmail } from "./helpers";
+import { createWorkspace, failServerActions, openShellMenu, respectRateLimit, setMemberRole, signIn, signUp, switchTo, uniqueEmail } from "./helpers";
 
 // Phase 2 plan Task 22: the catalog page (Admin and Owner), prices typed as text and stored exactly, the currency lock,
 // archive and restore. Kept short: the image job runs every spec at three widths.
@@ -115,6 +118,133 @@ test("Staff get the refusal, not the catalog, and no Catalog link", async ({ pag
   await expect(page.getByLabel("Default unit price")).toHaveCount(0);
   await openShellMenu(page);
   await expect(page.getByRole("link", { name: "Catalog" })).toHaveCount(0);
+});
+
+type Draft = { name: string; description: string; price: string; currency: string; unit: string; taxable: boolean };
+
+async function fillDraft(page: Page, draft: Draft): Promise<void> {
+  await page.getByLabel("Name").fill(draft.name);
+  await page.getByLabel("Default description").fill(draft.description);
+  await page.getByLabel("Default unit price").fill(draft.price);
+  await page.getByLabel("Currency").selectOption(draft.currency);
+  await page.getByLabel("Unit", { exact: true }).fill(draft.unit);
+  await page.getByLabel("Taxable by default").setChecked(draft.taxable);
+}
+
+async function expectDraft(page: Page, draft: Draft): Promise<void> {
+  await expect(page.getByLabel("Name")).toHaveValue(draft.name);
+  await expect(page.getByLabel("Default description")).toHaveValue(draft.description);
+  await expect(page.getByLabel("Default unit price")).toHaveValue(draft.price);
+  await expect(page.getByLabel("Currency")).toHaveValue(draft.currency);
+  await expect(page.getByLabel("Unit", { exact: true })).toHaveValue(draft.unit);
+  if (draft.taxable) await expect(page.getByLabel("Taxable by default")).toBeChecked();
+  else await expect(page.getByLabel("Taxable by default")).not.toBeChecked();
+}
+
+const EMPTY: Draft = { name: "", description: "", price: "", currency: "MYR", unit: "", taxable: false };
+
+// PR #78 Review R1 P1: with JavaScript, a refusal after a save keeps every field as typed (the action returns none of
+// it), whatever came before; only a save starts the form again (create) or shows the stored row (edit).
+test("with JavaScript a draft survives every refusal after a save, and the corrected retry saves", async ({ context, page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "the form is the same at every width; run once to keep the suite short");
+  await newOwner(page);
+  await createWorkspace(page, "Catalog Elsewhere");
+  await switchTo(page, "Catalog Studio");
+  await page.goto("/catalog");
+  const alert = main(page).getByRole("alert");
+  const save = page.getByRole("button", { name: CATALOG_SAVE });
+  const create = page.getByRole("button", { name: CATALOG_CREATE });
+
+  // Create: a save, then a refused draft (twice), then the corrected retry, then a second save in a row.
+  await fillDraft(page, { name: "Discovery", description: "One call.", price: "100", currency: "MYR", unit: "call", taxable: true });
+  await create.click();
+  await expect(status(page, CATALOG_CREATED)).toBeVisible();
+  await expectDraft(page, EMPTY);
+  const retainer: Draft = { name: "Aisha Rahman retainer", description: "Monthly.\nTwo calls.", price: "10.001", currency: "SGD", unit: "month", taxable: true };
+  await fillDraft(page, retainer);
+  await create.click();
+  await expect(alert).toHaveText(CATALOG_INVALID);
+  await expectDraft(page, retainer);
+  await create.click();
+  await expect(alert).toHaveText(CATALOG_INVALID);
+  await expectDraft(page, retainer);
+  await page.getByLabel("Default unit price").fill("10.00");
+  await create.click();
+  await expect(status(page, CATALOG_CREATED)).toBeVisible();
+  await expectDraft(page, EMPTY);
+  await fillDraft(page, { ...EMPTY, name: "Workshop", price: "500" });
+  await create.click();
+  await expect(row(page, "Workshop")).toContainText(/MYR\s500\.00/);
+  await expectDraft(page, EMPTY);
+  await expect(row(page, "Aisha Rahman retainer")).toContainText(/SGD\s10\.00/);
+
+  // Edit: a save shows the stored row; a refused draft (twice), an unreachable server, a stale version, the currency
+  // lock and a workspace switch each keep it; the corrected retry and two saves in a row save.
+  await row(page, "Aisha Rahman retainer").getByRole("link", { name: "Edit Aisha Rahman retainer" }).click();
+  await expectDraft(page, { ...retainer, price: "10.00" });
+  await fillDraft(page, { ...retainer, name: "Retainer", price: "20" });
+  await save.click();
+  await expect(status(page, CATALOG_SAVED)).toBeVisible();
+  await expectDraft(page, { ...retainer, name: "Retainer", price: "20.00" });
+  const edited: Draft = { name: "Retainer plus", description: "Weekly.", price: "-1", currency: "SGD", unit: "week", taxable: false };
+  await fillDraft(page, edited);
+  await save.click();
+  await expect(alert).toHaveText(CATALOG_INVALID);
+  await expectDraft(page, edited);
+  await save.click();
+  await expect(alert).toHaveText(CATALOG_INVALID);
+  await expectDraft(page, edited);
+
+  const restore = await failServerActions(page, "network");
+  await save.click();
+  await expect(alert).toHaveText(CATALOG_FAILED);
+  await expectDraft(page, edited);
+  await restore();
+
+  await page.getByLabel("Default unit price").fill("30");
+  await save.click();
+  await expect(status(page, CATALOG_SAVED)).toBeVisible();
+  const stored: Draft = { ...edited, price: "30.00" };
+  await expectDraft(page, stored);
+  await fillDraft(page, { ...stored, name: "Retainer two" });
+  await save.click();
+  await expect(status(page, CATALOG_SAVED)).toBeVisible();
+  await expectDraft(page, { ...stored, name: "Retainer two" });
+
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await other.getByLabel("Name").fill("Changed elsewhere");
+  await other.getByRole("button", { name: CATALOG_SAVE }).click();
+  await expect(other.getByRole("main").getByRole("status").filter({ hasText: CATALOG_SAVED })).toBeVisible();
+  const late: Draft = { ...stored, name: "Retainer late", description: "Late.", unit: "visit", taxable: true };
+  await fillDraft(page, late);
+  await save.click();
+  await expect(alert).toHaveText(CATALOG_STALE);
+  await expectDraft(page, late);
+
+  await page.reload();
+  await expectDraft(page, { ...stored, name: "Changed elsewhere" });
+  await fillDraft(page, { ...late, currency: "MYR" });
+  await save.click();
+  await expect(alert).toHaveText(CATALOG_CURRENCY_LOCKED);
+  // The currency select is not asserted after this refusal: its behaviour is an open owner question (PR #78).
+  await expect(page.getByLabel("Name")).toHaveValue(late.name);
+  await expect(page.getByLabel("Default description")).toHaveValue(late.description);
+  await expect(page.getByLabel("Default unit price")).toHaveValue(late.price);
+  await expect(page.getByLabel("Unit", { exact: true })).toHaveValue(late.unit);
+  await expect(page.getByLabel("Taxable by default")).toBeChecked();
+
+  await page.getByLabel("Currency").selectOption("SGD");
+  await switchTo(other, "Catalog Elsewhere");
+  await save.click();
+  await expect(alert).toHaveText(WORKSPACE_CHANGED_MESSAGE);
+  await expectDraft(page, late);
+  await switchTo(other, "Catalog Studio");
+  await other.close();
+  await save.click();
+  await expect(status(page, CATALOG_SAVED)).toBeVisible();
+  await page.goto("/catalog");
+  await expect(row(page, "Retainer late")).toContainText(/SGD\s30\.00/);
 });
 
 // Charlie, 2026-11-26 ("2a"): a refusal returns none of the typed text, so without JavaScript the form shows the saved
