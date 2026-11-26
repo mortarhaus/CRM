@@ -22,7 +22,7 @@ import { expect, test } from "./fixtures";
 import { createWorkspace, failServerActions, openShellMenu, respectRateLimit, setMemberRole, signIn, signUp, switchTo, uniqueEmail } from "./helpers";
 
 // Phase 2 plan Task 22: the catalog page (Admin and Owner), prices typed as text and stored exactly, the currency lock,
-// archive and restore. Kept short: the image job runs every spec at three widths.
+// archive and restore. Kept short: CI runs every spec at three widths.
 let pageErrors: string[] = [];
 
 test.beforeEach(async ({ page }) => {
