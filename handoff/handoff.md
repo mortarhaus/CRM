@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · PR 77 merged; Charlie answered 1A, 2A; awaiting `build` (catalog echo PR first, then Phase 2 close-out)
+# Handoff — 2026-11-26 · `build`: catalog echo fix, Opus sub-agent in worktree build-fix-catalog-refusal-echo (not pushed)
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -7,7 +7,7 @@
 
 ## 0. Active target
 - Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: none (nothing open)
-- Working folder: repo root (`/Users/charlie/Documents/Projects/Personal/CRM`, branch `main`). No build worktree. Log worktree: `.agent/worktrees/agent-logs`.
+- Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-fix-catalog-refusal-echo` (branch `fix/catalog-refusal-echo` from 6926c5d). Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
 - Branch: `main` = `6926c5d` (equal to origin/main). Open PRs: 0. Repo `mortarhaus/CRM` is PRIVATE (standing rule: public while a PR needs CI, private after merge).
@@ -38,7 +38,7 @@ agent-logs worktree at `4146f41` plus the handoff-copy commit, clean.
 2026-11-26: PR 77 opened, reviewed (R1 fixed, R2 Approved), receipted, merged and logged; removed worktree `build-fix-settings-workspace-binding` and local branch `fix/settings-workspace-binding` (tip 9ad66d8, on main); `main` fast-forwarded; repo private; artifact republished. Bob's review worktrees: none left. Backup branches `feat/p2-email-templates` and `chore/setup-reconcile-v4-6` kept.
 
 ## 5. Next step (file-level)
-1. On `build`: first the catalog echo PR (answer 2A: refusals return no free text; `catalog/actions.ts:72`, `:88`, `:101`; return only allow-listed choices and booleans; deep tier, Opus sub-agent).
+1. IN PROGRESS (sub-agent started 2026-11-26; next: check its report, push, repo public, open PR, `review N`): the catalog echo PR (answer 2A: refusals return no free text; `catalog/actions.ts:72`, `:88`, `:101`; return only allow-listed choices and booleans; deep tier, Opus sub-agent).
 2. Then the Phase 2 close-out docs PR: record the FILE-03 exception review (answer 1A: keep, next review Phase 4 gate; Bob reviews), refresh the CLAUDE.md Status section; spec line 803 goes in a spec PR.
 3. E2E sharding is due: image E2E job took ~67.5 min (limit 90).
 4. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
