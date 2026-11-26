@@ -344,8 +344,73 @@ describe("action(): the workspace the posting page was rendered for", () => {
 
   it("leaves requireWorkspaceMember() unbound for a page, which reads the session's workspace", async () => {
     expect((await requireWorkspaceMember("staff")).workspaceId).toBe(owner.workspaceId);
-    await expect(requireWorkspaceMember("staff", other.workspaceId)).rejects.toMatchObject({ status: "WORKSPACE_CHANGED" });
-    await expect(requireWorkspaceMember("staff", null)).rejects.toMatchObject({ status: "WORKSPACE_CHANGED" });
+    await expect(requireWorkspaceMember("staff", () => other.workspaceId)).rejects.toMatchObject({ status: "WORKSPACE_CHANGED" });
+    await expect(requireWorkspaceMember("staff", () => null)).rejects.toMatchObject({ status: "WORKSPACE_CHANGED" });
+  });
+});
+
+// PR 77 Review R1 P1: the session is read first; then only the rendered workspace; every other input value only once
+// the role check passed. Each read of the input is recorded in `steps`, beside the session and membership steps.
+describe("action(): what is read of the input, and when", () => {
+  const readLogged = (name: string, value: unknown) => {
+    steps.push(`read:${name}`);
+    return value;
+  };
+  // A raw input whose every property read is recorded.
+  const rawInput = (workspaceId: string | null) => {
+    const input = {};
+    if (workspaceId !== null) Object.defineProperty(input, "workspaceId", { enumerable: true, get: () => readLogged("workspaceId", workspaceId) });
+    Object.defineProperty(input, "note", { enumerable: true, get: () => readLogged("note", "x") });
+    return input;
+  };
+  // A posted form whose every field read is recorded.
+  class LoggedForm extends FormData {
+    override get(name: string) {
+      return readLogged(name, super.get(name)) as FormDataEntryValue | null;
+    }
+  }
+  const formInput = (workspaceId: string | null) => {
+    const form = new LoggedForm();
+    if (workspaceId !== null) form.append("workspaceId", workspaceId);
+    form.append("note", "x");
+    return form;
+  };
+  const fromForm = (form: FormData) => ({ note: form.get("note") });
+  const call = async (kind: "raw" | "form", workspaceId: string | null, minRole: Role = "staff") => {
+    const { handler, seen } = recordingHandler();
+    const run = action({ name: `test.order.${kind}`, minRole, input: noteInput, idempotent: false, handler, fromForm });
+    reset();
+    const result = kind === "raw" ? await run(rawInput(workspaceId)) : await run(null, formInput(workspaceId));
+    return { result, seen, steps: [...steps] };
+  };
+
+  it.each(["raw", "form"] as const)("%s: a request with no session reads nothing of the input", async (kind) => {
+    signedInAs(null);
+    expect(await call(kind, owner.workspaceId)).toMatchObject({ result: { ok: false, status: "UNAUTHENTICATED" }, steps: ["session"] });
+  });
+
+  it.each(["raw", "form"] as const)("%s: a stale page's post reads only the rendered workspace, after the session", async (kind) => {
+    for (const workspaceId of [other.workspaceId, null]) {
+      const { result, seen, steps: order } = await call(kind, workspaceId);
+      expect(result).toEqual({ ok: false, status: "WORKSPACE_CHANGED" });
+      expect(order).toEqual(workspaceId === null && kind === "raw" ? ["session"] : ["session", "read:workspaceId"]);
+      expect(seen).toEqual([]);
+    }
+  });
+
+  it.each(["raw", "form"] as const)("%s: a role refusal reads the rendered workspace only, never the payload", async (kind) => {
+    await setRole(owner, "staff");
+    const { result, steps: order } = await call(kind, owner.workspaceId, "admin");
+    expect(result).toEqual({ ok: false, status: "FORBIDDEN" });
+    expect(order).toEqual(["session", "read:workspaceId", "membership"]);
+  });
+
+  it.each(["raw", "form"] as const)("%s: an allowed post reads the payload after the role check and acts in the session's workspace", async (kind) => {
+    const { result, seen, steps: order } = await call(kind, owner.workspaceId);
+    expect(result).toEqual({ ok: true, status: "DONE", data: { done: true, n: 1 } });
+    expect(order.slice(0, 3)).toEqual(["session", "read:workspaceId", "membership"]);
+    expect(order.slice(3)).toContain("read:note");
+    expect(seen).toEqual([{ workspaceId: owner.workspaceId, userId: owner.userId, role: "owner", setting: owner.workspaceId, input: { note: "x" } }]);
   });
 });
 
