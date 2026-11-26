@@ -44,8 +44,8 @@ type Refusal =
 export type ActionResult<O> =
   | { ok: true; status: "DONE" | "REPLAYED"; data: O }
   | { ok: false; status: Refusal | "IDEMPOTENCY_KEY_REUSED" }
-  // Field paths only, never the submitted values (UNI-09); for a posted form, also the values its action's `echo`
-  // names as safe to show again (never a secret or personal data), so a page posted without JavaScript can render them.
+  // Field paths only, never the submitted values (UNI-09); for a posted form, also what its action's `echo` returns as
+  // safe to show again (never a secret or personal data), so a page posted without JavaScript can render it.
   | { ok: false; status: "INVALID_INPUT"; fields: string[]; echo?: Record<string, string> };
 
 export interface ActionContext {
@@ -188,9 +188,9 @@ export function action<I, O extends Json>(spec: {
   // from redirects once the action is done: a redirect while the page renders is a 307, which repeats the POST at
   // the new URL, where Next finds no such action. A refusal is still returned.
   redirectTo?: string;
-  // With fromForm: the posted values a refused form shows again (INVALID_INPUT only). Without JavaScript the page is
-  // rendered from the result, not from what was typed, so anything not echoed comes back empty. Only values that are
-  // neither secret nor personal data; strings only, read from the form as posted.
+  // With fromForm: what a refused form shows again (INVALID_INPUT only). Without JavaScript the page is rendered from
+  // the result, not from what was typed, so anything not echoed comes back empty. Only values that are neither secret
+  // nor personal data, as strings: posted values, or closed codes worked out from them (the catalog's price reason).
   echo?: (form: FormData) => Record<string, string>;
   // Work that must not run inside the workspace transaction, after step 4 and before step 5: a call that takes a
   // connection of its own from the same pool (step-up's code check posts to Better Auth, whose request runs in its

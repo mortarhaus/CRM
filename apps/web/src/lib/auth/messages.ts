@@ -295,6 +295,9 @@ export const CATALOG_CURRENCY_LOCKED = "The currency can't change while a defaul
 export const CATALOG_STALE = "Someone else changed this service after this page loaded. Reload the page, then save again.";
 export const CATALOG_NOT_FOUND = "That service doesn't exist in this workspace.";
 export const CATALOG_FAILED = "We couldn't save the service. Try again.";
+// Without JavaScript a refusal carries none of the typed text (it can hold personal data), so the form is shown as it was.
+export const CATALOG_CREATE_NOT_KEPT = "What you typed was not kept: the form below is back to how it started. Enter the service again, then add it.";
+export const CATALOG_EDIT_NOT_KEPT = "Your changes were not kept: the fields below show the saved service. Make your changes again, then save.";
 
 export const TEMPLATES_TITLE = "Email templates";
 // Q23 Phase 2 scope: saved templates are stored and previewed, and no sender reads them yet (runbook phase-1-security,

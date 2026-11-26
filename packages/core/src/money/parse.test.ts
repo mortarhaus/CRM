@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MONEY_INPUT_MAX_LENGTH, MONEY_MAX_MINOR } from "../security/limits";
 import { UnknownCurrencyError } from "./currency";
-import { MoneyParseError, type MoneyParseReason, parseDecimalToMinor } from "./parse";
+import { isMoneyParseReason, MONEY_PARSE_REASONS, MoneyParseError, type MoneyParseReason, parseDecimalToMinor } from "./parse";
 
 function refusal(input: string, currency: string, options?: { allowNegative?: boolean }): MoneyParseReason | "accepted" {
   try {
@@ -112,5 +112,12 @@ describe("parseDecimalToMinor", () => {
     expect(() => parseDecimalToMinor("1.00", "XXX")).toThrow(UnknownCurrencyError);
     expect(() => parseDecimalToMinor("1.00", "myr")).toThrow(UnknownCurrencyError);
     expect(() => parseDecimalToMinor("", "ZZZ")).toThrow(UnknownCurrencyError);
+  });
+});
+
+describe("isMoneyParseReason", () => {
+  it("accepts exactly the parser's reasons", () => {
+    expect(MONEY_PARSE_REASONS.every(isMoneyParseReason)).toBe(true);
+    expect(["", "Invalid", "1.005", "toString", undefined, null, 1].some(isMoneyParseReason)).toBe(false);
   });
 });

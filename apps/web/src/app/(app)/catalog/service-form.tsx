@@ -1,9 +1,9 @@
 "use client";
 
-import { currencyExponent, formatMinor, isCurrency, MoneyParseError, parseDecimalToMinor } from "@crm/core/money";
+import { currencyExponent, formatMinor, isCurrency, isMoneyParseReason } from "@crm/core/money";
 import { MONEY_MAX_MINOR } from "@crm/core/security";
 import { redirect, useRouter } from "next/navigation";
-import { type FormEvent, startTransition, useActionState, useEffect, useRef } from "react";
+import { type FormEvent, startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { RenderedWorkspace } from "@/components/rendered-workspace";
 import { type SelectOption, SelectField, TextField } from "@/components/settings/settings-field";
 import { SubmitFailureBoundary } from "@/components/submit-failure-boundary";
@@ -16,6 +16,7 @@ import {
   CATALOG_ARCHIVE_HINT,
   CATALOG_ARCHIVED,
   CATALOG_CREATE,
+  CATALOG_CREATE_NOT_KEPT,
   CATALOG_CREATED,
   CATALOG_CURRENCY,
   CATALOG_CURRENCY_INVALID,
@@ -23,6 +24,7 @@ import {
   CATALOG_CURRENCY_LOCKED_HINT,
   CATALOG_DESCRIPTION,
   CATALOG_DESCRIPTION_INVALID,
+  CATALOG_EDIT_NOT_KEPT,
   CATALOG_FAILED,
   CATALOG_FORBIDDEN,
   CATALOG_INVALID,
@@ -82,16 +84,12 @@ const FIELD_ERRORS: Record<string, string> = {
   unit: CATALOG_UNIT_INVALID,
 };
 
-// Why the price was refused, by the same core parser the action ran, on the price and currency it echoed.
-function priceError(price: string, currency: string): string | undefined {
-  if (!isCurrency(currency)) return undefined;
-  try {
-    parseDecimalToMinor(price, currency);
-    return undefined;
-  } catch (error) {
-    if (!(error instanceof MoneyParseError)) throw error;
-    return priceErrorMessage(error.reason, currency, currencyExponent(currency), formatMinor(MONEY_MAX_MINOR, currency, "en"));
-  }
+// Why the price was refused: the core parser's reason and the currency it read the price in, as the action returned
+// them (never the typed price). A post the action could not read that far gets the general rule, in the form's currency.
+function priceError(echoed: Partial<Record<string, string>>, formCurrency: string): string {
+  const reason = isMoneyParseReason(echoed.priceRefused) ? echoed.priceRefused : "invalid";
+  const currency = echoed.priceCurrency !== undefined && isCurrency(echoed.priceCurrency) ? echoed.priceCurrency : formCurrency;
+  return priceErrorMessage(reason, currency, currencyExponent(currency), formatMinor(MONEY_MAX_MINOR, currency, "en"));
 }
 
 // Common to both forms: a result after a post (with JavaScript or without), focus back on the button, a refresh after
@@ -106,13 +104,16 @@ function useSaveResult<D extends Saved>(action: FormAction<D>, unreachable: bool
   }, [result, unreachable, router]);
   if (result?.ok === false && result.status === "UNAUTHENTICATED") redirect("/sign-in");
   const error = result?.ok === false ? (REFUSALS[result.status] ?? CATALOG_FAILED) : unreachable ? CATALOG_FAILED : null;
-  // The form is not reset on a refusal (with JavaScript); without it the page is rendered from the result.
+  // Whether this browser posted the form (with JavaScript): the form is then not reset on a refusal and keeps what was
+  // typed. Without JavaScript the page is rendered from the result, which carries none of the typed text.
+  const [postedHere, setPostedHere] = useState(false);
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    setPostedHere(true);
     startTransition(() => formAction(form));
   }
-  return { result, formAction, pending, button, error, onSubmit };
+  return { result, formAction, pending, button, error, onSubmit, notKept: result?.ok === false && !postedHere };
 }
 
 interface ServiceFormProps {
@@ -125,13 +126,11 @@ interface ServiceFormProps {
 }
 
 function ServiceFields({ mode, action, values, currencies, workspaceId, unreachable }: ServiceFormProps & { unreachable: boolean }) {
-  const { result, formAction, pending, button, error, onSubmit } = useSaveResult(action, unreachable);
+  const { result, formAction, pending, button, error, onSubmit, notKept } = useSaveResult(action, unreachable);
   const refused = result?.ok === false && result.status === "INVALID_INPUT" ? result : null;
-  const echoed: Partial<Record<string, string>> = refused?.echo ?? {};
-  const value = (name: "name" | "description" | "price" | "currency" | "unit") => echoed[name] ?? values[name];
   const invalid = new Set(refused?.fields ?? []);
   const fieldError = (name: string) => (invalid.has(name) ? FIELD_ERRORS[name] : undefined);
-  const priceMessage = invalid.has("price") ? priceError(value("price"), value("currency")) : undefined;
+  const priceMessage = invalid.has("price") ? priceError(refused?.echo ?? {}, values.currency) : undefined;
   const locked = result?.ok === false && result.status === "CURRENCY_LOCKED";
   // A created service starts the form again empty; a saved edit shows the stored row (its new version).
   const version = result?.ok ? Math.max(result.data.version, values.version ?? 0) : values.version;
@@ -147,13 +146,13 @@ function ServiceFields({ mode, action, values, currencies, workspaceId, unreacha
         </>
       )}
       <div key={fieldsKey} className="flex flex-col gap-6">
-        <TextField id="service-name" name="name" label={CATALOG_NAME} defaultValue={value("name")} error={fieldError("name")} />
+        <TextField id="service-name" name="name" label={CATALOG_NAME} defaultValue={values.name} error={fieldError("name")} />
         <div className="flex max-w-sm flex-col gap-2">
           <Label htmlFor="service-description">{CATALOG_DESCRIPTION}</Label>
           <Textarea
             id="service-description"
             name="description"
-            defaultValue={value("description")}
+            defaultValue={values.description}
             aria-invalid={fieldError("description") ? true : undefined}
             aria-describedby={fieldError("description") ? "service-description-error" : undefined}
           />
@@ -169,7 +168,7 @@ function ServiceFields({ mode, action, values, currencies, workspaceId, unreacha
           label={CATALOG_PRICE}
           hint={CATALOG_PRICE_HINT}
           inputMode="decimal"
-          defaultValue={value("price")}
+          defaultValue={values.price}
           error={priceMessage}
         />
         <SelectField
@@ -178,16 +177,16 @@ function ServiceFields({ mode, action, values, currencies, workspaceId, unreacha
           label={CATALOG_CURRENCY}
           hint={values.priceSet ? CATALOG_CURRENCY_LOCKED_HINT : undefined}
           options={currencies}
-          defaultValue={value("currency")}
+          defaultValue={values.currency}
           error={locked ? CATALOG_CURRENCY_LOCKED : fieldError("currency")}
         />
-        <TextField id="service-unit" name="unit" label={CATALOG_UNIT} hint={CATALOG_UNIT_HINT} defaultValue={value("unit")} error={fieldError("unit")} />
+        <TextField id="service-unit" name="unit" label={CATALOG_UNIT} hint={CATALOG_UNIT_HINT} defaultValue={values.unit} error={fieldError("unit")} />
         <div className="flex items-center gap-2">
           <input
             id="service-taxable"
             name="taxable"
             type="checkbox"
-            defaultChecked={refused ? echoed.taxable === "on" : values.taxable}
+            defaultChecked={values.taxable}
             className="size-4 accent-primary"
           />
           <Label htmlFor="service-taxable">{CATALOG_TAXABLE}</Label>
@@ -196,6 +195,7 @@ function ServiceFields({ mode, action, values, currencies, workspaceId, unreacha
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
+          {notKept && ` ${mode === "create" ? CATALOG_CREATE_NOT_KEPT : CATALOG_EDIT_NOT_KEPT}`}
         </p>
       )}
       {result?.ok && (

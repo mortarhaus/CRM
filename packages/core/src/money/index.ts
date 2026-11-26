@@ -10,4 +10,4 @@ export {
   UnknownCurrencyError,
 } from "./currency";
 export { formatMinor, minorToDecimal } from "./format";
-export { MoneyParseError, type MoneyParseReason, parseDecimalToMinor } from "./parse";
+export { isMoneyParseReason, MoneyParseError, type MoneyParseReason, parseDecimalToMinor } from "./parse";
