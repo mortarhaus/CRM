@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · PR 79 (Phase 2 close, docs) open, head 0c48538; waiting for `review 79`
+# Handoff — 2026-11-26 · PR 79 R1 fixed, head e432717; waiting for `review 79` (R2)
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -7,7 +7,7 @@
 
 ## 0. Active target
 - Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: 79
-- Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-docs-phase-2-close` (branch `docs/phase-2-close`, head `0c48538646b060bcab10928867e1230f53e2df53`). Log worktree: `.agent/worktrees/agent-logs`.
+- Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-docs-phase-2-close` (branch `docs/phase-2-close`, head `e432717981aa16cfc7db73cf8f12c59ffba22d7d`). Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
 - `main` = `ffa616e` (equal to origin/main). Open PR: #79 "docs: close Phase 2" (CLAUDE.md and docs/DECISIONS.md only). Repo is PUBLIC while PR 79 needs CI; set private after merge.
@@ -32,13 +32,13 @@ Uncommitted files — fingerprint:
 | `.playwright-mcp/` | untracked, not mine | directory |
 | `docker/sync-export.sh` | untracked, not mine | `51dcde23b372ecaaf041cea716ec3f95fa70226a` |
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
-Build worktree clean at `0c48538` (pushed).
+Build worktree clean at `e432717` (pushed).
 
 ## 4. Just finished
-2026-11-26 `build`: Phase 2 close-out docs PR #79 (Opus sub-agent a27b062 + builder correction 94080df). Gate evidence: all four done-when items met on ffa616e. Local checks ran at a27b062 (typecheck, lint, 1529 tests, build); 94080df edits DECISIONS text only. Then 0c48538 records Charlie's "1 yes, 2 yes" (Q24 waits for Phase 6; require_2fa switch in Phase 3).
+2026-11-26 `build`: Phase 2 close-out docs PR #79 (Opus sub-agent a27b062 + builder correction 94080df). Gate evidence: all four done-when items met on ffa616e. Local checks ran at a27b062 (typecheck, lint, 1529 tests, build); 94080df edits DECISIONS text only. Then 0c48538 records Charlie's "1 yes, 2 yes" (Q24 waits for Phase 6; require_2fa switch in Phase 3). `fix` R1 (Bob, head 0c48538, Revision required): P1 added AUTH-09 and TEN-11 self-check rows (PR body); P2 scoped the QR access statement to the origin and recorded the 1 h private cache (e432717). Review archived at agent-logs 33ad818.
 
 ## 5. Next step (file-level)
-1. Charlie runs `review 79` in Bob's window; then `fix` or `approved 79`. Tell Charlie to run `approved 79` BEFORE merging.
+1. Charlie runs `review 79` (R2) in Bob's window; then `fix` or `approved 79`. Tell Charlie to run `approved 79` BEFORE merging.
 2. Q24 and the require_2fa placement are answered (recorded in 0c48538); nothing blocks the close but Bob's review.
 3. E2E sharding is due (image job ~69 min, limit 90). Then the spec PR for line 803, and the Phase 3 plan (customers and team; builder s8 ask; deep tier).
 4. Phase 4 items are listed in the PR 79 DECISIONS entry (carried forward).
@@ -61,7 +61,7 @@ Build worktree clean at `0c48538` (pushed).
 - 2026-11-26 asked with PR 79, ANSWERED "1 yes, 2 yes" (recorded in PR 79): Q24 proposal cover options wait for Phase 6; require_2fa switch goes in the Phase 3 plan (Owner only, step-up). Still open: Admin viewing the QR needs a spec clarification; account-number separators; DuitNow/PayNow ID text field; deleted-user wording; both Q6 parts; Cloudflare token not saved.
 
 ## 7. Open review findings (P0/P1) and verdict
-None open (P0/P1). PR 78 Approved (R2). Residual: pre-existing, from source reading only: catalog form action state keyed by workspace may carry to another service across Edit links (error/saved message, version number); two unexplained CATALOG_FAILED results in flaky local runs; new catalog browser tests desktop Chromium only. PR 77: no stale-workspace e2e with JavaScript disabled; no test races two first template saves; cold-dev-server accessibility.spec failures unverified. Dev only: Next dev mode logs 2FA action arguments (raise with Bob). Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 (DB currency list vs code table test; edit link for a missing service; long name at 320 px e2e); PR 72 (clock option, preview timing, time zone pause).
+PR 79 R1 findings fixed, awaiting R2. QR route sends `Cache-Control: private, max-age=3600` (a fresh browser copy skips the Owner/current-key checks for up to 1 h; not exercised in a browser): weigh at the Phase 4 FILE-03 review. None open (P0/P1). PR 78 Approved (R2). Residual: pre-existing, from source reading only: catalog form action state keyed by workspace may carry to another service across Edit links (error/saved message, version number); two unexplained CATALOG_FAILED results in flaky local runs; new catalog browser tests desktop Chromium only. PR 77: no stale-workspace e2e with JavaScript disabled; no test races two first template saves; cold-dev-server accessibility.spec failures unverified. Dev only: Next dev mode logs 2FA action arguments (raise with Bob). Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 (DB currency list vs code table test; edit link for a missing service; long name at 320 px e2e); PR 72 (clock option, preview timing, time zone pause).
 
 ## 8. Decisions made this session, not yet in the decisions log
 - The 2026-11-25 approvals are now in docs/DECISIONS.md (merged with PR 77).
