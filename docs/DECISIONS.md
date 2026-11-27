@@ -10,48 +10,54 @@
   3. "Where does an Admin see it?" Recommendation: "The same Bank page, view only, with a menu link".
   4. "The browser keeps the QR for up to 1 hour, so someone removed as Admin could still see their copy. Keep that?" Recommendation: "Yes, keep it".
   5. "Is the security check of this Admin access fine at the planned Phase 4 review?" Recommendation: "Yes".
-  **Charlie's reply, verbatim: "all ok".** Neither decision approves the revision text: revision 10 still needs Bob's exact-hash spec review and Charlie's approval.
+  **Charlie's reply, verbatim: "all ok".**
+- **Owner decision 3 (same day):** the builder asked two more questions, each with a recommendation:
+  1. "Is a fresh 2FA code needed to view the bank details text?" Recommendation: "No. From reading the code, the Owner can view it without one today."
+  2. "Must an Admin have 2FA turned on to see these details?" Recommendation: "Yes. The page already hides them from anyone without 2FA, and they're payment details."
+  The builder also said Bob will be asked to check the 1-hour QR copy against the 10-minute download-link rule. **Charlie's reply, verbatim: "ok both".** None of the three decisions approves the revision text: revision 10 still needs Bob's exact-hash spec review and Charlie's approval.
 - **Decision (draft spec text, revision 10, "Changes in v4.7" item 11):**
   - Authorization: the bank-details or QR change audit entry stores account numbers as their last 4 digits only, with no hash.
-  - Matrix: a new row lets Admin and Owner **view** the bank details and the current QR on the Bank settings page, which Admins reach from the menu (answers 1 and 3). Viewing the QR needs no step-up (answer 2).
+  - Matrix: a new row lets Admin and Owner **view** the bank details and the current QR on the Bank settings page, which Admins reach from the menu (decision 2, answers 1 and 3). Viewing, by an Admin or by the Owner, needs no step-up: the QR (decision 2, answer 2) and the bank-details text (decision 3, answer 1).
+  - An Admin must have 2FA turned on to see the bank details and the QR on the Bank page (decision 3, answer 2). This holds even when the workspace's `require_2fa` is off. The spec's `require_2fa` ("per workspace for owner/admin", "Authentication and sessions") is unchanged: that switch covers all of an Admin's access, while this rule covers only this view. No Owner rule is added or removed.
   - View only: an Admin cannot change, clear, upload, replace or remove anything, and gets no step-up prompt and no form. Every change stays Owner only with step-up, audited, with an email to all owners.
   - Staff get no settings view. Who sees issued invoices, which print bank details and the QR from the frozen snapshot, is unchanged.
-  - Files: the current-QR response may stay in the viewer's browser for up to 1 hour, so a member removed as Admin or Owner can still see their copy that long (answer 4). The FILE-03 review at the Phase 4 gate covers this Admin access (answer 5).
+  - Files: the current-QR response may stay in the viewer's browser for up to 1 hour, so a member removed as Admin or Owner can still see their copy that long (decision 2, answer 4). The FILE-03 review at the Phase 4 gate covers this Admin access (decision 2, answer 5).
   - Revision 9 is relabelled approved and merged (PR #66, `b926fd6`), the label fix `agents/PROJECT.md` §11 asked for.
 - **What viewing needs today (Owner), for the record:**
   - The spec puts step-up on "high-risk actions" and on a bank-details or QR "change" (Authorization, the step-up and bank bullets). The matrix row "Bank details, DuitNow QR (step-up)" does not separate viewing from changing.
   - The code shows an Owner the saved bank details and the QR without a fresh code: `settings/payment/page.tsx` passes the saved values to the form, and `<img>` points at the QR route; `steppedUp` only switches between the prompt and "Confirmed". The route checks the role and the key, not step-up (`files/payment-qr/route.ts:16`).
   - The page does require 2FA to be on: with 2FA off, it shows only the enrol message and no values (`page.tsx:67`, plan Q16, which is about being able to step up). No e2e test asserts that saved values show before step-up (code reading only).
-  - So step-up for viewing the bank-details text is **not** a recorded rule either way, and question 2 asked about the QR only. The spec leaves it open (ASK below).
+  - The QR route does **not** check 2FA. `requireWorkspaceMember` refuses an Admin or Owner without 2FA only when the workspace's `require_2fa` is on (`apps/web/src/lib/auth/action.ts:95`). So with `require_2fa` off, an Owner without 2FA who calls `/files/payment-qr?id=<current hash>` directly gets the image, although the page hides it from them. After the role change, an Admin without 2FA would get it the same way unless the route checks 2FA (code reading only, not run).
 - **Cache, checked:**
-  - The QR route answers `Cache-Control: private, max-age=3600` (`route.ts:37`) and keeps doing so for Admins (answer 4).
+  - The QR route answers `Cache-Control: private, max-age=3600` (`route.ts:37`) and keeps doing so for Admins (decision 2, answer 4).
   - Spec "Input, templates, files" asks for "signed URLs ≤ 10 min" for uploads, and FILE-04 asks for downloads "via signed URLs with short expiry (≤ 10 min)". The QR route is a session-checked same-origin route, not a signed URL, so the letter of both does not apply. A 1-hour browser copy does go past the 10-minute idea, though. That was already true for the Owner (2026-11-26 control (7)); it now also covers Admins and is owner-accepted. Bob rules whether this is a FILE-04 exception (see "Exception to a rule?").
   - The Bank page itself sets no `Cache-Control`. It reads the session, so it renders per request, and Next.js's default for dynamic pages applies (`private, no-cache, no-store, max-age=0, must-revalidate`). Not measured here.
-- **Left open (ASK):**
-  - Does viewing the bank-details **text** need step-up, for an Admin or the Owner?
-  - Must an Admin have 2FA on to see the view? Today the page hides values from anyone without 2FA, because the forms need step-up. A view-only Admin has no step-up path, so that reason does not carry over. Not asked.
+- **Left open (ASK; written as "not decided" in item 11):** must the QR image route itself refuse an Admin without 2FA who requests it directly, outside the page? The answer covers "these details" on the page, and the recommendation's reason ("The page already hides them") is about the page. The direct route was not asked about. If the answer is yes, the same question for an Owner without 2FA is a separate owner choice, also not asked.
 - **After approval and merge, these must follow (not changed here):**
   - Code:
-    - `apps/web/src/app/(app)/files/payment-qr/route.ts` and its comment: `requireWorkspaceMember("owner")` at line 16 becomes Admin or Owner; the cache header stays.
-    - `apps/web/src/app/(app)/settings/payment/page.tsx`: the Owner check at line 34 and the comment at line 29. Admins get a view-only render with no `StepUpPrompt`, no `BankDetailsForm` and no `PaymentQrForm` controls.
+    - `apps/web/src/app/(app)/files/payment-qr/route.ts` and its comment: `requireWorkspaceMember("owner")` at line 16 becomes Admin or Owner; the cache header stays. Whether it adds a 2FA check for an Admin waits on the ASK above.
+    - `apps/web/src/app/(app)/settings/payment/page.tsx`: the Owner check at line 34 and the comment at line 29. Admins get a view-only render with no `StepUpPrompt`, no `BankDetailsForm` and no `PaymentQrForm` controls. An Admin without 2FA sees no bank values and no QR, whatever `require_2fa` says: the existing `!twoFactorEnabled` branch (line 67) also covers the Admin render, and no step-up is needed to view.
     - `settings/payment/actions.ts`: stays `minRole: "owner"` with step-up on every action.
     - `apps/web/src/components/shell/nav-links.tsx`: the Bank link shows for Admins as well (comments at lines 8 and 19, `showOwnerSettings` at line 74).
   - Tests:
-    - `apps/web/src/app/(app)/settings/payment/actions.test.ts:266`: today "an Admin … get 404". It becomes: Admin served; Staff, another workspace's member and an old id refused; Admin refused on every change action.
-    - `apps/web/e2e/bank-details.spec.ts:272`: today "an Admin sees no Bank link, and the page refuses them". It becomes: Admin sees the link and a view-only page with no forms or step-up; Staff refused.
+    - `apps/web/src/app/(app)/settings/payment/actions.test.ts:266`: today "an Admin … get 404". It becomes: Admin served; Staff, another workspace's member and an old id refused; Admin refused on every change action. If the ASK is answered yes, add: an Admin without 2FA gets 404 with `require_2fa` off.
+    - `apps/web/e2e/bank-details.spec.ts:272`: today "an Admin sees no Bank link, and the page refuses them". It becomes:
+      - an Admin with 2FA sees the link and a view-only page: saved bank values and the QR shown, no forms, no step-up prompt, no fresh code asked;
+      - an Admin without 2FA, with `require_2fa` off, sees no bank values and no QR;
+      - Staff are refused.
   - Docs:
-    - FILE-03 control (7) in the 2026-11-26 "Phase 2 close" entry (Owners only) is superseded for viewing when the code ships. The Phase 4 FILE-03 review checks the Admin audience (answer 5).
+    - FILE-03 control (7) in the 2026-11-26 "Phase 2 close" entry (Owners only) is superseded for viewing when the code ships. The Phase 4 FILE-03 review checks the Admin audience (decision 2, answer 5).
     - `docs/runbooks/phase-1-security.md:107` (the step-up prompt on `/settings/payment`): note that Admins see no prompt.
     - `setup` reconciles `agents/PROJECT.md` §2 and §11 and `CLAUDE.md` to the new hash.
   - The audit code needs no change: it already stores `{"last4": …}` with no hash (2026-11-22 entry).
 - **Why:** builder §4 and §8 (a spec deviation needs a reviewed spec revision; an owner answer is recorded with what was asked); `agents/PROJECT.md` §11 (the line 803 fix and the revision 9 label in the next spec PR).
-- **Alternatives rejected:** a separate spec revision for the Admin view (two reviews; Charlie chose one); reading answer 2 as covering the bank-details text (it asked about the QR only); `no-store` or a shorter cache for non-Owners (answer 4: keep it).
-- **Scope / affects:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` (title, Status, "Changes in v4.7" heading and items 10 and 11, the Authorization matrix and the bank-details bullet, the DuitNow QR bullet in "Input, templates, files", Current gates (a)). No code, test or `agents/PROJECT.md` change. Rules: AUTH-02, AUTH-03, AUTH-09, FILE-03, FILE-04, UNI-09, UNI-10.
+- **Alternatives rejected:** a separate spec revision for the Admin view (two reviews; Charlie chose one); `no-store` or a shorter cache for non-Owners (decision 2, answer 4: keep it); reading decision 3's 2FA rule as covering the direct QR route (not asked; left as an ASK).
+- **Scope / affects:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` (title, Status, "Changes in v4.7" heading and items 10 and 11, the Authorization matrix and the bank-details bullet, the DuitNow QR bullet in "Input, templates, files", Current gates (a)). No code, test or `agents/PROJECT.md` change. Rules: AUTH-02, AUTH-03, AUTH-09, FILE-03, FILE-04, UNI-09, UNI-10; spec `require_2fa` (Authentication and sessions).
 - **Versions:** spec v4.7 revision 10 (draft).
 - **Exception to a rule?**
   - FILE-03 is unchanged (content-addressed, never deleted; next review at the Phase 4 gate, now including Admin access).
-  - FILE-04: the builder reads the 1-hour private browser cache of a session-checked route as outside FILE-04's signed-URL rule, so not an exception. If Bob rules it is one, the owner acceptance is answer 4 ("all ok"). The compensating controls are the route's role and current-key checks, `private` (no shared cache), and the Phase 4 review.
-- **Decided by:** owner (Charlie): Q26 (2026-11-22), "admin yes" (2026-11-25), "build, include QR" and "all ok" (2026-11-27). Builder: the draft wording, the code reading and the open list.
+  - FILE-04: the builder reads the 1-hour private browser cache of a session-checked route as outside FILE-04's signed-URL rule, so not an exception. If Bob rules it is one, the owner acceptance is decision 2, answer 4 ("all ok"). Charlie was told Bob will be asked (decision 3). The compensating controls are the route's role and current-key checks, `private` (no shared cache), and the Phase 4 review.
+- **Decided by:** owner (Charlie): Q26 (2026-11-22), "admin yes" (2026-11-25), "build, include QR", "all ok" and "ok both" (2026-11-27). Builder: the draft wording, the code reading and the open item.
 
 ## 2026-11-26 — CI: the browser tests run as one job per Playwright project, in parallel (UNI-13, FE-70)
 - **Decision:** the job "Image, Trivy, E2E" is split in `.github/workflows/ci.yml`:
