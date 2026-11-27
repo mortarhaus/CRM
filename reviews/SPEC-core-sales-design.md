@@ -1,5 +1,411 @@
 # Review — spec `core-sales-design`
 
+## Round 29 — 2026-11-27 · scope: v4.7 revision 10, bank audit and Admin payment details view
+
+- **Spec:** `.agent/worktrees/build-docs-spec-bank-audit-qr-view/docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 10 (draft).
+- **Spec hash:** `7bb8bc0736ce817801bcacf5d0efdeffa06eb116`. The supplied file and commit `721f90d` have the same blob. Rechecked at the end.
+- **Approved comparison:** revision 9, blob `b8e5a758ced6738217b8c98aa3bc9e40376a6eca` on main at `b0dbc52`.
+- **Reviewer:** Bob · **Builder:** Andy.
+
+### Findings
+
+#### [P1] Record the Bank QR preview as a scoped FILE-04 alternative
+
+- Category: guardrail mismatch.
+- Rule: FILE-04, AUTH-03, TEN-11. The files pack requires a documented alternative and evidence when signed URLs are replaced.
+- Evidence: Draft spec lines 860–861 retain the general signed-URL rule and add the session-checked Bank QR route with a one-hour browser cache. Draft `docs/DECISIONS.md:45,70–72` treats this as outside FILE-04. `agents/PROJECT.md:244` records the separate FILE-03 key exception. The existing preview route serves an attachment through the app and sets `Cache-Control: private, max-age=3600` without a session-specific cache key (`apps/web/src/app/(app)/files/payment-qr/route.ts:30–38`). The 2026-11-11 storage decision and `docs/runbooks/phase-2-storage.md:78–83` document the current delivery mechanism.
+- Failure scenario: The widened route’s origin correctly refuses a viewer whose role or 2FA state no longer qualifies. A private browser cache can still reuse a fresh response without contacting the origin. The directive scopes caching to a private cache, which can persist across app sessions in the same browser profile. Draft spec line 97 gives a categorical statement about refusing the QR while lines 96 and 861 allow cached reuse. [RFC 9111 §§4–4.2](https://www.rfc-editor.org/rfc/rfc9111.html#section-4.2), [RFC 9111 §5.2.2.7](https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.7)
+- Why it matters: The ten-minute limit measures signed-link validity. The one-hour window measures freshness of an authenticated image response. The Bank preview uses a different delivery mechanism, so the draft must state where each rule applies. The owner’s recorded answer supports retaining a one-hour private QR cache and reviewing the Admin audience at Phase 4.
+- Required correction: State the Bank preview alternative explicitly in the spec and decisions. Preserve ten-minute expiry for signed downloads. Document authenticated same-origin delivery with the active session workspace, current key, role and 2FA checks at the origin, attachment and nosniff headers, and the scope of the accepted private cache. Clarify how reuse in the same browser profile is handled when authorization changes, and describe one hour as freshness rather than guaranteed deletion. Record the compensating controls and Phase 4 review in the decision, and list the alternative and test evidence for `setup` to reconcile under PROJECT §9. The implementation check should separately verify the origin’s allow/refuse cases and the cache policy.
+- Owner: builder, with the owner deciding any cache behavior beyond the recorded acceptance.
+- Verification: Read the amended file rules, access matrix and decision together. Confirm the code follow-up verifies the authorized origin response, refused principals with workspace 2FA off, tenant and current-key checks, and the documented cache and response headers.
+- Status: open.
+
+#### [P2] Correct the claim that the audit already stores digits only
+
+- Category: defect in the implementation handoff.
+- Rule: owner decision Q26, revised Authorization (`docs/superpowers/specs/2026-09-27-core-sales-design.md:813`), UNI-09 and UNI-10.
+- Evidence: Draft spec line 96 says the current audit already stores the last four only, and draft `docs/DECISIONS.md:65` says the code needs no change. `apps/web/src/app/(app)/settings/payment/actions.ts:73–88` accepts the bank account number through `requiredText`. `apps/web/src/db/settings/workspace-settings.ts:27–32` stores `value.slice(-4)`, which takes four characters. The fixture that currently tests the mask ends in digits (`settings/payment/actions.test.ts:151–170`).
+- Failure scenario: A supported account-number value with a non-digit in its last four characters can place that character in the audit’s masked value. The supplied decisions say digits only and carry the bank-input change separately.
+- Why it matters: The last-four rule is correct as drafted. The follow-up list would leave the mismatch in an append-only audit trail if it is used as written.
+- Required correction: Record the currently shipped behavior accurately in item 11 and the decision. Carry the digits-only audit requirement into the reviewed code work, including masking older accepted input when it appears on the before side of a new entry. If a format decision is needed, keep it separate from Q26. Keep historical audit rows append-only.
+- Owner: builder.
+- Verification: Review the corrected handoff. The implementation review should require fixture coverage for valid current numbers and previously accepted values containing separators or non-digits, with only the approved digit fragment and no hash in new entries.
+- Disposition: before merge.
+- Status: open.
+
+### Applicability and spec checks
+
+| Rule or scope | Review result |
+|---|---|
+| AUTH-02, AUTH-03, AUTH-07, AUTH-09 and TEN-11 | Spec separates role, 2FA enrollment and fresh step-up. The recorded Owner restriction covers the direct QR route. The draft leaves Owner access to bank text without 2FA outside this change. Admin viewing stays read-only. Owner mutations, Staff permissions and issued-invoice audiences are preserved. The origin/cache distinction needs the P1 correction. |
+| FILE-01 to FILE-04 | Upload restrictions and FILE-03 retention remain as approved. The current preview and signed downloads need distinct FILE-04 rules. |
+| UNI-09, UNI-10 | The specification adopts digits only and no hash. The handoff needs to cover the current character-based mask. |
+| FE-32, FE-70 | The view uses the existing Bank page with a menu link. The draft decision names view-only UI and an E2E test. No UI implementation is in this review. |
+| REC-01 and Phase 4 | The issued invoice retains its frozen bank details and snapshot key. Phase 4 review of the QR audience remains documented. |
+
+### Verification performed
+
+- Compared the exact rev 10 file and companion decisions against rev 9. The tracked diff contains only the spec and decisions. `git diff --check b0dbc52...721f90d` passed.
+- Cross-checked the draft’s owner-answer record against the companion decision, Q26 and the Phase 2 close. Confirmed the revision 9 approval labels, the audit policy and the read/write split. The builder’s session itself was not available.
+- Read the route, page, audit mask, input validation and cited tests to verify statements about shipped behavior. Checked HTTP cache semantics against RFC 9111.
+- Rechecked the candidate spec and companion decision hashes and the clean builder worktree. Spec review only. Browser caching and changed application behavior were not exercised.
+
+### Required before merge
+
+- Close both findings and send the updated spec hash for re-review.
+
+### Deferred conditions
+
+- None. The draft’s existing Phase 4 check stays at that gate.
+
+**Model used:** GPT-6 (Codex). **Switch model next step?** No for the scoped text corrections. The project's deep tier applies to the security re-review.
+
+**Verdict:** Revision required
+
+## Round 28 — 2026-11-15 · scope: slice — v4.7 revision 9, MY default date format
+- **Spec review:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 9 (draft) · hash (`git hash-object`) `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`.
+- **Selected source:** `.agent/worktrees/build-docs-spec-my-date-format/docs/superpowers/specs/2026-09-27-core-sales-design.md`, branch `docs/spec-my-date-format`, local commit `e22bc6bd7c5db11cefd9eb55b014eb771b956227`. No path was supplied; this is the newest revision of the sole spec in the configured folder, identified in handoff §5. Root main still contains revision 8; this approval does not apply to that older copy.
+- **Baseline:** Round 27's approved revision 8 blob `733cc0e9ce4af0771bdd2769720e3f228caf8855`. Effective change: one spec file, +10/-6 lines. Reviewed immutable commit/blob text and confirmed the selected working file exactly matches it, with a clean tracked worktree, at completion.
+- **Mode:** spec review only. No PR is open for this draft according to the handoff; no PR review, CI pass, runtime pass, owner approval, merge permission or setup reconciliation is implied.
+
+### Findings
+
+No blocking findings in revision 9. The requirement and provenance are consistent:
+- Spec `:86-88` and Onboarding `:734` change MY's default from `dd/mm/yyyy` to `dd-mmm-yyyy`; `mmm` explicitly means an English three-letter month regardless of locale, with `08-Nov-2026` as an unambiguous example.
+- The date format remains editable; existing workspaces retain their stored values. This agrees with DECISIONS 2026-11-08 and 2026-11-09 (`docs/DECISIONS.md:63-80`) and PR #59 review Round 1's recorded direct owner confirmation, retained below Round 2 in `.agent/reviews/PR-59.md`.
+- Revision 8 approval labels at `:1`, `:3`, `:11`, `:61`, `:1186` now agree with Round 27 and DECISIONS 2026-10-22 (`docs/DECISIONS.md:472-480`). Revision 9 remains explicitly unapproved pending the owner and subsequent workflow steps.
+- An exact comparison with the approved blob confirms no changes to money, security, auth, tenancy, tax rates, numbering, professional gates, or other business requirements. The Phase 2 done-when at `:1142` still requires country defaults on sign-up, and the existing plan Task 8 tests (`:173`) name the date value.
+
+#### [P3] Handoff fixed sections retain the merged PR as the active target
+- Category: documentation inconsistency.
+- Rule: reviewer §2 (report handoff drift; git wins for code state).
+- Evidence: `.agent/handoff.md:9-10` retains active PR 65 and its removed worktree, §2 says PR 65 is in progress, and §3 retains main `107163b`; `git worktree list` shows root main `c5e4649` and the spec worktree at `e22bc6b`. Handoff §1 records PR 65 merged and its worktree removed; §5 correctly identifies revision 9, its branch, commit and hash.
+- Failure scenario: a new builder uses the fixed active-target fields and resumes a removed checkout or an already merged PR.
+- Why it matters: resume ambiguity, isolated from this exact-hash spec assessment; §5 provides enough evidence to identify the intended revision.
+- Required correction: Andy should refresh the active-target, milestone and git-state fields to this spec revision, retaining merged PR information as history.
+- Owner: builder (Andy).
+- Verification: compare the fixed sections with git state and the spec hash before the next builder command resumes work.
+- Status: open; nonblocking documentation maintenance.
+
+### Self-check audit
+
+Independent applicability for this incremental spec slice: reviewer §4 consistency, concrete/testable values, approved owner provenance, scope, milestone preservation and ambiguity; UNI-02 (configuration/provenance), UNI-07 (hard, added text), UNI-12 (review output location), and PROJECT.md §2/§11 spec hash/approval/reconcile rules. No PR self-check table is required to conduct this standalone spec review; one is assessed in the later PR review. No table absence is treated as an implementation failure here.
+
+| Rule / review criterion | Applies? | Builder statement | Reviewer found | Evidence | Disagreement |
+|---|---|---|---|---|---|
+| Spec consistency / provenance | yes | records Charlie's existing decision | pass | spec :86; DECISIONS 2026-11-08/09; PR-59 review confirmation | no |
+| Concrete values / ambiguity | yes | `dd-mmm-yyyy`, English month, example | pass | spec :87, :734; old value is historical, new default is explicit | no |
+| Scope / milestones | yes | only MY default and approval labels | pass | exact blob diff; unchanged Phase 2 done-when and plan test expectations | no |
+| UNI-02 | yes, country default is configured rather than an invented value | existing country-defaults module | pass at specification level | recorded decision; `packages/core/src/settings/country-defaults.ts` contains the date format and allowed-format examples | no |
+| UNI-07 (hard) | yes, added spec content | no secrets introduced | pass for added content | project secret-pattern scan of added lines: zero hits | no |
+| UNI-12 / reviewer Rule 0 | yes | n-a to builder's spec claims | reviewer writes only this local review file | output path resolved and symlinks rejected; no source/hand-off edits | no |
+| PROJECT.md §2 and §11 / START spec gates | yes | revision 9 draft, exact-hash review and owner approval then reconciliation | conforming; reconciliation remains pending | spec :3, :86, :1186; current project hash remains revision 8 as expected | no |
+| UNI-13 | later PR delivery gate | no CI claim for local-only draft | not assessed as a runtime/PR approval | no PR review requested and no CI required to establish this textual decision's consistency | no |
+| UNI-01/03-06/08-11/14-19 | no changed implementation, dependency, boundary, logging, deployment, migration or platform behavior | unchanged | n-a to this delta | exact one-file diff | no |
+| Frontend pack and FRONTEND_STANDARDS | no changed component, page structure, styling or interaction; readable example/provenance checked | default only | browser/a11y implementation checks are outside this slice | existing settings UI unchanged; no runtime pass inferred | no |
+| Tenancy, money, finalized records, auth, public links, files, jobs, payments packs | no changed domain/security requirements | unchanged | n-a to this delta; prior approved baseline is retained | exact blob comparison | no |
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| Identify selected revision | Sole configured spec; active worktree contains revision 9; root still revision 8 |
+| Exact pin | Working-file hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`, equals the spec in commit `e22bc6bd7c5db11cefd9eb55b014eb771b956227` |
+| Prior review | Round 27 approved baseline hash `733cc0e9ce4af0771bdd2769720e3f228caf8855`; this round preserves all earlier review text |
+| Full effective change comparison | Changed lines inspected, long status/gate paragraphs compared sentence by sentence; all other spec lines identical to baseline |
+| Decision and plan cross-check | DECISIONS 2026-11-08/09 and 2026-10-22; PR #59 reviewer record; Phase 2 plan Q10 and Task 8 expectations agree |
+| Existing implementation/test evidence read | Country defaults and allowed formats; test assertions in country-defaults.test.ts, apply-country-defaults.test.ts and onboarding.spec.ts; no tests executed or pass claimed |
+| `git diff --check <old-blob> <new-blob>` | PASS, exit 0 |
+| Added-line project secret-pattern scan | Zero hits |
+| Final spec hash / worktree state | Unchanged hash; pinned branch HEAD unchanged; no tracked changes |
+| Local source edits / installs / tests / network mutations | None performed for this spec review |
+
+### Residual risks and test gaps
+- Incremental approval of revision 9 against Round 27, not a fresh full-product or production-security certification. Existing professional and later-phase design gates remain in force.
+- SG's additional defaults and the MY/SG locale values remain recorded in Q10 and DECISIONS; this revision deliberately resolves only the MY value that contradicted the old spec. No SG or locale policy is invented or reversed by omission here.
+- Existing test source corroborates the intended defaults, but tests and browser behavior were not rerun for this Markdown-only change. End-to-end date rendering is not established by this review.
+- The draft is local-only and has no PR CI evidence in this round. The later PR review must cover its final head and applicable CI gates.
+- The revision 8 labels are corrected without altering the previously reviewed blob. To preserve this revision 9 hash, record the owner's revision 9 approval in DECISIONS/PR metadata rather than editing the spec's draft labels solely to acknowledge this review.
+
+### Required before merge
+- No spec corrections required by this round.
+- Charlie's explicit approval of revision 9, followed by the ordinary PR review and approval-receipt steps. The spec-hash reconciliation through `setup` remains required before `build`, following the established approved/merged-spec sequence.
+
+### Deferred conditions
+- None. The handoff P3 is nonblocking maintenance, not a P2 condition.
+
+### Optional improvements
+- Refresh the handoff fixed fields as described above; no spec hash change is needed.
+
+**Model used:** GPT-6 (Codex). **Switch model next step?** No — this narrow exact-hash spec review is complete; preserve the hash through owner approval and run `setup` for reconciliation in the established sequence.
+
+**Verdict:** Approved
+
+## Round 27 — 2026-10-22 · scope: v4.7 revision 8, Round 26 fixes (PR #36)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 8 · hash (`git hash-object`) `733cc0e9ce4af0771bdd2769720e3f228caf8855`.
+- **Pin:** PR #36 base and merge base `999b9c4397fd76aaaa97297e8e0a71975f2ad735`, head `4714f04ef55316d864707a9cc621065febf7654c` (host head re-read at the end: unchanged). Reviewed in detached checkout `.agent/worktrees/review-36-4714f04e` (`git worktree add --detach` worked this time); its spec blob hash matches. Round 26 reviewed hash `846b772e493464672f103c99bf8a4c39a9627085`. Fix diff `40f2777..4714f04`: three docs files, +33/−31. Main→head: three files, +106/−65 (matches the PR body's Size).
+
+**Verdict:** Approved  
+**Model used:** Opus 5.5 (deep tier, as Rounds 25–26 asked) · **Switch model next step?** No — `review 36` of the final head should also run on Opus 5.5.
+
+This verdict applies only to spec hash `733cc0e9…`. It is not Charlie's approval of revision 8 and does not approve PR #36's final head; `review 36` does that.
+
+### Round 26 disposition rechecked
+
+| Round 26 finding | Result | Evidence |
+|---|---|---|
+| P1: regeneration can race an old recovery-code sign-in | Resolved at requirement and test level. Binding outcome in both commit orders, "a sign-in authorized from the pre-regeneration code set never inserts a usable session after the regeneration commits", audit rows and consumption must match the winner. T5 (c4) forces both orders with a pause after code check and before session insert, asserts the wait where the design serialises, and runs an unprotected control that must reproduce the defect. T5 (c4) is in the exit criteria. Candidate mechanism classes are listed but not chosen (scope choice B). F=A is unchanged. | Spec `:73`, `:515`, `:775`, `:862`, `:1137`; plan R5 `:737`, T5 (c4) `:759`, exit criteria `:780`, 31.E `:879`. |
+| P1: UNI-15 and UNI-16 missing from the self-check | Resolved. Both rows are in the PR self-check and in PR 4's self-check list (`plan:798`). UNI-16 deliverables: a runbook section "Upgrading a Phase 0 database to Phase 1: every user is signed out once" with user effect, operator steps and an after-check, copied into the PR 4 body, both landing in PR 4 (`plan:789`). Ruling on UNI-15 below. | PR #36 body Self-check; plan `:789`, `:798`, `:1606`. |
+| P2: plan still called F/G proposals; wrong open-point reference | Resolved for the cited places: `:729` now names open point D for event names and says F is decided; R15, 31.D G, Risk 18 and the spec say "decided by Charlie on 2026-10-22" and "owner-rejected alternative". One leftover dead clause in T15; P3 below. | Plan `:729`, `:747`, `:813`, `:1578`. |
+| P2: R13 "no personal data in a row" | Resolved. Exact column allow-list (`id`, `user_id`, `event`, `detail`, `ip`, `created_at`), exact `detail` key allow-list, a stated rule for adding a key through the spike round, a prohibited list, and IP kept out of logs. T13 asserts a catalog column list, a row-content scan and log capture. Spec, plan and the Phase 4 professional gate use the same list. | Spec `:515`, `:862`, `:1137`, `:1178`; plan R13 `:745`, T13 `:767`, open point E `:811`. |
+| P2: stale PR body | Resolved. The head, hash, Size, owner-decision provenance and AUTH-07/UNI-15/UNI-16 rows match the exact diff. | PR #36 body. |
+
+### Reviewer rulings
+
+- **UNI-15 (the R15 cutover): conforming. No owner exception is needed.** UNI-15 protects running code from a schema change it cannot handle ("never a destructive change in the same release as the code that stops using the old shape"). The cutover deletes rows of short-lived credentials and changes no table, column, type, constraint or grant. Phase 0 code and Phase 1 code both work against the result, and a rollback restores nothing (users sign in again). It is a documented security cutover under UNI-16. The same reading covers the candidate trusted-device `verification` row delete (Risk 15), as long as it also changes no shape.
+- **UNI-16: conforming at plan level.** Implementation is pending in PR 4 and is checked in that PR's review.
+- **Open point B (R1–R15 completeness): complete at spec level** for this hash. The PR 4 spike can still surface a requirement under the existing stop rule.
+
+### Findings
+
+#### [P3] T15 keeps a pass condition for an alternative the owner rejected
+- Evidence: plan `:769` (T15) says "no `session` row remains (or, if Bob rules the alternative, every remaining row has its audit row)". G is decided as option A; option B is owner-rejected (`:813`). The clause is dead, but it leaves a second pass condition in a binding test of a security cutover. The same text is already on `main`.
+- Required correction: delete the parenthesis so T15 asserts only "no `session` row remains". Plan only; the spec hash does not change. Owner: builder. Fix before `review 36`. Status: open.
+
+#### [P3] A decisions-log sentence is written to bind later reviews
+- Evidence: `docs/DECISIONS.md:13` adds "These decisions are final and are not reopened by later review rounds." It is not a reviewer instruction to approve or skip a gate, and it had no effect on this round. But reviewer role §3 says security, data isolation, money, privacy and legal exposure are flagged "even inside an approved decision". As written, the sentence claims to limit that.
+- Required correction: reword it to "Owner decisions; changing them needs a new owner decision." Plan/decisions only; the spec hash does not change. Owner: builder. Fix before `review 36`. Status: open.
+
+No P0, P1 or P2 finding.
+
+### Self-check audit
+
+Independent applicable list before reading the PR body: UNI-07/09/10/12/13/15/16; TEN-02/03/06/07/08/09/10; AUTH-06/07/12; the project's own-login `crm_purge` and no-RLS system-table rules. The PR self-check now covers every one. Its rows mark implementation evidence pending, with no runtime pass claimed from prose. Besides the `DECISIONS.md:13` sentence above, no text in the PR, spec, plan or decisions log addresses an AI agent.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| Exact-head pin | Host PR #36 base `999b9c4…`, head `4714f04…`; merge base matches; host head re-read at the end, unchanged. |
+| Spec hash | `git hash-object` in the review checkout = `733cc0e9ce4af0771bdd2769720e3f228caf8855`, matching the PR body and handoff. |
+| Effective diff and hygiene | `git diff --check origin/main...4714f04` clean. Three docs files only. |
+| Label sweep (plan) | Searched for "builder proposal", "rejected for now", "Bob rules", "open point B)". The remaining hits are unrelated items (31.E candidates, other spike rulings) except T15 `:769` (P3). |
+| Review checkout | `git status --untracked-files=no` clean at the end. |
+| CI on exact head | Dependency audit, secret scan, typecheck/lint/test pass; Image/Trivy/E2E pending when checked. No local tests were run for this docs review. |
+
+### Residual risks and test gaps
+
+- T5 (c4)'s pause comes after the code check (and consumption, where the design does it there). The window between reading the code set and writing the consumption relies on the stock compare-and-set the plan cites (`verify-backup-code` line 216, `incrementOne`, plan `:842`). I did not verify that Better Auth 1.7.6 fact. PR 4's code review must confirm the chosen mechanism keeps it, or T5 (c4) adds a pause in that window.
+- Candidate 3 of open point A ("restartable enrolment", `plan:804`) asks Bob to rule whether it weakens 2FA. I rule on it only if the spike chooses it; it must never apply to a completed enrolment.
+- The auth-audit retention period stays the professional gate before Phase 4 goes live.
+- **To avoid another hash loop:** record Charlie's approval of revision 8 in `docs/DECISIONS.md` and the PR body, not in the spec. Mark revision 8 "approved and merged" in the spec in the next spec PR, as was done for revision 7.
+
+### Handoff block
+
+- Current objective: PR #36 final-head review after the two P3 fixes.
+- Completed checks: Round 26 disposition, UNI-15/16 rulings, R13/T13 consistency, F/G labels, PR body, diff hygiene, pin and head recheck.
+- Pending checks: the P3 fixes; Charlie's approval of revision 8; `review 36` on the final head with Image/Trivy/E2E green; then `approved 36` before merge.
+- Key decisions / assumptions: F=A, G=A and scope choice B are binding owner decisions. UNI-15 conforms for the R15 row delete.
+- Open risks: the code-read-to-consumption window (residual above); mechanism not yet chosen (PR 4 spike).
+- Next exact files: plan `:769` (T15), `docs/DECISIONS.md:13`, PR #36 body.
+- Suggested model tier for next step: deep (Opus 5.5) for `review 36`, because it gates an auth contract.
+
+## Round 26 — 2026-10-22 · scope: v4.7 revision 8, Round 25 fixes and owner decisions F/G (PR #36)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 8 · hash (`git hash-object`) `846b772e493464672f103c99bf8a4c39a9627085`.
+- **Pin:** PR #36 base and merge base `999b9c4397fd76aaaa97297e8e0a71975f2ad735`, head `40f27772567b06efa48e377468d4b935bee66d7a`; host head re-read at the end and unchanged. Exact-head archive snapshot `.agent/worktrees/review-spec-rev8-40f2777` (the sandbox denied `git fetch` and `git worktree add` writes under `.git`; the exact commit was already local).
+
+**Verdict:** Revision required  
+**Model used:** GPT-5 (below this project's named deep tier, Opus 5.5) · **Switch model next step?** Yes — use Opus 5.5 for the next exact-hash auth/security review.
+
+### Round 25 disposition
+
+| Round 25 finding | Result |
+|---|---|
+| P1: regeneration kept the changer's old session | Resolved at the stated requirement level. Spec `:73`, `:515`, `:775`, `:862`, `:1137` and plan R5/T5 `:737`, `:759` now end every pre-change session, issue a fresh audited session, and make regeneration all-or-nothing. A new concurrency gap is below. |
+| P1: TEN-09 and AUTH-06 absent from self-check | Resolved. Both have explicit spec/plan evidence and identify implementation work still unproved. |
+| P2: open point A contradicted scope choice B | Resolved. The no-lockout outcome binds; PR 4 chooses a conforming mechanism; only a weaker outcome returns to Charlie. |
+| P2: stale purge connection choice | Resolved in the spec. Item 8(b1), Open question 8, the home rule and Phase 1 done-when all require the own login. |
+| P2: no pre-live auth-audit retention gate | Resolved. Spec `:1178` makes the first retention/erasure decision a before-Phase-4-live launch gate and invents no retention period. |
+| P3: reviewer-directed wording | Resolved in the spec and plan status line. |
+
+Charlie's F=A and G=A decisions are recorded in spec `:75`, `:79–80`, the home rules and `docs/DECISIONS.md`. **Ruling:** F=A is a conforming reading of AUTH-07: consuming a recovery code is a login event, while configuring/regenerating the codes is the 2FA change. G=A is a valid product policy: the cutover invalidates the old sessions and invents no history; the delivery treatment under UNI-15/16 still needs the missing self-check below.
+
+### Findings
+
+#### [P1] Regeneration can race an old recovery-code sign-in past the revocation
+- Category: material security risk / incomplete requirement. Rule: AUTH-07; spec's old-code refusal and session-revocation outcome.
+- Evidence: plan R5/T5 (`:737`, `:759`) tests regeneration, failures and interruption, and proves an old code is refused after regeneration. R6/T6 and R7/T7 (`:738–739`, `:760–761`) orchestrate concurrent sign-in only for enable/disable state changes. Neither the spec's Phase 1 done-when (`:1137`) nor T1–T15 forces regeneration against a recovery-code sign-in.
+- Failure scenario: device B validates or consumes an old recovery code and pauses before storing its session; device A regenerates codes, revokes every session that exists and commits; B then stores a new session after the revocation. An old code has effectively authorized a usable session after the regeneration, and that session never existed when A performed the required revocation.
+- Why it matters: Charlie's F=A choice says a completed recovery-code login does not end other devices. It does not say an old code may finish authenticating across a regeneration. Without a serialisation outcome, regeneration cannot reliably invalidate leaked recovery codes.
+- Required correction: add a binding outcome and forced two-order test for recovery-code sign-in versus regeneration. If the sign-in commits first, regeneration revokes its session; if regeneration commits first, the old code cannot create a session; a sign-in authorized from the pre-regeneration code set may never insert a usable session after regeneration. Audit rows and code consumption must match the winning order. Put this in R5/R6 (or a new requirement), T5/T6 and the spec Phase 1 done-when. This does not change F=A.
+- Owner: builder. Verification: a controlled pause after old-code validation/consumption and before session insert, run in both commit orders, proves the stated outcomes and reproduces the unsafe result on an unprotected control.
+- Status: open.
+
+#### [P1] The final G decision makes UNI-15 and UNI-16 applicable, but the PR self-check omits both
+- Category: guardrail mismatch. Rules: reviewer §3, UNI-15, UNI-16.
+- Evidence: R15 (`plan:747`) now requires a migration to lock `session` and delete every Phase 0 session; the runbook/upgrade notice is required at `plan:788`. Charlie has now decided G=A. PR #36's current self-check contains neither UNI-15 nor UNI-16.
+- Failure scenario: the final security cutover is treated as settled without assessing the project's expand/migrate/contract rule or the same-PR runbook requirement.
+- Required correction: add both rows. For UNI-15, state and support whether this intentional session invalidation is conforming because it changes no database shape and is a documented security cutover; if that interpretation is not supportable, redesign the cutover or record the required owner exception. For UNI-16, cite the exact PR 4 runbook and upgrade-notice deliverables and mark implementation pending. Do not call either implemented from this docs PR.
+- Owner: builder; owner only if an exception is proposed. Verification: independent applicability list matches the revised table and the cited PR 4 deliverables remain in the binding plan.
+- Status: open.
+
+#### [P2 · before merge] The binding plan still calls decided F/G policies proposals
+- Category: consistency.
+- Evidence: the binding definition at plan `:729` calls F “a builder proposal” and sends it to Charlie; R15 at `:747` calls G a “builder proposal; open point G” and its alternative “rejected for now”. The same plan correctly records both as decided at `:799`, `:811–812`, and the spec at `:75`, `:79–80`. Plan `:729` also says the event names are open point B, while their gate is open point D (`:809`).
+- Failure scenario: an implementer following 31.A treats a settled owner policy as reopenable or sends event vocabulary through the wrong gate.
+- Required correction: make `:729` and R15 state the 2026-10-22 decisions, change “rejected for now” to the owner-rejected alternative, and correct the event-name reference to D.
+- Owner: builder. Verification: a sweep for `builder proposal`, `open point F/G`, `rejected for now` and the wrong B reference leaves no contradictory live label.
+- Disposition: before merge. Status: open.
+
+#### [P2 · before merge] R13 says an audit row contains no personal data although the schema deliberately stores it
+- Category: privacy-control ambiguity. Rule: UNI-09 / revision 8 privacy gate.
+- Evidence: `auth_audit_log` intentionally stores `user_id` and raw client `ip` (spec `:515`, `:862`, `:1178`; plan open point E `:810`). Binding R13 says “No personal data or secret in a row” (`plan:745`), while T13 merely says it scans every row and separately excludes IP from captured logs (`:767`).
+- Failure scenario: one builder removes or hashes the required IP to satisfy R13; another treats any additional personal field as allowed because the row already contains personal data. Both can claim the text supports them.
+- Required correction: state an exact row allow-list: `user_id`, client `ip`, event/time and the fixed-label/ID detail allowed by the schema; prohibit every other personal datum and every secret. Keep IP out of application/error logs. Make T13 assert the allow-list rather than the impossible “no personal data in a row” formulation.
+- Owner: builder. Verification: schema, R13, T13, the spec privacy wording and the professional retention gate use the same allow-list.
+- Disposition: before merge. Status: open.
+
+#### [P2 · before merge] PR #36's body is stale after the two fix commits
+- Category: review-evidence accuracy.
+- Evidence: the top E12 summary still says the three changes end only the user's “other sessions”; the AUTH-07 self-check says F is pending; Owner decision provenance says F and G remain proposals; Size says two files and +54/−23, while the exact head changes three files and +95/−56 from main. The appended reply records the newer policy, so the body contradicts itself.
+- Failure scenario: a final-head reviewer or owner relies on the earlier self-check and reviews a different policy/scope from the exact diff.
+- Required correction: refresh the main summary, owner-decision row, file/line counts and self-check in place; remove superseded pending labels. Keep the Round 25 response as history if useful, but make the current-state sections authoritative and internally consistent.
+- Owner: builder. Verification: compare the body with `git diff --stat origin/main...40f2777`, the exact spec hash and decisions F/G.
+- Disposition: before merge. Status: open.
+
+### Self-check audit
+
+Independent applicable list before comparing the PR body: UNI-07/09/10/12/13/15/16; TEN-02/03/06/07/08/09/10; AUTH-06/07/12; project rules for own-login `crm_purge`, no-RLS system tables and the spec-change gate. The body covers the Round 25 additions TEN-09 and AUTH-06 and correctly leaves implementation evidence pending. UNI-15/16 are absent (P1); the AUTH-07 and owner-provenance rows retain superseded F/G text (P2). The spec remains a draft and does not claim implementation is complete.
+
+### Reviewer rulings on open points B–E
+
+- **B (R1–R15 completeness): not yet complete** because the regeneration/sign-in race and R13 ambiguity above are missing from the binding contract. Recheck on the corrected exact hash; the spike may still surface a requirement that needs a later spec revision under the existing stop rule.
+- **C (password-step residual): correctly assigned to the PR 4 spike.** Acceptance requires real evidence that the token reaches no response or enabled endpoint, the row is audited with a non-login reason and the runbook records it. No policy choice is needed now.
+- **D (event names): correctly assigned to the PR 4 spike.** The spec fixes categories; the spike fixes and records the closed vocabulary.
+- **E (retention/erasure): correctly assigned to the before-Phase-4 professional gate.** The launch control is concrete; no legal period is invented. The implementation mechanism remains a later reviewed change.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| Exact-head pin | Host PR #36 base `999b9c4…`, head `40f27772567b06efa48e377468d4b935bee66d7a`; host head re-read unchanged. Local merge base matches host base. |
+| Spec hash | `git hash-object` in the exact-head snapshot = `846b772e493464672f103c99bf8a4c39a9627085`, matching the PR body/handoff. |
+| Snapshot integrity | 142 Git-tree, archive and snapshot files; 0 missing/extra/changed; fingerprint before and after `7e07f03409a3a199f451d7e2f7297a2f68bed61d304fcc1ac655eddc5b765517`. |
+| Effective diff and hygiene | Main→head: three docs files, +95/−56. Round 25 fix diff: three files, +56/−48. `git diff --check` clean. |
+| CI on exact head | Dependency audit, Secret scan, Typecheck/lint/test, and Image/Trivy/E2E all pass. No local test suite was run for this docs review. |
+
+### Residual risks and test gaps
+
+- The PR 4 spike remains responsible for proving the mechanism against Better Auth 1.7.6 and every R/T outcome. This review approves no candidate trigger or hook design.
+- The professional must still decide the auth-audit retention period and erasure treatment before Phase 4 has live users; this is an intentional later gate, not a defect in this revision.
+
+### Required before merge
+
+1. Close the old-code sign-in versus regeneration race in the binding requirements and tests.
+2. Add UNI-15/16 to the PR self-check and settle the cutover's guardrail disposition.
+3. Remove stale F/G proposal labels, correct R13/T13's personal-data allow-list, and refresh the PR body.
+4. Repeat `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` on the new exact hash. After spec approval and Charlie's approval, run `review 36` on the final PR head.
+
+### Handoff block
+
+- Current objective: approve v4.7 revision 8 at PR #36's exact spec hash.
+- Completed checks: Round 25 fix disposition, F/G provenance, requirements/tests, guardrail applicability, decisions/spec/plan consistency, CI, diff hygiene, exact-head integrity and host recheck.
+- Pending checks: the five corrections above, a new exact-hash spec round, Charlie's approval, then the final-head PR round.
+- Key decisions / assumptions: F=A is conforming under AUTH-07; G=A is the intended cutover policy; A remains a PR 4 mechanism choice under a binding no-lockout outcome; C/D are spike gates; E is the pre-Phase-4 professional gate.
+- Open risks: old recovery-code race, UNI-15 disposition, and the contradictory privacy allow-list wording.
+- Next exact files: spec `:73`, `:515`, `:862`, `:1137`; plan Task 31 `:729`, R5–R7 `:737–739`, R13/R15 `:745–747`, T5–T7/T13 `:759–767`, open points `:799–812`; PR #36 self-check/body.
+- Suggested model tier for next step: deep (project mapping: Opus 5.5), because the remaining correction is auth concurrency and migration security policy.
+
+## Round 25 — 2026-10-22 · scope: v4.7 revision 8, Phase 1 plan alignment (PR #36)
+- **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 8 · hash (`git hash-object`) `132747c701604754aafad92fe03e1f8cc1bd6625`.
+- **Pin:** PR #36, base and merge base `999b9c4397fd76aaaa97297e8e0a71975f2ad735`, head `3ec71a4c7f020096b73847dd499ec08661c9e338`; host head re-read at the end and unchanged. Exact-head archive snapshot `.agent/worktrees/review-spec-rev8-3ec71a4c` (the sandbox denied `git worktree add` under `.git/worktrees`).
+
+**Verdict:** Revision required  
+**Model used:** GPT-6 (below this project's named deep tier, Opus 5.5) · **Switch model next step?** Yes — have the security and auth corrections checked in Opus 5.5 before a new exact-hash review.
+
+### Findings
+
+#### [P1] Recovery-code regeneration keeps a session that the approved rule revokes
+- Category: spec/guardrail mismatch. Rule: AUTH-07.
+- Evidence: the approved Authentication and sessions rule still says “All sessions revoked on password, 2FA or email change” (spec `:770`; `agents/guardrails/auth.md:18`). Revision 8 says regeneration of recovery codes ends only “other sessions” (spec `:73`, `:510`, `:857`, `:1132`). The binding Phase 1 plan explicitly keeps the changer's **existing** session after regeneration (Task 31 R5 `:737`, T5 `:759`).
+- Failure scenario: a session issued before recovery codes were replaced remains valid after that 2FA credential change.
+- Why it matters: two different session policies can be built and tested as compliant; the narrower one conflicts with the approved rule. The spec itself acknowledges this conflict as open point B (`:79`) but states the narrower rule in its normative sections.
+- Required correction: make the active spec, Task 31 R5/T5 and its tests one policy. To retain AUTH-07, end **every pre-change session** on regeneration; if the changer should remain signed in, issue a fresh audited session after the change, without a failure or lockout window. A weaker policy needs an explicit owner decision and reviewed rule change.
+- Owner: builder for the aligned text; owner if choosing the weaker policy. Verification: a regeneration test with changer and second device proves neither pre-change session works; any replacement session has its own audit row, and failure leaves old codes and sessions usable.
+- Status: open.
+
+#### [P1] Applicable guardrails are absent from the PR self-check
+- Category: guardrail mismatch. Rule: reviewer §3; TEN-09 (hard), AUTH-06.
+- Evidence: PR #36 body, “Self-check”, covers TEN-02/03/06/07/08/10 and AUTH-07/12, but omits TEN-09 while revision 8 gives `crm_purge` its own connection and requires transaction-local `withWorkspace()` (spec `:868`), and omits AUTH-06 while E6 corrects the Better Auth limiter fallback (spec `:70`, `:740`). The independent applicable list also included UNI-07/09/10/12/13, TEN-02/03/06/07/08/10 and AUTH-07/12; the existing rows cover these at spec level. This is a self-check completeness finding, not evidence that the named controls fail at runtime.
+- Failure scenario: the builder's gate does not explicitly assess the tenant context of the newly settled purge connection or the limiter affected by E6.
+- Required correction: add TEN-09 and AUTH-06 rows with exact spec and plan evidence, state what remains to be proved in implementation, and do not mark implementation tests as passing from prose alone.
+- Owner: builder. Verification: compare the revised table with the independent applicable list and recheck the cited clauses.
+- Status: open.
+
+#### [P2 · before merge] Open point A makes the PR 4 mechanism an owner decision again
+- Category: consistency. Rule: Charlie's 2026-10-21 scope choice B.
+- Evidence: revision 8 says E12 states requirements, not mechanism, and PR 4's reviewed spike chooses the mechanism (spec `:65`, decisions log `:14–21`, plan Task 31.C `:719–723`). The same revision labels the recovery **path** among candidate mechanisms “proposal, pending Charlie's decision” (spec `:76`; repeated at `:510`, `:857`). Plan R11 `:743` binds the outcome of no lockout without an operator reset.
+- Failure scenario: a builder reads the spec as requiring another owner choice before implementing any of the valid spike designs, contrary to the approved scope decision.
+- Required correction: keep the no-lockout outcome binding and say PR 4's reviewed spike chooses a mechanism that meets it. Seek Charlie's decision if the spike proposes weakening that outcome, not for picking among conforming mechanisms. Align the repeated labels.
+- Owner: builder. Verification: scope decision, spec and Task 31.C/D all place the mechanism choice at the same gate.
+- Status: open.
+
+#### [P2 · before merge] The old purge summary still presents Open question 8 as undecided
+- Category: consistency. Rule: own-login decision (ASK 1).
+- Evidence: spec `:55` says `crm_purge` “connects or switches as Open question 8 decides in the Phase 1 plan”, whereas Open question 8 is RESOLVED to own login at `:294` and the home rule requires its own login at `:868`.
+- Failure scenario: a later implementer following the prominent change summary treats `SET LOCAL ROLE` as still allowed.
+- Required correction: replace that stale summary clause with the own-login choice and its worker credential placement; leave no “connects or switches” alternative as live text.
+- Owner: builder. Verification: sweep the spec for the old alternative and compare the summary with the home rule.
+- Status: open.
+
+#### [P2 · before merge] New auth audit data has no pre-live retention gate
+- Category: material privacy risk. Rule: spec professional PDPA check before Phase 4.
+- Evidence: revision 8 adds append-only `auth_audit_log` with `user_id` and `ip` (spec `:510`, `:857`) and says retention/erasure will be decided with Phase 9 offboarding (spec `:79`; plan Task 31 open point E). The existing professional check is before Phase 4 goes live and covers a retention statement and purge path (spec `:1167–1172`).
+- Failure scenario: the product starts serving live users in Phase 4 and retains login IPs indefinitely until the Phase 9 design arrives, without deciding their retention and erasure treatment at the pre-live check.
+- Required correction: explicitly include `auth_audit_log` in the **before-Phase-4-live** professional retention and erasure check, while leaving the eventual mechanism to the appropriate later plan. State what decision or temporary retention control blocks launch if that check is unresolved.
+- Owner: builder for the gate text; owner/professional for the policy decision. Verification: the Phase 4 gate names this table and does not defer its first retention decision to Phase 9.
+- Status: open.
+
+#### [P3] Reviewer-directed wording is embedded in the spec
+- Category: documentation hygiene / trust boundary. Evidence: spec `:79`: “For Bob's ruling”. It asks for a ruling but does not tell the reviewer to approve, skip a gate or change a verdict; it had no effect on this review.
+- Required correction: after the ruling, replace the reviewer-directed line with the resulting owner/implementation gate. Owner: builder. Status: open.
+
+### Self-check audit
+
+Independent applicable list before comparing the PR body: UNI-07/09/10/12/13; TEN-02/03/06/07/08/09/10; AUTH-06/07/12; the project's own-login and no-RLS system-module rules. Code-only and later-phase guardrails were assessed as not newly implemented in this docs PR. The PR has a self-check, so the review is not Blocked. Its evidence is specification-level; no runtime pass is inferred. TEN-09 and AUTH-06 are missing (P1). AUTH-07's “Pass at spec level” disagrees with the approved all-session rule (P1). No secret or source-code changes were found in the effective diff.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| Exact-head pin | Host PR #36 base `999b9c4…`, head `3ec71a4…`, re-read unchanged; spec blob `132747c…` in snapshot. |
+| Snapshot integrity | 142 Git-tree, archive and snapshot files; 0 missing/extra/changed; fingerprint before and after `1a9f8712a075e6a194aa13820ce52e5ac698ff81fe875ccb02858c77ddc8d963`. |
+| Effective diff and hygiene | Two docs files, +54/−23; `git diff --check` clean. Compared decisions, plan Task 30/31, approved spec, guardrails and revision 8 home clauses. |
+| PR #36 CI at review | Dependency audit, Secret scan, Typecheck/lint/test pass; Image/Trivy/E2E pending. No local test or implementation verification run for this docs review. |
+
+### Residual risks and test gaps
+
+- Owner decisions F (recovery-code consumption) and G (Phase 0 session cutover) remain explicitly proposed. They must be decided before revision 8 approval. Open point B must settle the all-session conflict above. The PR 4 spike must prove the actual Better Auth and race behavior against R1–R15 and T1–T15; this review does not certify a mechanism.
+- The preceding Round 24 Phase 1 polymorphic-test placement condition is addressed by E1/E2/E4/E5 at spec level; the creating-phase plans and code must still implement it.
+
+### Required before merge
+
+1. Align the regeneration session policy and tests with AUTH-07 or obtain and record an explicit owner change.
+2. Complete the PR self-check for TEN-09 and AUTH-06, and correct the AUTH-07 assessment.
+3. Align open point A with the PR 4 spike decision, fix the stale purge summary, and add the pre-live auth-audit retention gate.
+4. Obtain Charlie's choices on F and G after the revised text is reviewed; repeat `review spec` on the new exact hash, then review the PR's final head under the kit gate.
+
+### Handoff block
+
+- Current objective: review spec v4.7 revision 8, PR #36.
+- Completed checks: exact-head snapshot, decisions/plan/spec consistency, guardrail self-check, diff hygiene, CI status, snapshot integrity and host head recheck.
+- Pending checks: builder corrections and owner decisions; new exact-hash spec round; final-head PR round; image CI completion.
+- Key decisions / assumptions: Charlie's own-login, per-table test placement, no-RLS auth audit and PR 4 spike scope decisions are treated as binding; F and G are still open.
+- Open risks: AUTH-07 contradiction and the Phase 4 retention gate above.
+- Next exact commands/files to inspect: revised spec `docs/superpowers/specs/2026-09-27-core-sales-design.md`, Phase 1 plan Task 31 R5/T5 and open point A, PR #36 self-check; run `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` after the fix.
+- Suggested model tier for next step: deep (project mapping: Opus 5.5) because this is an auth and security rule change.
+
 ## Round 24 — 2026-10-20 · scope: Round 23 label fix, exact-hash confirmation (PR #31)
 - **Spec reviewed:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 7, owner decisions of 2026-10-20 recorded · hash (`git hash-object`) `50acbcfe0b402718ddd2c49f4297ce378e1b7451`.
 - **Pin:** PR #31 base `bccb846248f4d21f62c4dc21a3e5a15eef415b89`, head `4ec37c33b8360a3d3a0d4acf6781a176d8f179a7` (host head re-read at the end: unchanged). Reviewed in detached checkout `.agent/worktrees/review-31-4ec37c33`; its spec blob hash matches. Round 23 reviewed hash `c49329f78c6d7adc074263ab4b35353d8ac3ed5f`. This round checks the fix diff `3ec62ef..4ec37c3` (spec only, +2/−2).
