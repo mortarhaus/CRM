@@ -1,5 +1,56 @@
 # Review — spec `core-sales-design`
 
+## Round 31 — 2026-11-27 · scope: v4.7 revision 12, Round 30 corrections and full account-number audit
+
+- **Spec:** `.agent/worktrees/build-docs-spec-bank-audit-qr-view/docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 12 (draft).
+- **Spec hash:** `5b87075707045a356c38515ca7d50eca7f2fd9f6`, confirmed in the supplied file and PR #81 head `3aa42df2db58dfe533fdd5dae705aaff673d9d52`. Companion decision blob `5a0d2de0777560ea25e823784bc1ae436d49982f`. Rechecked at the end.
+- **Comparison:** revision 11 draft `a1623280086f33f65bc6ff63fab20b72e446df96` and approved revision 9 `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`.
+- **Reviewer:** Bob · **Builder:** Andy.
+
+### Findings
+
+#### [P1] Limit the audit exception to receiving account numbers
+
+- Category: conflict with recorded owner decision.
+- Rule: approved scope in `docs/DECISIONS.md:6–8`, spec “Audit, logging, privacy”, UNI-03.
+- Evidence: The recorded answer allows full receiving account numbers and specifically distinguishes card numbers. Draft spec lines 530, 816 and 879 exempt the bank account field, and `docs/DECISIONS.md:14,22–28` makes the exception apply at every length and whatever its characters, including old free-text values with no digits at all. The server validates `bankAccountNumber` as required text (`apps/web/src/app/(app)/settings/payment/actions.ts:73–88`) and the planned implementation removes the mask. `apps/web/src/db/settings/workspace-settings.ts:98–119` serializes both the replaced value and the new value for changed fields.
+- Failure scenario: The field holds a value that is actually a card number or other information pasted in by mistake. A later correction can copy that old value into an append-only row even if the corrected input itself is a receiving account number. A numeric-only input rule alone does not distinguish a card number from a receiving account number.
+- Why it matters: The draft equates a free-text field with the narrower type the owner approved. Once written, the normal application roles cannot remove the value.
+- Required correction: Define which values qualify for the full-value exception, including how to handle unverified or legacy input on either side of a new entry. Require an approved safe result for values that cannot qualify, with no full copy of a card number or unrelated data. Scope the exception to changes of the account number itself. Keep the QR reference and previous rows under their existing rules. If the classification or fallback cannot yet be specified, gate the full-value writer and keep the existing audit behavior until its design is reviewed.
+- Owner: builder, with owner confirmation for any new input or fallback policy.
+- Verification: The implementation plan must distinguish supported receiving-account identifiers from values outside the exception and verify new and legacy inputs on both sides of a change. Use synthetic fixtures.
+
+#### [P1] Set retention and access boundaries before retaining full account history
+
+- Category: material privacy risk.
+- Rule: spec “Audit, logging, privacy”, its before/after redaction rule, the existing professional privacy gate, and AUTH-03.
+- Evidence: `docs/DECISIONS.md:15,29–44` specifies permanent retention but leaves future readers and exports open. Spec lines 530 and 879 set a personal-data exception without a minimum access policy. The general audit feed at line 711 lists other events, and the professional gate at lines 1194–1195 treats retention for the separate auth audit. Workspace RLS (`apps/web/drizzle/0012_rls_audit_log.sql:4–21`) isolates tenants and allows `crm_app` to read audit rows. It does not enforce Bank-page member roles. The current notification worker receives the complete audit `after` JSON (`apps/web/src/lib/audit.ts:42–49`, `apps/web/src/jobs/bank-details-email.ts:73–75`) even though its message only uses the keys (`:45–51,102`).
+- Failure scenario: An old receiving account belonging to an identifiable sole trader is copied into the audit. A later staff-visible activity reader or export can expose the historical value unless its scope is defined. An ordinary account update or offboarding does not remove the historical copy, and the application has already created an unnecessary copy in a worker that only needs field names.
+- Why it matters: Sharing the current destination for payment and retaining a history of full values have different purposes and audiences. The Malaysian Act’s definition can cover data that identifies a person when combined with other held information. Where its retention principle applies, the necessity of keeping the data must be established. This review does not decide legal applicability or a retention period. [Malaysia Personal Data Protection Act 2010, §§4 and 10](https://pdp.gov.my/wp-content/uploads/2026/10/Akta-709-cetakan-semula-2026-BI.pdf)
+- Required correction: Record the purpose and policy for full-value history. Define allowed readers and how general activity views, exports, notifications, logs and backups handle the field. Have the project’s privacy review cover necessity, retention and deletion/offboarding treatment for potentially personal values before enabling full-value storage for real data. Establish an explicit gating rule if that decision is pending. The notification path should consume only the non-sensitive columns it needs. Scope any audit exception explicitly. UNI-10 protects integrity and does not settle retention. UNI-09 continues to prohibit PII in operational logs, trackers and analytics. The dedicated audit trail is governed by its explicit field-redaction rule and any reviewed exception.
+- Owner: builder and owner for the policy, with the project’s privacy professional for the retention and erasure treatment.
+- Verification: Check that the draft defines when writing full values may start and requires role and projection checks before any reader ships, including automated evidence that general activity, email, logs and unapproved exports omit the value. Check that retention and disposal treatment covers copies such as backups.
+
+### Round 30 verification
+
+- **QR cache finding resolved in the spec.** The spec and decision require `private, max-age=3600, must-revalidate`, failed origin validation prevents stale reuse, and the implementation checklist calls for the full header and a stale-request check. Same-profile reuse during the approved hour and behavior of saved images or browser history are distinguished. Signed downloads retain their separate expiry. [RFC 9111 §5.2.2.2](https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.2)
+- **Short-value ambiguity addressed by a new owner choice.** The record now explicitly covers four, fewer than four, and zero digits. The proposed implementation broadens the exception beyond confirmed receiving account numbers and introduces privacy questions, as detailed above.
+- **Client links.** The 30-day default is retained and confirmation is recorded as a Phase 7 planning gate. No link implementation or invoice access change is in this diff.
+
+### Verification performed
+
+- Compared the exact supplied spec and decision with the prior round and checked the draft diff against main. The worktree was clean and `git diff --check b0dbc52...HEAD` passed.
+- Compared the documented decisions with the authorization, audit and cache rules. The builder’s conversation was available only through the decision record.
+- Read the existing validator, changed-field snapshot, RLS, audit reader and notification worker. Checked the cache and privacy sources cited above. No browser, implementation or legal applicability test was performed.
+
+### Required before merge
+
+- Narrow or gate the full-value audit exception, then specify its access and retention boundaries. Return the revised hash for review.
+
+**Model used:** GPT-6 (Codex). **Switch model next step?** No for the focused corrections. Use the project’s deep tier for security re-review.
+
+**Verdict:** Revision required
+
 ## Round 30 — 2026-11-27 · scope: v4.7 revision 11, Round 29 corrections
 
 - **Spec:** `.agent/worktrees/build-docs-spec-bank-audit-qr-view/docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 11 (draft).
