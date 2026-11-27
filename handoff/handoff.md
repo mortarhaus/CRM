@@ -1,4 +1,4 @@
-# Handoff — 2026-11-27 · PR 81 open (spec rev 10 draft), waiting for `review spec` and `review 81`
+# Handoff — 2026-11-27 · PR 81: owner answered the five rev 10 ASKs ("all ok"); sub-agent adding them (not pushed yet) — do NOT review da3ee60
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -56,7 +56,7 @@ Uncommitted files — fingerprint:
 4. After rev 10: code for the Admin QR view (files listed in the 2026-11-27 DECISIONS entry); needs the ASKs below.
 
 ## 6. Open ASK items, blockers, and owner answers
-- Rev 10 ASKs (open): may an Admin see the bank details text; does viewing the QR need step-up; where an Admin sees the QR; keep the 1-hour private cache on the QR for more roles; is the FILE-03 control (7) audience change fine before the Phase 4 review.
+- Rev 10 ASKs ANSWERED 2026-11-27, Charlie "all ok" to the builder's recommendations: (1) Admin also sees bank details text, view only; (2) no fresh 2FA code to view the QR; (3) same Bank page, view only, with a menu link; (4) keep the 1-hour private QR cache; (5) FILE-03 audience change checked at the Phase 4 review. Not an approval of the spec text. Being written into rev 10 by sub-agent a965963a32f0bf0b3.
 - All answers up to 2026-11-26 ("1 yes, 2 yes") are recorded in docs/DECISIONS.md (merged with PR 78 and PR 79). Later PRs implement the 2026-11-25 ones (numbering time-zone warning; payment page digits-only, Owner clear/remove, Admin QR view after a spec revision; currency list widening), each with a spec check first.
 - Open owner asks: DuitNow/PayNow ID text field; spaces or hyphens in account numbers (remove or refuse); Admin seeing bank details text; deleted-user wording; meaning of "add 2 decimals 0.00" and "drop down list from the settings"; PR 74 money limits and text lengths; no-JS 409 policy; header greeting wording; Urbanist font source; outdated-browser notice wording; CRM sender name wording.
 - Cloudflare token not saved yet (`.agent/cloudflare.env`, DNS edit on mortarhaus.com only, never in chat); then add the domain in Resend.
