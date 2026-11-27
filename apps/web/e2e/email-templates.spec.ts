@@ -19,8 +19,8 @@ import { expect, test } from "./fixtures";
 import { createWorkspace, openShellMenu, respectRateLimit, setMemberRole, signIn, signUp, uniqueEmail } from "./helpers";
 
 // Phase 2 plan Task 25: the email templates page (Admin and Owner): the Q23 defaults, an audited save, an unknown field
-// refused at save time, the watermarked preview with sample data, and restoring the default. Kept short: the image job
-// runs every spec at three widths, and expectAccessible checks the 320px page does not overflow.
+// refused at save time, the watermarked preview with sample data, and restoring the default. Kept short: CI runs
+// every spec at three widths, and expectAccessible checks the 320px page does not overflow.
 let pageErrors: string[] = [];
 
 test.beforeEach(async ({ page }) => {

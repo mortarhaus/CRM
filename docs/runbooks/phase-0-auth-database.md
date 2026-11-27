@@ -174,7 +174,7 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
   `E2E_RATE_LIMITED=1`): the six no-JavaScript form tests then in the spec pass, and a fourth wrong sign-in within 10 seconds shows
   "Too many attempts" with JavaScript off and on. Verified again 2026-10-14 against `next start` of a build made with
   `env -i` (port 3321, `E2E_RATE_LIMITED=1`, chromium): all 10 tests in `e2e/no-javascript.spec.ts` and the 3 in
-  `e2e/sign-out.spec.ts` pass. In CI the `image` job runs the whole suite against the Docker image (below).
+  `e2e/sign-out.spec.ts` pass. In CI the `e2e` jobs run the whole suite against the Docker image, one job per project (below).
 
 ## Docker image and compose stack (Phase 0 PR 4)
 
@@ -204,10 +204,16 @@ Migrations are additive. `pnpm db:migrate` is safe to repeat: applied files are 
 | E2E against the image | `E2E_BASE_URL=http://localhost:3000 E2E_RATE_LIMITED=1 pnpm test:e2e` | Verified 2026-10-15: 84 passed (28 tests at three widths) in 21.6 minutes; the rate-limit waits make it slow |
 | Image scan | `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.74.0 image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 crm-app:dev` | Verified 2026-10-15; exit 0, no findings |
 
-CI (`.github/workflows/ci.yml`, job `image`, after `checks`) writes a throwaway `.env` with a random
-`AUTH_SECRET`, builds the image, scans it with Trivy (CRITICAL and HIGH, fixed only, blocking), starts the
-stack, runs `pnpm smoke:auth-route`, and runs the full E2E suite against the image with rate limits on. On
-failure it uploads the Playwright report, traces and the stack logs for 7 days.
+CI (`.github/workflows/ci.yml`; DECISIONS 2026-11-26) has two jobs for the image. Job `image` ("Image, Trivy,
+smoke", after `checks`) writes a throwaway `.env` with a random `AUTH_SECRET`, builds the image, scans it with Trivy
+(CRITICAL and HIGH, fixed only, blocking), starts the stack and runs `pnpm smoke:auth-route`. Only when it passes,
+job `e2e` runs once per Playwright project ("E2E (chromium)", "E2E (tablet-768)", "E2E (mobile-320)", in parallel):
+each writes the same kind of `.env`, builds the image, starts its own fresh stack and runs
+`pnpm test:e2e --project=<name>` against the image with rate limits on. A failed E2E job uploads the artifact
+`e2e-failure-<project>` (Playwright report, traces, stack logs) for 7 days. To run one project locally:
+`E2E_BASE_URL=http://localhost:3000 E2E_RATE_LIMITED=1 pnpm test:e2e --project=mobile-320` (no `--` before the flag,
+or pnpm passes it on and every project runs). A new Playwright project needs a matching matrix entry;
+`apps/web/scripts/ci-e2e-matrix.test.ts` fails until both lists agree.
 
 ## Safe public-origin settings
 

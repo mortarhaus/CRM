@@ -6,8 +6,8 @@ import postgres from "postgres";
 import { createDb } from "../db/client";
 import { runInWorkspace } from "../db/workspace";
 
-// A connection string from the environment, or else from the repository's .env, which `pnpm dev` and the CI image job
-// use but Playwright does not load. Only the named value is read from the file.
+// A connection string from the environment, or else from the repository's .env, which `pnpm dev` and the CI image and
+// E2E jobs use but Playwright does not load. Only the named value is read from the file.
 function envValue(name: "DATABASE_URL" | "DATABASE_MIGRATOR_URL"): string {
   const file = path.resolve(__dirname, "../../../../.env");
   const value = process.env[name] ?? (existsSync(file) ? parseEnv(readFileSync(file, "utf8"))[name] : undefined);

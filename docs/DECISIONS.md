@@ -2,6 +2,23 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-26 — CI: the browser tests run as one job per Playwright project, in parallel (UNI-13, FE-70)
+- **Decision:** the job "Image, Trivy, E2E" is split in `.github/workflows/ci.yml`:
+  - `image` ("Image, Trivy, smoke", timeout 20 min): install, CI `.env`, image build, Trivy (CRITICAL and HIGH, fixed only, exit code 1, unchanged), stack start, `pnpm smoke:auth-route`. `needs: [checks, changes]`, runs only when `code == 'true'`, as before.
+  - `e2e` ("E2E (chromium)", "E2E (tablet-768)", "E2E (mobile-320)", timeout 40 min each): a matrix with one entry per project of `apps/web/playwright.config.ts`, `fail-fast: false`. Each job builds the image from the same commit, starts its own fresh stack (Postgres, MinIO, Mailpit, web, worker) and runs `pnpm test:e2e --project=<name>` with `E2E_BASE_URL=http://localhost:3000` and `E2E_RATE_LIMITED=1`, as before. On failure it uploads `e2e-failure-<project>` (report, traces, stack logs, 7 days).
+- **Rules:**
+  - `e2e` has `needs: [changes, image]` and an `if` with no `always()`, so it runs only after `image` passed (Trivy, stack, smoke) and is skipped when `image` fails or is skipped. A green E2E job therefore means the gates before it passed.
+  - The matrix and the config projects must be the same list, each name once. `apps/web/scripts/ci-e2e-matrix.test.ts` (in `pnpm test`) fails otherwise, and also when the run line is not exactly `pnpm test:e2e --project=${{ matrix.project }}`: with `pnpm test:e2e -- --project=…` pnpm passes the `--` on and Playwright then runs all 273 tests (checked with `--list`).
+  - The docs-only skip (2026-11-12) and "unsure means run" now cover both jobs.
+  - Specs must not depend on another project having run first: each job starts with an empty database. Today every test signs up its own user (`uniqueEmail()`), has its own client IP and finds its mail by recipient.
+- **Why:** PR #78 took 69 minutes (limit 90; run 45799683831): E2E 3995 s, about 22 minutes per project, run one after another; setup, build, Trivy, stack and smoke about 2.5 minutes. The reviewer asked for a split before about 75 minutes (carried item of the Phase 2 close, above). Expected wall time: about 2.5 minutes for `image`, then about 25 minutes for the slowest E2E job, so about 27 to 30 minutes (estimate until CI runs).
+- **Trade-offs:** more runner minutes in total (three installs, three image builds, three stack starts, three Playwright installs: about 2.5 extra minutes per extra job, plus `image`; about 75 minutes in total against 69). The repo is public while a PR runs CI (2026-11-14), so those minutes are free; on a push to `main` with the repo private the jobs do not start, as today. Trivy scans the image built in `image`; each E2E job tests its own build of the same commit (base pinned by digest, Alpine packages pinned, frozen lockfile), not the same bytes. Check names change, so any saved filter or required check on "Image, Trivy, E2E" or the artifact `e2e-failure` needs the new names.
+- **Alternatives rejected:** keeping one job and raising the timeout again (wall time keeps growing with each spec); Playwright `--shard` across all projects (shards would mix widths and need a merge step for the report); passing the scanned image to the E2E jobs as an artifact (`docker save` plus `actions/download-artifact`: the tests would run the exact image Trivy scanned, at the cost of one more action and an image upload and download per run); a composite action or YAML anchors for the repeated setup (fewer lines, harder to read, nothing to share across workflows); more Playwright workers in one job (the suite is serial on purpose, `workers: 1`).
+- **Scope / affects:** `.github/workflows/ci.yml`, `.github/scripts/code-changed.sh` (comment), `apps/web/scripts/ci-e2e-matrix.test.ts`, `docs/runbooks/phase-0-auth-database.md` (CI section), comments in `apps/web/e2e/catalog.spec.ts`, `apps/web/e2e/email-templates.spec.ts`, `apps/web/src/test/member-role.ts`, `apps/web/src/test/workspace-settings.ts`. Supersedes the 90-minute value of 2026-11-23. Rules: UNI-13, UNI-14, FE-70.
+- **Versions:** none (same pinned action SHAs). actionlint 1.7.7 (`rhysd/actionlint@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9`) was run locally, not part of the repo.
+- **Exception to a rule?** no
+- **Decided by:** builder (Andy), at the reviewer's request; Charlie started it with `build` on 2026-11-26 after the builder proposed the split, and decides on the merge.
+
 ## 2026-11-26 — Phase 2 close: done-when evidence, FILE-03 review at the Phase 2 gate, owner answers of 2026-11-25, carried items
 - **Decision (Phase 2 close):** the four Phase 2 done-when items of spec "Build phases for Part 1" (row 2) are met on `main` at `ffa616e`, and every Phase 2 plan PR and the two follow-ups approved before the close are merged: PR 1 #53, PR 2a #54, PR 2b #55, PR 3 #56, Task 9 #57, Q10 #59, date format #60, PR 4 #62, PR 5a #68, PR 5b #70, PR 5c #71, PR 6 #72, onboarding short code #73, PR 7 #74, PR 8a #75, PR 8b #76, workspace binding #77, catalog refusal echo #78. Phase 2 closes when this PR merges. Evidence:
   - "Pattern preview matches issued numbers": `apps/web/src/db/numbering/preview-matches-issued.test.ts:57` (random rounds; preview and allocator agree, number or refusal). PR #72.
@@ -186,6 +203,7 @@
 - **Versions:** none.
 - **Exception to a rule?** no
 - **Decided by:** builder (Andy), on Charlie's report "ci image cancelled" (2026-11-23); owner may prefer sharding.
+- **Superseded (2026-11-26):** the job is split into `image` (20 minutes) and one `e2e` job per Playwright project (40 minutes each); see the 2026-11-26 entry "CI: the browser tests run as one job per Playwright project".
 
 ## 2026-11-23 — Phase 2 PR 5c: owner email on a bank-details or QR change; QR size and shape confirmed
 - **Owner answers (Charlie):**

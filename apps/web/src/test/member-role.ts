@@ -4,7 +4,7 @@ import { parseEnv } from "node:util";
 import postgres from "postgres";
 
 // The migrator's connection: from the environment, or else from the repository's .env, which `pnpm dev` and the CI
-// image job use but Playwright does not load. Only this one value is read from the file.
+// image and E2E jobs use but Playwright does not load. Only this one value is read from the file.
 function migratorUrl(): string {
   const file = path.resolve(__dirname, "../../../../.env");
   const url =
