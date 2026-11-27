@@ -1,5 +1,59 @@
 # Review — spec `core-sales-design`
 
+## Round 30 — 2026-11-27 · scope: v4.7 revision 11, Round 29 corrections
+
+- **Spec:** `.agent/worktrees/build-docs-spec-bank-audit-qr-view/docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 11 (draft).
+- **Spec hash:** `a1623280086f33f65bc6ff63fab20b72e446df96`, confirmed in the supplied file and commit `9a111c5de8dbbbf78fce334c450430e871adf6a6`. The companion decision blob is `9d70e6695edf93e3ba03e83a21017d039fd6a0f6`. Rechecked both at the end.
+- **Comparison:** revision 10 draft `7bb8bc0736ce817801bcacf5d0efdeffa06eb116`. Approved revision 9 remains `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`.
+- **Reviewer:** Bob · **Builder:** Andy.
+
+### Findings
+
+#### [P1] Keep new QR requests within the approved one-hour cache window
+
+- Category: conflict with recorded owner decision.
+- Rule: the scoped FILE-04 alternative and owner decision 5.
+- Evidence: Draft `docs/DECISIONS.md:23–29` records option B as accepting reuse without access during the one-hour window. Draft spec line 862 expressly permits a stale HTTP cache entry to answer a request without revalidation when the browser is disconnected, among other cases. Draft `docs/DECISIONS.md:51–53,61,68,81,98` retains `private, max-age=3600` in the policy and implementation checks. That header allows stale responses in cases permitted by RFC 9111. [RFC 9111 §4.2.4](https://www.rfc-editor.org/rfc/rfc9111.html#section-4.2.4), [RFC 9111 §5.2.2.2](https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.2)
+- Failure scenario: A cached preview is already more than an hour old. A disconnected cache may still use it to satisfy a new HTTP request under the drafted policy. The recorded owner choice covers reuse during the hour.
+- Why it matters: This exceeds the authorized interval for serving a new request without an access check. HTTP revalidation and the browser’s retention or display of content it already received are separate behaviors.
+- Required correction: Keep the approved one-hour private cache for fresh copies. Require successful origin revalidation before stale reuse for a new request, including when the browser is offline. A suitable response policy is `Cache-Control: private, max-age=3600, must-revalidate`. Align the spec, decision, implementation checks and planned PROJECT §9 entry. State separately that this does not delete a saved image or control a browser history view. If the owner intends to allow stale HTTP reuse, record explicit approval of that wider scope.
+- Owner: builder. Owner decision required only to widen the existing permission.
+- Verification: Confirm the amended decision and spec describe the same cache behavior. The code follow-up should assert the full header and check that a stale cache entry cannot satisfy a new request without origin validation.
+- Status: open.
+
+#### [P2] Include exactly four digits in the audit edge-case decision
+
+- Category: documentation consistency.
+- Rule: Q26, UNI-09, draft Authorization.
+- Evidence: Draft spec line 814 requires the last four digits only. Draft `docs/DECISIONS.md:84,86` also requires that the full value never be stored. Line 87 leaves the output open for values with fewer than four digits, while the current bank-account input at `apps/web/src/app/(app)/settings/payment/actions.ts:80` has no rule excluding four-digit values.
+- Failure scenario: For an accepted account number consisting of exactly four digits, copying the last four writes the full value. The draft’s owner question omits that case.
+- Why it matters: The code follow-up could satisfy the fragment rule and violate the full-value rule on a regular input or an older value in the audit’s before image.
+- Required correction: Include values with exactly four digits in the existing owner question, or state an agreed rule that resolves which requirement applies to every supported short value. Keep the outcome a prerequisite for the audit implementation and testing. The spec correction can carry the clarified question as an explicit implementation gate.
+- Owner: builder to correct the handoff, owner to decide the short-value behavior.
+- Verification: Confirm the question or rule covers four, one to three, and zero digits and that the planned tests cover the chosen outcome on both sides of a new audit entry.
+- Disposition: before merge.
+- Status: open.
+
+### Round 29 verification
+
+- **FILE-04 scope and controls verified.** The revised draft explicitly limits the alternative to the Bank preview, retains the signed download expiry, states the origin role, workspace, key and 2FA gates, and documents attachment and nosniff. The owner’s B choice explicitly covers same-browser-profile reuse even by a viewer without current access during the hour. The decision specifies the Phase 4 review and PROJECT §9 reconciliation. The remaining approval boundary is the stale HTTP reuse finding above.
+- **Audit handoff corrected.** Item 11 and `docs/DECISIONS.md:82–88` now distinguish the shipped four-character mask from the approved four-digit policy. The implementation follow-up covers the before and after fields, legacy formats and preserving historical rows. The new exactly-four edge case remains as listed above.
+
+### Verification performed
+
+- Rechecked the candidate and decision blob hashes, clean worktree, PR head and revision labels. `git diff --check b0dbc52...HEAD` passed. The diff is limited to the spec and decisions.
+- Compared the recorded B choice with the cache rule, proposed header test and planned PROJECT §9 record. Verified the HTTP semantics against RFC 9111.
+- Compared Q26 and the audit follow-up with the existing input and audit mask. Runtime and browser behavior were not exercised for this spec review.
+
+### Required before merge
+
+- Align new-request cache reuse with the approved interval.
+- Include the exactly-four-digit case in the gated audit decision.
+
+**Model used:** GPT-6 (Codex). **Switch model next step?** No for the scoped drafting fixes. The deep tier applies to the security-spec re-review.
+
+**Verdict:** Revision required
+
 ## Round 29 — 2026-11-27 · scope: v4.7 revision 10, bank audit and Admin payment details view
 
 - **Spec:** `.agent/worktrees/build-docs-spec-bank-audit-qr-view/docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 10 (draft).
