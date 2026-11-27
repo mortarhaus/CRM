@@ -2,7 +2,7 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
-## 2026-11-27 — Spec v4.7 revision 10 (draft): audit stores the last 4 digits only; Admins may view bank details and the payment QR
+## 2026-11-27 — Spec v4.7 revision 10, corrected as revision 11 (draft) after Bob's Round 29: audit stores the last 4 digits only; Admins may view bank details and the payment QR
 - **Owner decision 1:** the builder asked Charlie: "should I also add your earlier decision that Admins can view the payment QR?", recommending yes, because it needs a spec change before it can be built and one review then covers both changes. Options: "build, include QR" / "build, without QR". **Charlie's reply, verbatim: "build, include QR".** This puts the 2026-11-25 answer ("admin yes", Q5 in the 2026-11-26 "Phase 2 close" entry) into the same spec revision as Q26 (2026-11-22, "the audit entry stores the LAST 4 digits of the account number only, no hash").
 - **Owner decision 2 (same day):** after saying "Approving these answers doesn't approve the spec", the builder asked five questions, each with a recommendation:
   1. "Can Admins also see the bank details text?" Recommendation: "Yes, view only".
@@ -27,8 +27,8 @@
   - Charlie asked clarifying questions. The builder explained that it concerns only the team's browser on the Bank page, not clients or invoices, and said of B: "the spec will say plainly that anyone using the same browser could see the saved QR for that long, even without access. Bob still has to accept that wording."
   - **Charlie's reply, verbatim: "B".**
 
-  None of the five decisions approves the revision text: revision 10 still needs Bob's exact-hash spec review and Charlie's approval.
-- **Decision (draft spec text, revision 10, "Changes in v4.7" item 11):**
+  None of the five decisions approves the revision text. Revision 10 was reviewed in Bob's spec review Round 29 (hash `7bb8bc0736ce817801bcacf5d0efdeffa06eb116`, Revision required) and never approved; revision 11 still needs Bob's exact-hash spec review and Charlie's approval.
+- **Decision (draft spec text, revision 10 as corrected by revision 11, "Changes in v4.7" item 11):**
   - Authorization: the bank-details or QR change audit entry stores account numbers as their last 4 digits only, with no hash. Today's code stores no hash but takes the last 4 characters, not digits (see the audit follow-up below; Bob's Round 29 P2).
   - Matrix: a new row lets Admin and Owner **view** the bank details and the current QR on the Bank settings page, which Admins reach from the menu (decision 2, answers 1 and 3). Viewing, by an Admin or by the Owner, needs no step-up: the QR (decision 2, answer 2) and the bank-details text (decision 3, answer 1).
   - An Admin must have 2FA turned on to see the bank details and the QR on the Bank page (decision 3, answer 2). This holds even when the workspace's `require_2fa` is off. The spec's `require_2fa` ("per workspace for owner/admin", "Authentication and sessions") is unchanged: that switch covers all of an Admin's access, while this rule covers only this view.
@@ -51,7 +51,10 @@
   - Spec "Input, templates, files" asks for "signed URLs ≤ 10 min" for uploads, and FILE-04 asks for downloads "via signed URLs with short expiry (≤ 10 min)". Bob's Round 29 P1 rules that the Bank QR preview replaces signed URLs with another mechanism, so the files pack needs a documented alternative and test evidence ("If this project lacks that mechanism, don't silently waive these rules. Before ticking this pack, record in `PROJECT.md` §9 the alternative mechanism and how each affected rule's outcome is tested"). Revision 11 records it (below and spec "Input, templates, files"). The earlier builder reading (outside FILE-04, so no exception) is withdrawn.
   - What the cache means (RFC 9111): `private` stops shared caches from storing the response (§5.2.2.7); a fresh stored response "can be used to satisfy subsequent requests without contacting the origin server" (§4.2); after it is stale the browser must check with the app before reuse, except as §4.2.4 allows (for example when disconnected); nothing requires a stale copy to be deleted, and "a history mechanism can display a previous representation even if it has expired" (§6). The route sends no `Vary` header, and the app sends no `Clear-Site-Data` on sign-out (none in `apps/web/src`, checked), so the copy is tied to the browser profile, not to the session.
   - The Bank page itself sets no `Cache-Control`. It reads the session, so it renders per request, and Next.js's default for dynamic pages applies (`private, no-cache, no-store, max-age=0, must-revalidate`). Not measured here.
-- **Left open:** no owner question. One point is outside what was asked and is not written as a rule: whether an Owner without 2FA may see the bank-details text on the page (see above). It does not block building.
+- **Left open:**
+  - Outside what was asked, not written as a rule: whether an Owner without 2FA may see the bank-details text on the page (see above). It does not block building.
+  - ASK Charlie (Round 29 P2, before the audit code change is built): what a new audit entry stores when the account number has fewer than 4 digits, or none.
+  - Still open from Q5 (2026-11-26 entry), separate from Q26: whether spaces or hyphens typed in the account number are refused or removed.
 - **After approval and merge, these must follow (not changed here):**
   - Code:
     - `apps/web/src/app/(app)/files/payment-qr/route.ts` and its comment: `requireWorkspaceMember("owner")` at line 16 becomes Admin or Owner; the cache header stays. Add a 2FA check: refuse an Admin or Owner whose `twoFactorEnabled` is false, whatever the workspace's `require_2fa` says (`requireWorkspaceMember` returns `twoFactorEnabled`, `lib/auth/action.ts:98`). It is not step-up.
@@ -82,10 +85,10 @@
     - Fixtures (the code review requires them): a valid current number (digits only); a previously accepted value whose last 4 characters include a space or a hyphen; a previously accepted value with a letter or other non-digit among its last 4 characters; each on the before side of a new change and, while the input still accepts it, on the after side. Each entry holds only the approved digit fragment, and neither the full value nor its SHA-256.
     - Not decided (ASK Charlie, not invented here): what a new entry stores when the value has fewer than 4 digits, or none.
     - The input question stays separate from Q26: Q5 (2026-11-25, "5 digits only") makes the account number digits only, and whether spaces or hyphens typed as separators are refused or removed is still open (2026-11-26 entry).
-- **Why:** builder §4 and §8 (a spec deviation needs a reviewed spec revision; an owner answer is recorded with what was asked); `agents/PROJECT.md` §11 (the line 803 fix and the revision 9 label in the next spec PR).
+- **Why:** builder §4 and §8 (a spec deviation needs a reviewed spec revision; an owner answer is recorded with what was asked); Bob's spec review Round 29 (P1 FILE-04 alternative, P2 audit characters); `agents/PROJECT.md` §11 (the line 803 fix and the revision 9 label in the next spec PR).
 - **Alternatives rejected:** a separate spec revision for the Admin view (two reviews; Charlie chose one); `no-store` or a shorter cache for non-Owners (decision 2, answer 4: keep it); "yes admin only" and "no" for the direct QR address (decision 4: "yes both"); turning today's page behaviour for an Owner without 2FA into a spec rule (not asked); option A of decision 5, `no-store` on the QR (decision 5: "B"); the builder's earlier reading that the cache is outside FILE-04 (Bob's Round 29 P1).
-- **Scope / affects:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` (title, Status, "Changes in v4.7" heading and items 10 and 11, the Authorization matrix and the bank-details bullet, the DuitNow QR bullet in "Input, templates, files", Current gates (a)). No code, test or `agents/PROJECT.md` change. Rules: AUTH-02, AUTH-03, AUTH-09, TEN-11, FILE-03, FILE-04, UNI-09, UNI-10; spec `require_2fa` (Authentication and sessions).
-- **Versions:** spec v4.7 revision 10 (draft).
+- **Scope / affects:** `docs/superpowers/specs/2026-09-27-core-sales-design.md` (title, Status, "Changes in v4.7" heading and items 10 and 11, the Authorization matrix and the bank-details bullet, the Uploads and DuitNow QR bullets in "Input, templates, files", Current gates (a)); this entry, and correcting notes in the 2026-11-22 and 2026-11-26 entries. No code, test or `agents/PROJECT.md` change. Rules: AUTH-02, AUTH-03, AUTH-09, TEN-11, FILE-03, FILE-04, UNI-09, UNI-10; spec `require_2fa` (Authentication and sessions).
+- **Versions:** spec v4.7 revision 10 (Round 29: Revision required, never approved); revision 11 (draft) with the Round 29 corrections.
 - **Exception to a rule?**
   - FILE-03 is unchanged (content-addressed, never deleted; next review at the Phase 4 gate, now including Admin access).
   - **FILE-04: yes, a scoped alternative (revision 11, after Bob's Round 29 P1).**
