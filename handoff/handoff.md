@@ -1,4 +1,4 @@
-# Handoff — 2026-11-27 · `build, include QR`: spec revision 10 being drafted by an Opus sub-agent (not pushed)
+# Handoff — 2026-11-27 · PR 81 open (spec rev 10 draft), waiting for `review spec` and `review 81`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,13 +6,13 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: none (nothing open)
-- Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-docs-spec-bank-audit-qr-view` (branch `docs/spec-bank-audit-qr-view` from b0dbc52). Log worktree: `.agent/worktrees/agent-logs`.
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md`. Approved on main: v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`. Draft on PR 81: rev 10, hash `3428fa8ac138d293f6a74fb313739dcbad4c6569` (not approved). Active PR number: 81
+- Working folder: build worktree `.agent/worktrees/build-docs-spec-bank-audit-qr-view` (branch `docs/spec-bank-audit-qr-view`); main checkout on `main`. Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- Branch: `main` = `b0dbc52` (equal to origin/main). Open PRs: 0. Repo `mortarhaus/CRM` is PRIVATE (standing rule: public while a PR needs CI, private after merge).
-- Last merged: PR 80 (split the E2E CI job) 2026-11-27T00:39:34Z, no gate breach, log on agent-logs (`ca2d8e8`). Log gate clear.
-- main CI run 45918009472 (merge commit), state when checked after going private: in_progress  Secret scan | completed success Dependency audit | completed success Typecheck, lint, test | in_progress  Changed files | completed success
+- PR 81 https://github.com/mortarhaus/CRM/pull/81, head `da3ee60`, base `main` = `b0dbc52`. Docs only (image and E2E jobs skip).
+- Repo `mortarhaus/CRM` is PUBLIC for PR 81; make it private after the merge.
+- Last merged: PR 80 2026-11-27T00:39:34Z, no gate breach, log on agent-logs (`ca2d8e8`). Log gate clear.
 - GitHub order: push first, then make public (a push right after the switch returned 403 "Repository is disabled" twice on 2026-11-26; cause unverified).
 
 ## 2. Milestones
@@ -47,16 +47,16 @@ Uncommitted files — fingerprint:
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
 ## 4. Just finished
-2026-11-27 `merged 80`: logged (`ca2d8e8`; real CI times in the log), `main` fast-forwarded to b0dbc52, removed worktree `build-ci-split-e2e-job` and local branch `ci/split-e2e-job` (tip 92aa80a = final head, on main), repo private, progress artifact republished. Backup branches `feat/p2-email-templates` and `chore/setup-reconcile-v4-6` kept.
+2026-11-27 `build, include QR`: Opus sub-agent wrote spec rev 10 draft (bank audit keeps last 4 only; matrix row: Admin and Owner view the current DuitNow QR; rev 9 relabelled approved) and a DECISIONS entry; commit `da3ee60`, checked by the builder, pushed, PR 81 opened. Spec check of the other 2026-11-25 answers (sub-agent report): digits-only account number silent in spec; Owner clear details allowed but not mentioned; remove QR ok only if the file is kept (never-deleted rule); currency widening and numbering time-zone warning silent, no conflict.
 
 ## 5. Next step (file-level)
-1. IN PROGRESS (sub-agent a965963a32f0bf0b3, 2026-11-27): spec rev 10 draft: bank audit keeps last 4 digits only; Admin may view the payment QR (Charlie chose "build, include QR"). Next: check report, push, repo public, open PR; then `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` and `review N`; after approval `approved N`, merge, `merged N`, `setup` (reconcile hash, strike PROJECT.md s11 line).
+1. Charlie: in the review window `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` then `review 81` (both on head `da3ee60`); the spec must be checked out from the PR head. Then Charlie approves revision 10 in words, `approved 81` BEFORE merging, merge, `merged 81`, `setup` (reconcile hash `3428fa8a`, update PROJECT.md s2/s11 and CLAUDE.md).
 2. Then the Phase 3 plan (customers and team, includes the require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 3. With the next CI change: PR 80 R1 P3 (show Compose logs when the auth smoke check fails).
-4. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
-5. Phase 4 items are listed in the PR 79 DECISIONS entry (carried forward).
+4. After rev 10: code for the Admin QR view (files listed in the 2026-11-27 DECISIONS entry); needs the ASKs below.
 
 ## 6. Open ASK items, blockers, and owner answers
+- Rev 10 ASKs (open): may an Admin see the bank details text; does viewing the QR need step-up; where an Admin sees the QR; keep the 1-hour private cache on the QR for more roles; is the FILE-03 control (7) audience change fine before the Phase 4 review.
 - All answers up to 2026-11-26 ("1 yes, 2 yes") are recorded in docs/DECISIONS.md (merged with PR 78 and PR 79). Later PRs implement the 2026-11-25 ones (numbering time-zone warning; payment page digits-only, Owner clear/remove, Admin QR view after a spec revision; currency list widening), each with a spec check first.
 - Open owner asks: DuitNow/PayNow ID text field; spaces or hyphens in account numbers (remove or refuse); Admin seeing bank details text; deleted-user wording; meaning of "add 2 decimals 0.00" and "drop down list from the settings"; PR 74 money limits and text lengths; no-JS 409 policy; header greeting wording; Urbanist font source; outdated-browser notice wording; CRM sender name wording.
 - Cloudflare token not saved yet (`.agent/cloudflare.env`, DNS edit on mortarhaus.com only, never in chat); then add the domain in Resend.
@@ -69,4 +69,4 @@ None blocking. PR 80 Approved (R2), one optional P3 open: an auth smoke failure 
 - None.
 
 ## 9. Files touched but not committed
-None of mine (see section 3). Local `.env` and `.agent/q23-email-templates.md` are gitignored.
+None of mine (build worktree clean at `da3ee60`). Local `.env` and `.agent/q23-email-templates.md` are gitignored.
