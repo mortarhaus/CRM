@@ -1,4 +1,4 @@
-# Handoff — 2026-11-27 · PR 81 at `9a111c5` (spec rev 11 draft, Round 29 fixed); waiting for `review spec` and `review 81`
+# Handoff — 2026-11-27 · `fix`: spec Round 30 Revision required (P1 must-revalidate, P2 4-digit audit case); asking Charlie the short-number question
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -50,7 +50,7 @@ Uncommitted files — fingerprint:
 2026-11-27 `build, include QR`: Opus sub-agent wrote spec rev 10 draft (bank audit keeps last 4 only; matrix row: Admin and Owner view the current DuitNow QR; rev 9 relabelled approved) and a DECISIONS entry; commit `da3ee60`, checked by the builder, pushed, PR 81 opened. Spec check of the other 2026-11-25 answers (sub-agent report): digits-only account number silent in spec; Owner clear details allowed but not mentioned; remove QR ok only if the file is kept (never-deleted rule); currency widening and numbering time-zone warning silent, no conflict.
 
 ## 5. Next step (file-level)
-1. In the review window: `review spec .agent/worktrees/build-docs-spec-bank-audit-qr-view/docs/superpowers/specs/2026-09-27-core-sales-design.md` and `review 81` (head `9a111c5`; Round 29 P1+P2 fixed, owner decision 5 "B" recorded). Then Charlie approves revision 11 in words, `approved 81` BEFORE merging, merge, `merged 81`, `setup` (reconcile hash, PROJECT.md s2/s11 incl. the FILE-04 alternative under s9, CLAUDE.md). ASK before the audit code change (not blocking now): what a new entry stores when the account number has fewer than 4 digits.
+1. `fix` for spec Round 30 (hash `a1623280`, head `9a111c5`; review archived `d7a666c`). Asked Charlie 2026-11-27: account number of 4 digits or fewer — (A, recommended) record no digits, only that it changed, or (B) still record them (whole number in the record). Then one sub-agent pass: P1 `Cache-Control: private, max-age=3600, must-revalidate` in spec, DECISIONS, code follow-up checks (full header; a stale entry cannot serve a new request without origin validation) and PROJECT s9 text; say it deletes nothing and does not control history view (inside owner choice B, no owner question); P2 cover 4, 1-3 and 0 digits, tests both sides of a new entry. Then push, update PR 81 body, Charlie re-runs `review spec` and `review 81`; approve, `approved 81` before merge, `merged 81`, `setup`.
 2. Then approve rev 10, `approved 81` before merge, merge, `merged 81`, `setup`.
 3. Then the Phase 3 plan (require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 4. With the next CI change: PR 80 R1 P3 (Compose logs on smoke failure); skipped E2E matrix job shows raw name.
@@ -65,6 +65,7 @@ Uncommitted files — fingerprint:
 - Raise with Bob: Next dev mode logs arguments of the 2FA actions, incl. setup keys of throwaway e2e accounts (dev only).
 
 ## 7. Open review findings (P0/P1) and verdict
+Spec Round 30 (2026-11-27) Revision required: [P1] cache policy lets a stale copy answer a new request (add must-revalidate); [P2, before merge] audit short-value question must include exactly 4 digits. No PR-81 review file yet.
 Spec Round 29 (2026-11-27) Revision required: [P1] record the Bank QR preview as a scoped FILE-04 alternative (cache behaviour beyond the accepted one needs the owner); [P2, before merge] the audit does not yet guarantee digits only. No PR-81 review file yet.
 None blocking. PR 80 Approved (R2), one optional P3 open: an auth smoke failure after the stack starts shows no Compose logs (ci.yml image job; fix with the next CI change). PR 79 Approved (R2). Builder suggestion, not decided: weigh the QR route's `Cache-Control: private, max-age=3600` at the Phase 4 FILE-03 review. Residuals: catalog form action state may carry to another service across Edit links (source reading only); two unexplained CATALOG_FAILED results in flaky local runs; new catalog browser tests desktop Chromium only; PR 77 no stale-workspace no-JS e2e, no test races two first template saves, cold-dev-server accessibility.spec failures unverified. Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 DB currency list vs code table test, edit link for a missing service, long name at 320 px e2e; PR 72 clock option, preview timing, time zone pause.
 
