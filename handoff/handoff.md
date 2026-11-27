@@ -1,4 +1,4 @@
-# Handoff — 2026-11-27 · PR 80 merged and logged; next: spec PR for line 803 (on `build` / `spec`)
+# Handoff — 2026-11-27 · `build, include QR`: spec revision 10 being drafted by an Opus sub-agent (not pushed)
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -7,7 +7,7 @@
 
 ## 0. Active target
 - Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md` (v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`) · Active PR number: none (nothing open)
-- Working folder: repo root (`main`). No build worktree. Log worktree: `.agent/worktrees/agent-logs`.
+- Working folder: repo root (`main`). Build worktree: `.agent/worktrees/build-docs-spec-bank-audit-qr-view` (branch `docs/spec-bank-audit-qr-view` from b0dbc52). Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
 - Branch: `main` = `b0dbc52` (equal to origin/main). Open PRs: 0. Repo `mortarhaus/CRM` is PRIVATE (standing rule: public while a PR needs CI, private after merge).
@@ -50,7 +50,7 @@ Uncommitted files — fingerprint:
 2026-11-27 `merged 80`: logged (`ca2d8e8`; real CI times in the log), `main` fast-forwarded to b0dbc52, removed worktree `build-ci-split-e2e-job` and local branch `ci/split-e2e-job` (tip 92aa80a = final head, on main), repo private, progress artifact republished. Backup branches `feat/p2-email-templates` and `chore/setup-reconcile-v4-6` kept.
 
 ## 5. Next step (file-level)
-1. Spec PR (PROJECT.md s11): line 803 drops "SHA-256"; revision 9 "draft" label. "Admin may view the QR" also needs a spec revision before it is built (could share that PR; ask).
+1. IN PROGRESS (sub-agent a965963a32f0bf0b3, 2026-11-27): spec rev 10 draft: bank audit keeps last 4 digits only; Admin may view the payment QR (Charlie chose "build, include QR"). Next: check report, push, repo public, open PR; then `review spec docs/superpowers/specs/2026-09-27-core-sales-design.md` and `review N`; after approval `approved N`, merge, `merged N`, `setup` (reconcile hash, strike PROJECT.md s11 line).
 2. Then the Phase 3 plan (customers and team, includes the require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 3. With the next CI change: PR 80 R1 P3 (show Compose logs when the auth smoke check fails).
 4. Remember on every PR: tell Charlie to run `approved N` BEFORE merging.
