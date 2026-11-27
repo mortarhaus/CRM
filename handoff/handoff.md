@@ -1,4 +1,4 @@
-# Handoff — 2026-11-26 · PR 80 open (split the E2E CI job), CI running, waiting for `review 80`
+# Handoff — 2026-11-27 · PR 80 Approved (R2) and archived, waiting for Charlie to merge, then `merged 80`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -35,10 +35,10 @@ Uncommitted files — fingerprint:
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
 ## 4. Just finished
-2026-11-26 `build`: Opus sub-agent built the split (jobs `image` + `e2e` matrix per Playwright project, guard test, DECISIONS entry, runbook). Its observed results: `--list` 273 total, 91 per project; mobile-320 alone on a fresh stack 87 passed / 4 skipped, 22.2 min; actionlint 0 errors; typecheck, lint, test (1531 passed, 1 skipped), build exit 0 at `b0a1016`. Head `92aa80a` only rewords three DECISIONS sentences (not re-run locally). Pushed, PR 80 opened.
+2026-11-27 `approved 80`: review archived (`0eb90d4`, hash `f70794f3`), receipt on agent-logs (`ccfeb7a`, 2026-11-27T00:38:55Z) for head `92aa80a`. CI run 45834314859: all 8 jobs passed. Image job 2m03s; E2E chromium 23m31s, tablet-768 23m40s, mobile-320 25m37s; image start to last E2E end 27m43s (PR 78 combined job 68m58s); whole run 13:58:23Z to 14:30:25Z; same 255 passed / 18 skipped (reviewer's counts).
 
 ## 5. Next step (file-level)
-1. Check run 45834314859: the four new jobs must run and pass; record real job times in the PR. Then Charlie: `review 80`, then `approved 80` BEFORE merging.
+1. Charlie merges PR 80, then `merged 80` (log with the real CI times above, repo private, progress artifact, remove worktree `build-ci-split-e2e-job` after proof).
 2. Then the spec PR (PROJECT.md s11): line 803 drops "SHA-256"; revision 9 "draft" label. "Admin may view the QR" also needs a spec revision before it is built (could share that PR; ask).
 3. Then the Phase 3 plan (customers and team, includes the require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 4. Phase 4 items are listed in the PR 79 DECISIONS entry (carried forward).
@@ -50,7 +50,7 @@ Uncommitted files — fingerprint:
 - Raise with Bob: Next dev mode logs arguments of the 2FA actions, incl. setup keys of throwaway e2e accounts (dev only).
 
 ## 7. Open review findings (P0/P1) and verdict
-None open. PR 79 Approved (R2). Builder suggestion, not decided: weigh the QR route's `Cache-Control: private, max-age=3600` at the Phase 4 FILE-03 review. Residuals: catalog form action state may carry to another service across Edit links (source reading only); two unexplained CATALOG_FAILED results in flaky local runs; new catalog browser tests desktop Chromium only; PR 77 no stale-workspace no-JS e2e, no test races two first template saves, cold-dev-server accessibility.spec failures unverified. Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 DB currency list vs code table test, edit link for a missing service, long name at 320 px e2e; PR 72 clock option, preview timing, time zone pause.
+None blocking. PR 80 Approved (R2), one optional P3 open: an auth smoke failure after the stack starts shows no Compose logs (ci.yml image job; fix with the next CI change). PR 79 Approved (R2). Builder suggestion, not decided: weigh the QR route's `Cache-Control: private, max-age=3600` at the Phase 4 FILE-03 review. Residuals: catalog form action state may carry to another service across Edit links (source reading only); two unexplained CATALOG_FAILED results in flaky local runs; new catalog browser tests desktop Chromium only; PR 77 no stale-workspace no-JS e2e, no test races two first template saves, cold-dev-server accessibility.spec failures unverified. Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 DB currency list vs code table test, edit link for a missing service, long name at 320 px e2e; PR 72 clock option, preview timing, time zone pause.
 
 ## 8. Decisions made this session, not yet in the decisions log
 - None.
