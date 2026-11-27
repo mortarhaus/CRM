@@ -23,8 +23,9 @@
 - **Owner decision 5 (same day, after Bob's spec review Round 29):**
   - The builder first said: "Bob also found a risk we hadn't covered: someone else using the same browser could reopen the saved image, even without access, for up to 1 hour."
   - Question: "should the browser keep saving the QR image?"
-  - Options: "A. Stop saving it (recommended): The app checks access every time. The image reloads on each visit to the Bank page..." (quoted as far as recorded) and "B. Keep it for 1 hour: You also accept that someone else using the same browser could see the saved copy during that hour."
+  - Options: "A. Stop saving it (recommended): The app checks access every time. The image reloads on each visit to the Bank page, which should be barely noticeable for one small image." and "B. Keep it for 1 hour: You also accept that someone else using the same browser could see the saved copy during that hour."
   - Charlie asked clarifying questions. The builder explained that it concerns only the team's browser on the Bank page, not clients or invoices, and said of B: "the spec will say plainly that anyone using the same browser could see the saved QR for that long, even without access. Bob still has to accept that wording."
+  - The last explanation before the reply included: "Now (B): after you open the Bank page, your browser keeps a copy of the picture for 1 hour. It can show that copy again without asking the app whether the person is still allowed to see it."
   - **Charlie's reply, verbatim: "B".**
 
   None of the five decisions approves the revision text. Revision 10 was reviewed in Bob's spec review Round 29 (hash `7bb8bc0736ce817801bcacf5d0efdeffa06eb116`, Revision required) and never approved; revision 11 still needs Bob's exact-hash spec review and Charlie's approval.
