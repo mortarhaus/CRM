@@ -1,4 +1,4 @@
-# Handoff — 2026-11-27 · `fix`: spec Round 29 Revision required (P1 FILE-04/QR cache, P2 audit digits); waiting for Charlie on the QR cache
+# Handoff — 2026-11-27 · `fix` spec Round 29: owner chose B (keep 1-hour QR cache); sub-agent fixing P1 + P2 (not pushed) — do NOT re-review yet
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -50,7 +50,7 @@ Uncommitted files — fingerprint:
 2026-11-27 `build, include QR`: Opus sub-agent wrote spec rev 10 draft (bank audit keeps last 4 only; matrix row: Admin and Owner view the current DuitNow QR; rev 9 relabelled approved) and a DECISIONS entry; commit `da3ee60`, checked by the builder, pushed, PR 81 opened. Spec check of the other 2026-11-25 answers (sub-agent report): digits-only account number silent in spec; Owner clear details allowed but not mentioned; remove QR ok only if the file is kept (never-deleted rule); currency widening and numbering time-zone warning silent, no conflict.
 
 ## 5. Next step (file-level)
-1. `fix` in progress for spec Round 29 (hash `7bb8bc07`, head `721f90d`; review archived on agent-logs `9d994d8`). Asked Charlie 2026-11-27: (A) stop the browser saving the QR (`no-store`; builder now recommends this) or (B) keep 1 hour and accept that others using the same browser could see the saved image. Then one sub-agent pass: P1 (state the Bank preview as a scoped FILE-04 alternative in spec + DECISIONS: origin checks session workspace, current key, role, 2FA; attachment + nosniff; cache scope; signed downloads keep <= 10 min; evidence list for `setup`/PROJECT s9) and P2 (stop saying the shipped audit stores digits only: `workspace-settings.ts` keeps `slice(-4)` characters and the input accepts non-digits; carry digits-only masking, incl. old values on the before side, into the code work; historical rows stay). Push, update PR body, Charlie re-runs `review spec <worktree path>` then `review 81`.
+1. `fix` for spec Round 29 (review archived `9d994d8`). Owner answered 2026-11-27, verbatim "B", to: keep the QR saved 1 hour and "accept that someone else using the same browser could see the saved copy during that hour" (builder had recommended A, no-store). Sub-agent a965963a32f0bf0b3 is fixing P1 and P2 as revision 11. Then: verify, push, update PR 81 body, Charlie re-runs `review spec <worktree path>` and `review 81`.
 2. Then approve rev 10, `approved 81` before merge, merge, `merged 81`, `setup`.
 3. Then the Phase 3 plan (require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 4. With the next CI change: PR 80 R1 P3 (Compose logs on smoke failure); skipped E2E matrix job shows raw name.
