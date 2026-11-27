@@ -1,4 +1,4 @@
-# Handoff — 2026-11-27 · `fix` spec Round 29: owner chose B (keep 1-hour QR cache); sub-agent fixing P1 + P2 (not pushed) — do NOT re-review yet
+# Handoff — 2026-11-27 · PR 81 at `9a111c5` (spec rev 11 draft, Round 29 fixed); waiting for `review spec` and `review 81`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,11 +6,11 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md`. Approved on main: v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`. Draft on PR 81: rev 10, hash `7bb8bc0736ce817801bcacf5d0efdeffa06eb116` (not approved). Active PR number: 81
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md`. Approved on main: v4.7 rev 9, hash `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`. Draft on PR 81: rev 10, hash `a1623280086f33f65bc6ff63fab20b72e446df96` (revision 11, not approved). Active PR number: 81
 - Working folder: build worktree `.agent/worktrees/build-docs-spec-bank-audit-qr-view` (branch `docs/spec-bank-audit-qr-view`); main checkout on `main`. Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- PR 81 https://github.com/mortarhaus/CRM/pull/81, head `721f90d`, base `main` = `b0dbc52`. Docs only (image and E2E jobs skip).
+- PR 81 https://github.com/mortarhaus/CRM/pull/81, head `9a111c5`, base `main` = `b0dbc52`. Docs only (image and E2E jobs skip).
 - Repo `mortarhaus/CRM` is PUBLIC for PR 81; make it private after the merge.
 - Last merged: PR 80 2026-11-27T00:39:34Z, no gate breach, log on agent-logs (`ca2d8e8`). Log gate clear.
 - GitHub order: push first, then make public (a push right after the switch returned 403 "Repository is disabled" twice on 2026-11-26; cause unverified).
@@ -50,7 +50,7 @@ Uncommitted files — fingerprint:
 2026-11-27 `build, include QR`: Opus sub-agent wrote spec rev 10 draft (bank audit keeps last 4 only; matrix row: Admin and Owner view the current DuitNow QR; rev 9 relabelled approved) and a DECISIONS entry; commit `da3ee60`, checked by the builder, pushed, PR 81 opened. Spec check of the other 2026-11-25 answers (sub-agent report): digits-only account number silent in spec; Owner clear details allowed but not mentioned; remove QR ok only if the file is kept (never-deleted rule); currency widening and numbering time-zone warning silent, no conflict.
 
 ## 5. Next step (file-level)
-1. `fix` for spec Round 29 (review archived `9d994d8`). Owner answered 2026-11-27, verbatim "B", to: keep the QR saved 1 hour and "accept that someone else using the same browser could see the saved copy during that hour" (builder had recommended A, no-store). Sub-agent a965963a32f0bf0b3 is fixing P1 and P2 as revision 11. Then: verify, push, update PR 81 body, Charlie re-runs `review spec <worktree path>` and `review 81`.
+1. In the review window: `review spec .agent/worktrees/build-docs-spec-bank-audit-qr-view/docs/superpowers/specs/2026-09-27-core-sales-design.md` and `review 81` (head `9a111c5`; Round 29 P1+P2 fixed, owner decision 5 "B" recorded). Then Charlie approves revision 11 in words, `approved 81` BEFORE merging, merge, `merged 81`, `setup` (reconcile hash, PROJECT.md s2/s11 incl. the FILE-04 alternative under s9, CLAUDE.md). ASK before the audit code change (not blocking now): what a new entry stores when the account number has fewer than 4 digits.
 2. Then approve rev 10, `approved 81` before merge, merge, `merged 81`, `setup`.
 3. Then the Phase 3 plan (require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 4. With the next CI change: PR 80 R1 P3 (Compose logs on smoke failure); skipped E2E matrix job shows raw name.
@@ -72,4 +72,4 @@ None blocking. PR 80 Approved (R2), one optional P3 open: an auth smoke failure 
 - None.
 
 ## 9. Files touched but not committed
-None of mine (build worktree clean at `721f90d`). Local `.env` and `.agent/q23-email-templates.md` are gitignored.
+None of mine (build worktree clean at `9a111c5`). Local `.env` and `.agent/q23-email-templates.md` are gitignored.
