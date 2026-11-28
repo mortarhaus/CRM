@@ -1,5 +1,52 @@
 # Review — spec `core-sales-design`
 
+## Round 32 — 2026-11-27 · scope: v4.7 revision 13, Round 31 audit corrections
+
+- **Spec:** `.agent/worktrees/build-docs-spec-bank-audit-qr-view/docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 13 (draft).
+- **Spec hash:** `bf633eb3850c101134e682d4cea21dcc19cd93af`, confirmed in the supplied file and PR #81 head `733aae4109fc5525401275bef028d71c944b8fea`. Companion decision blob `b3902cd5613ff01686f0c0bd1b687e619d732e93`. Rechecked at the end.
+- **Comparison:** revision 12 draft `5b87075707045a356c38515ca7d50eca7f2fd9f6` and approved revision 9 `b8e5a758ced6738217b8c98aa3bc9e40376a6eca`.
+- **Reviewer:** Bob · **Builder:** Andy.
+
+### Findings
+
+#### [P2] Make the existing four-character audit mask safe for Unicode
+
+- Category: defect in the existing implementation recorded by the draft.
+- Rule: Authorization, spec line 817, and the receiving field’s existing code-point input limit.
+- Evidence: `docs/DECISIONS.md:14,19–20` documents the suffix as four characters and treats the existing implementation as sufficient. `apps/web/src/db/settings/workspace-settings.ts:29–32` uses `slice(-4)`, which counts UTF-16 code units. `apps/web/src/lib/settings-input.ts:10–20,43–44` accepts Unicode free text and counts code points. `apps/web/src/lib/audit.ts:19–21,31–37` serializes the suffix into PostgreSQL `jsonb`, which requires escaped surrogate pairs to be valid. [PostgreSQL 17 JSON types](https://www.postgresql.org/docs/17/datatype-json.html)
+- Failure scenario: An accepted value contains a supplementary Unicode character at the split point. The mask can produce a lone surrogate. PostgreSQL rejects that audit value, so the transaction can refuse the settings save. A standalone synthetic string check confirmed the validator’s character pattern accepts the input and the existing slice produces the invalid surrogate escape. The whole application save was not run.
+- Why it matters: The recorded rule promises four characters on both sides of the audit entry. The implementation can split a character at the boundary.
+- Required correction: In the payment-settings follow-up, take the last four Unicode code points without splitting a character, with the same `last4` shape, short-value behavior and no hash. Update the implementation note and add a synthetic regression case that exercises the audit write on a settings change. Keep existing audit rows append-only.
+- Owner: builder.
+- Verification: The settings save and its audit write succeed for supported Unicode input whose old mask could split a character. The stored suffix contains the expected whole code points. Existing numeric, short and null cases keep their recorded behavior.
+- Disposition: deferred to the Bank settings Admin-view and QR revalidation implementation PR.
+- Status: open. Existing code edge case, with no new writer introduced by this spec PR.
+
+### Round 31 verification
+
+- **Full-value scope finding resolved.** The owner’s recorded option 1 withdraws full-value history. Spec line 817 and the active decision return to the four-character suffix on the before and after sides, without a hash. The record explicitly covers non-digits and the case where a value of four or fewer characters is wholly contained in the suffix. The prior full-value proposal is marked superseded.
+- **Full-value retention and access finding resolved.** The proposed full-value exception and its write path are withdrawn. The current account remains available through the separately defined Bank-page and invoice rules. The decision records that future audit readers require role and field-projection tests and limits the notification follow-up to reading changed column names. See `docs/DECISIONS.md:23–30`.
+- **Redaction ruling.** The Authorization rule is the specific, limited treatment of this audit field under the general `[pii]` rule. It covers at most four characters including short values, and provides no basis for treating the fragment as anonymous, exposing it through an unreviewed reader, or copying it into operational logs. No new full-value exception is needed for this spec revision.
+- **QR and link decisions retained.** The Bank QR preview remains the scoped FILE-04 alternative with one hour of fresh private caching, required origin validation when stale, and Phase 4 review. Signed downloads keep their ten-minute maximum, and client links keep their current default with the Phase 7 planning check. The proposed test method may be chosen in the code PR if it exercises a stale response and an unavailable origin, in addition to asserting the actual route header. The method and any library choice remain implementation details.
+
+### Verification performed
+
+- Compared the exact supplied spec and decisions against the prior draft and main. The diff is documentation only. `git diff --check b0dbc52...HEAD` passed, the PR head matches the supplied spec, and the worktree was clean.
+- Read the recorded owner choice and implementation evidence, including validation, the mask, JSON serialization and the notification reader. The source conversation was available through the decision record.
+- Used a standalone synthetic string check and PostgreSQL documentation for the deferred defect. No browser or application tests were run for this spec review.
+
+### Required before merge
+
+- No open P0 or P1, and no P2 required before merge.
+
+### Deferred conditions
+
+- Address and verify the Unicode mask finding in the Bank settings Admin-view and QR revalidation implementation PR.
+
+**Model used:** GPT-6 (Codex). **Switch model next step?** No for the exact-head PR review. The project’s deep tier applies to the implementation security review.
+
+**Verdict:** Approved with conditions
+
 ## Round 31 — 2026-11-27 · scope: v4.7 revision 12, Round 30 corrections and full account-number audit
 
 - **Spec:** `.agent/worktrees/build-docs-spec-bank-audit-qr-view/docs/superpowers/specs/2026-09-27-core-sales-design.md` · v4.7 revision 12 (draft).
