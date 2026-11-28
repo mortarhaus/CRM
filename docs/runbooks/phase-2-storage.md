@@ -78,7 +78,8 @@ digest with `docker buildx imagetools inspect pgsty/minio:<tag>`, change both pi
 - **No signed URLs.** The adapter has no signed URL method (FILE-04): R2 and S3 do not add
   `X-Content-Type-Options: nosniff` and a presigned GET cannot ask for it, so a direct link to the bucket could not
   meet FILE-04. Every object is served through an app route that sets `nosniff`, `Content-Disposition: attachment`
-  and its own type (today only `/files/logo`). A future signed download needs a controlled same-origin or edge
+  and its own type (today `/files/logo` and `/files/payment-qr`, the FILE-04 scoped alternative of
+  `agents/PROJECT.md` §9). A future signed download needs a controlled same-origin or edge
   response that sets expiry ≤ 10 minutes, `Content-Disposition: attachment` and `nosniff`, with a contract test, built
   when it is first needed.
 
@@ -104,6 +105,16 @@ another workspace, signed out, an old or unknown id, storage off, or a stored ty
 `Cache-Control: no-store`. A hit streams the object with its stored type, `X-Content-Type-Options: nosniff`,
 `Content-Disposition: attachment` and `Cache-Control: private, max-age=3600`. The CSP `img-src 'self' blob: data:`
 is unchanged.
+
+## Serving the payment QR
+
+`GET /files/payment-qr?id={sha256}` (`apps/web/src/app/(app)/files/payment-qr/route.ts`): Admin or Owner of the
+active workspace with 2FA turned on, also when `require_2fa` is off (no step-up), and the id must be the hash of that
+workspace's current `duitnow_qr_key`. Anything else, including Staff, an Admin or Owner without 2FA, a member of
+another workspace, an old or unknown id, storage off, or a stored type other than PNG/JPG, is 404 with
+`Cache-Control: no-store`. A hit streams the object with `nosniff`, `Content-Disposition: attachment` and
+`Cache-Control: private, max-age=3600, must-revalidate`: a browser may reuse a fresh copy for up to an hour without
+asking, and never reuses a stale one without the route's checks, also offline (`route.cache.test.ts`; spec revision 13).
 
 ## R2 verification (pre-deployment check)
 

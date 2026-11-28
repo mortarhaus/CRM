@@ -24,10 +24,11 @@ const PII_COLUMNS = [
   "bank_account_holder",
 ] as const;
 
-// The bank account number is audited as its last 4 characters only, never in full and never hashed (spec line 799;
-// plan Q26, Charlie 2026-11-22: "last 4 digits of the account number only, no hash").
+// The bank account number is audited as its last 4 characters as saved, never hashed, so a value of 4 characters or
+// fewer is recorded whole (spec "Authorization", revision 13; DECISIONS 2026-11-27). Characters are code points, as
+// the input counts them: slicing UTF-16 units could split a pair, which jsonb refuses (Bob spec R32 P2).
 const AUDIT_MASKS: Partial<Record<string, (value: unknown) => unknown>> = {
-  bank_account_number: (value) => (typeof value === "string" ? { last4: value.slice(-4) } : value),
+  bank_account_number: (value) => (typeof value === "string" ? { last4: Array.from(value).slice(-4).join("") } : value),
 };
 const audited = (column: string, value: unknown) => AUDIT_MASKS[column]?.(value) ?? value;
 
@@ -53,6 +54,19 @@ function workspaceId(): string {
 export async function getSettings(tx: Tx, options: { forUpdate?: boolean } = {}): Promise<WorkspaceSettings> {
   const query = tx.select().from(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId()));
   const [row] = options.forUpdate ? await query.for("update") : await query;
+  if (!row) throw new Error("workspace_settings row missing");
+  return row;
+}
+
+// What the owner email on a bank or QR change formats with: the country (the QR's name), the time zone and the date
+// format; never a bank value (Bob PR 83 R1 P2). A missing row throws, as getSettings does, so the job retries.
+export async function findEmailSettings(
+  tx: Tx,
+): Promise<Pick<WorkspaceSettings, "country" | "timezone" | "dateFormat">> {
+  const [row] = await tx
+    .select({ country: workspaceSettings.country, timezone: workspaceSettings.timezone, dateFormat: workspaceSettings.dateFormat })
+    .from(workspaceSettings)
+    .where(eq(workspaceSettings.workspaceId, workspaceId()));
   if (!row) throw new Error("workspace_settings row missing");
   return row;
 }

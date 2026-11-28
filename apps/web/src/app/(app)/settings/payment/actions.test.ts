@@ -11,11 +11,11 @@ import { rendered } from "@/test/rendered";
 // against Better Auth in lib/auth/step-up.test.ts).
 let databaseUrl = "";
 vi.mock("@/lib/env", () => ({ getEnv: () => ({ DATABASE_URL: databaseUrl }) }));
-let signedIn: { userId: string; sessionId: string; workspaceId: string } | null = null;
+let signedIn: { userId: string; sessionId: string; workspaceId: string | null; twoFactor: boolean } | null = null;
 vi.mock("@/lib/auth/session", () => ({
   getCurrentSession: async () =>
     signedIn && {
-      user: { id: signedIn.userId, twoFactorEnabled: true },
+      user: { id: signedIn.userId, twoFactorEnabled: signedIn.twoFactor },
       session: { id: signedIn.sessionId, activeOrganizationId: signedIn.workspaceId },
     },
 }));
@@ -33,9 +33,9 @@ vi.mock("@/adapters/storage", async (original) => ({
 }));
 
 const actions = await import("./actions");
-const confirmStepUp = rendered(actions.confirmStepUp, () => signedIn?.workspaceId);
-const saveBankDetails = rendered(actions.saveBankDetails, () => signedIn?.workspaceId);
-const uploadPaymentQr = rendered(actions.uploadPaymentQr, () => signedIn?.workspaceId);
+const confirmStepUp = rendered(actions.confirmStepUp, () => signedIn?.workspaceId ?? undefined);
+const saveBankDetails = rendered(actions.saveBankDetails, () => signedIn?.workspaceId ?? undefined);
+const uploadPaymentQr = rendered(actions.uploadPaymentQr, () => signedIn?.workspaceId ?? undefined);
 const { stableJobId } = await import("@/jobs/enqueue");
 const { GET } = await import("../../files/payment-qr/route");
 
@@ -65,12 +65,12 @@ async function addMember(role: string, workspace = workspaceId): Promise<string>
   return user.id;
 }
 
-// Signs a new member in; with stepUp, this session passed a code check `age` seconds ago.
-async function signInAs(role: string, options: { stepUp?: boolean; workspace?: string } = {}): Promise<string> {
+// Signs a new member in (2FA on unless twoFactor is false); with stepUp, this session passed a code check just now.
+async function signInAs(role: string, options: { stepUp?: boolean; workspace?: string; twoFactor?: boolean } = {}): Promise<string> {
   const workspace = options.workspace ?? workspaceId;
   const userId = await addMember(role, workspace);
   const sessionId = randomUUID();
-  signedIn = { userId, sessionId, workspaceId: workspace };
+  signedIn = { userId, sessionId, workspaceId: workspace, twoFactor: options.twoFactor ?? true };
   if (options.stepUp) await admin`insert into step_up (workspace_id, session_id, verified_at) values (${workspace}, ${sessionId}, now())`;
   return userId;
 }
@@ -184,6 +184,26 @@ describe("saveBankDetails", () => {
     expect(JSON.stringify(jobs)).not.toContain("1234");
   });
 
+  // Spec "Authorization" (revision 13): the last 4 characters as saved, a short value whole, no hash, on both sides.
+  // The mask counts code points as the input does, so a character outside the BMP is never split (Bob spec R32 P2:
+  // half a surrogate pair is not valid jsonb, and the save failed). Synthetic values only.
+  it.each([
+    ["a value of 3 characters, whole", "123", { last4: "123" }],
+    ["a value of exactly 4", "5678", { last4: "5678" }],
+    ["non-digits among the last 4", "5140-1234-AB", { last4: "4-AB" }],
+    ["a character outside the BMP at the split", "5140 1\u{1D7D7}345", { last4: "\u{1D7D7}345" }],
+  ])("audits %s as last4, after it is saved and before the next change", async (_name, value, masked) => {
+    await signInAs("owner", { stepUp: true });
+    const { version } = await settings();
+    expect((await saveBankDetails(null, bankForm(version, { bankAccountNumber: value }))).ok).toBe(true);
+    expect((await saveBankDetails(null, bankForm(version + 1))).ok).toBe(true);
+    const [saved, next, ...more] = await bankAudits();
+    expect(more).toHaveLength(0);
+    expect(saved?.after).toMatchObject({ bank_account_number: masked });
+    expect(next?.before).toMatchObject({ bank_account_number: masked });
+    expect(next?.after).toMatchObject({ bank_account_number: { last4: "6789" } });
+  });
+
   it("writes nothing for a save that changes nothing", async () => {
     await signInAs("owner", { stepUp: true });
     const { version } = await settings();
@@ -251,6 +271,14 @@ describe("uploadPaymentQr", () => {
     expect(await settings()).toEqual(before);
   });
 
+  it("refuses an Admin with FORBIDDEN, even after step-up, and stores nothing (changes stay Owner only)", async () => {
+    await signInAs("admin", { stepUp: true });
+    const before = await settings();
+    expect(await uploadPaymentQr(null, qrForm(before.version, PNG_A))).toEqual({ ok: false, status: "FORBIDDEN" });
+    expect(puts).toBe(0);
+    expect(await settings()).toEqual(before);
+  });
+
   it("refuses an SVG named qr.png by its bytes, and stores nothing", async () => {
     await signInAs("owner", { stepUp: true });
     const before = await settings();
@@ -260,26 +288,84 @@ describe("uploadPaymentQr", () => {
   });
 });
 
+// The Bank QR preview, the scoped FILE-04 alternative (PROJECT.md §9; spec "Input, templates, files"): the handler is
+// called directly, as the origin. The workspace's require_2fa is off throughout (the column's default).
 describe("files/payment-qr", () => {
-  const get = (id: string) => GET(new Request(`http://localhost/files/payment-qr?id=${id}`));
+  const get = (query: string, init?: RequestInit) => GET(new Request(`http://localhost/files/payment-qr${query}`, init));
 
-  it("serves the current QR to the Owner only; an Admin, another workspace's Owner and an old id get 404", async () => {
+  // PNG_A, then PNG_B as the current QR, uploaded by an Owner.
+  async function withTwoQrs(): Promise<void> {
     await signInAs("owner", { stepUp: true });
     const { version } = await settings();
     await uploadPaymentQr(null, qrForm(version, PNG_A));
     await uploadPaymentQr(null, qrForm(version + 1, PNG_B));
+    const [row] = await admin<{ require_2fa: boolean }[]>`select require_2fa from workspace_settings where workspace_id = ${workspaceId}`;
+    expect(row?.require_2fa).toBe(false);
+  }
 
-    const served = await get(sha256(PNG_B));
+  // Points the signed-in session at another active workspace (or none), keeping the user and their memberships.
+  function pointSessionAt(workspace: string | null): void {
+    if (!signedIn) throw new Error("not signed in");
+    signedIn = { ...signedIn, workspaceId: workspace };
+  }
+
+  // Every refusal is the same 404, never a cacheable image.
+  async function expectRefused(response: Response): Promise<void> {
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("content-type")).toBeNull();
+    expect((await response.arrayBuffer()).byteLength).toBe(0);
+  }
+
+  it.each(["owner", "admin"])("serves the current QR to an %s with 2FA and no step-up, with the exact headers", async (role) => {
+    await withTwoQrs();
+    await signInAs(role);
+    const served = await get(`?id=${sha256(PNG_B)}`);
     expect(served.status).toBe(200);
-    expect(served.headers.get("x-content-type-options")).toBe("nosniff");
-    expect(served.headers.get("content-disposition")).toBe("attachment");
+    expect(Object.fromEntries(served.headers)).toEqual({
+      "content-type": "image/png",
+      "content-length": String(PNG_B.length),
+      "content-disposition": "attachment",
+      "x-content-type-options": "nosniff",
+      "cache-control": "private, max-age=3600, must-revalidate",
+    });
     expect(new Uint8Array(await served.arrayBuffer())).toEqual(PNG_B);
-    expect((await get(sha256(PNG_A))).status).toBe(404);
+  });
 
-    await signInAs("admin");
-    expect((await get(sha256(PNG_B))).status).toBe(404);
+  it("refuses signed out, no active workspace, Staff, and an Admin or Owner without 2FA (require_2fa off)", async () => {
+    await withTwoQrs();
+    const current = `?id=${sha256(PNG_B)}`;
+    signedIn = null;
+    await expectRefused(await get(current));
+    await signInAs("owner");
+    pointSessionAt(null);
+    await expectRefused(await get(current));
+    await signInAs("staff");
+    await expectRefused(await get(current));
+    await signInAs("admin", { twoFactor: false });
+    await expectRefused(await get(current));
+    await signInAs("owner", { twoFactor: false, stepUp: true });
+    await expectRefused(await get(current));
+  });
+
+  it("refuses another workspace's member, an old, unknown or malformed id; the workspace comes from the session only", async () => {
+    await withTwoQrs();
+    const own = workspaceId;
+    const current = `?id=${sha256(PNG_B)}`;
     await signInAs("owner", { workspace: await createWorkspace() });
-    expect((await get(sha256(PNG_B))).status).toBe(404);
+    await expectRefused(await get(current));
+    // Naming this workspace in the request changes nothing (TEN-11).
+    await expectRefused(await get(`${current}&workspaceId=${own}`, { headers: { "x-workspace-id": own } }));
+    // A session pointed at this workspace without a membership of it is no better.
+    pointSessionAt(own);
+    await expectRefused(await get(current));
+
+    await signInAs("owner");
+    await expectRefused(await get(`?id=${sha256(PNG_A)}`));
+    await expectRefused(await get(`?id=${sha256(SVG)}`));
+    await expectRefused(await get("?id=../../x"));
+    await expectRefused(await get(""));
+    expect((await get(current)).status).toBe(200);
   });
 });
 

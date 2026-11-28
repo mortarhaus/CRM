@@ -38,13 +38,16 @@ export async function recordAudit(tx: Tx, entry: AuditEntry): Promise<string> {
   return id;
 }
 
-// One entry of the transaction's workspace by id and action (RLS shows no other workspace's), or null.
+// One entry of the transaction's workspace by id and action (RLS shows no other workspace's), or null: who made it,
+// when, and the names of the columns in its after side. No before or after value leaves the database.
 export async function findAuditEntry(
   tx: Tx,
   id: string,
   action: string,
-): Promise<{ actorUserId: string | null; after: Record<string, unknown> | null; createdAt: Date } | null> {
-  const [row] = await tx.execute<{ actor_user_id: string | null; after: Record<string, unknown> | null; created_at: Date | string }>(sql`
-    select actor_user_id, after, created_at from audit_log where id = ${id} and action = ${action}`);
-  return row ? { actorUserId: row.actor_user_id, after: row.after, createdAt: new Date(row.created_at) } : null;
+): Promise<{ actorUserId: string | null; changedColumns: string[]; createdAt: Date } | null> {
+  const [row] = await tx.execute<{ actor_user_id: string | null; changed_columns: string[]; created_at: Date | string }>(sql`
+    select actor_user_id, created_at,
+      array(select jsonb_object_keys(coalesce(after, '{}'::jsonb)) order by 1) as changed_columns
+    from audit_log where id = ${id} and action = ${action}`);
+  return row ? { actorUserId: row.actor_user_id, changedColumns: row.changed_columns, createdAt: new Date(row.created_at) } : null;
 }

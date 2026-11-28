@@ -222,3 +222,13 @@ describe("stableJobId", () => {
     expect(stableJobId(a, b)).not.toBe(stableJobId(b, a));
   });
 });
+
+// The job never reads the full settings row, which holds the current bank values (Bob PR 83 R1 P2): it reads only
+// the formatting fields (findEmailSettings). A full read fails the job, so every sending test above would fail.
+// Vitest hoists vi.mock; it is last so the test lines cited in docs/DECISIONS.md do not move.
+vi.mock("../db/settings/workspace-settings", async (original) => ({
+  ...(await original<typeof import("../db/settings/workspace-settings")>()),
+  getSettings: () => {
+    throw new Error("the owner email job read the full settings row");
+  },
+}));

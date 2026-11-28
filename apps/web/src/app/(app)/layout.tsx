@@ -48,7 +48,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     );
   }
   const showAdminSettings = membership?.role === "admin" || membership?.role === "owner";
-  const showOwnerSettings = membership?.role === "owner";
   // The page CSP allows an inline <style> only with this request's nonce (src/proxy.ts).
   const nonce = requestHeaders.get("x-nonce");
   const brandCss = brandTokenCss(settings?.brandColour ?? null);
@@ -56,13 +55,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
       {brandCss && nonce && <style nonce={nonce}>{brandCss}</style>}
-      <Sidebar showAdminSettings={showAdminSettings} showOwnerSettings={showOwnerSettings} />
+      <Sidebar showAdminSettings={showAdminSettings} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           theme={theme}
           user={{ name: session.user.name, email: session.user.email }}
           showAdminSettings={showAdminSettings}
-          showOwnerSettings={showOwnerSettings}
           workspaceSwitcher={switcher}
           signOut={<SignOutButton />}
         />

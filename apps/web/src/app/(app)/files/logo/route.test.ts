@@ -47,6 +47,15 @@ async function memberOf(workspaceId: string, role = "staff"): Promise<void> {
 
 const get = (path: string) => GET(new Request(`http://localhost:3000${path}`));
 
+// Every refusal is the same 404 with no-store and no body, never a cacheable image (TEN-05; the FILE-04 exception in
+// PROJECT.md §9).
+async function expectRefused(response: Response): Promise<void> {
+  expect(response.status).toBe(404);
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(response.headers.get("content-type")).toBeNull();
+  expect((await response.arrayBuffer()).byteLength).toBe(0);
+}
+
 beforeAll(async () => {
   [database, minio] = await Promise.all([startDatabase(), startMinio()]);
   databaseUrl = database.appUrl;
@@ -82,25 +91,25 @@ describe("GET /files/logo", () => {
     const a = await workspaceWithLogo();
     const b = await workspaceWithLogo();
     await memberOf(b.id, "owner");
-    expect((await get(logoUrl(a.key))).status).toBe(404);
+    await expectRefused(await get(logoUrl(a.key)));
     // Their own logo still works.
     expect((await get(logoUrl(b.key))).status).toBe(200);
     // A session pointed at A, without a membership of A, is no better.
     signedIn = { userId: signedIn?.userId ?? "", workspaceId: a.id };
-    expect((await get(logoUrl(a.key))).status).toBe(404);
+    await expectRefused(await get(logoUrl(a.key)));
   });
 
   it("answers 404 signed out, for an old or unknown id, a malformed id, and with storage off", async () => {
     const a = await workspaceWithLogo();
     signedIn = null;
-    expect((await get(logoUrl(a.key))).status).toBe(404);
+    await expectRefused(await get(logoUrl(a.key)));
     await memberOf(a.id);
-    expect((await get(`/files/logo?id=${randomUUID()}`)).status).toBe(404);
-    expect((await get("/files/logo?id=../../other")).status).toBe(404);
-    expect((await get("/files/logo")).status).toBe(404);
+    await expectRefused(await get(`/files/logo?id=${randomUUID()}`));
+    await expectRefused(await get("/files/logo?id=../../other"));
+    await expectRefused(await get("/files/logo"));
     storage = null;
     try {
-      expect((await get(logoUrl(a.key))).status).toBe(404);
+      await expectRefused(await get(logoUrl(a.key)));
     } finally {
       storage = createS3Adapter(minio.config);
     }
@@ -110,6 +119,6 @@ describe("GET /files/logo", () => {
     const a = await workspaceWithLogo();
     await storage?.put(a.key, new TextEncoder().encode("<svg/>"), "image/svg+xml");
     await memberOf(a.id);
-    expect((await get(logoUrl(a.key))).status).toBe(404);
+    await expectRefused(await get(logoUrl(a.key)));
   });
 });

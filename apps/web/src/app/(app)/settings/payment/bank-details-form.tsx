@@ -22,7 +22,7 @@ import {
   BANK_SWIFT_HINT,
   BANK_SWIFT_INVALID,
   ONBOARDING_INVALID,
-  PAYMENT_FORBIDDEN,
+  PAYMENT_CHANGE_FORBIDDEN,
   WORKSPACE_CHANGED_MESSAGE,
 } from "@/lib/auth/messages";
 import { stepUpRefusal } from "./save-follow-up";
@@ -50,7 +50,7 @@ interface FormProps {
 
 const MESSAGES: Partial<Record<Exclude<SaveResult, { ok: true }>["status"], string>> = {
   STALE_VERSION: BANK_STALE,
-  FORBIDDEN: PAYMENT_FORBIDDEN,
+  FORBIDDEN: PAYMENT_CHANGE_FORBIDDEN,
   WORKSPACE_CHANGED: WORKSPACE_CHANGED_MESSAGE,
 };
 

@@ -5,9 +5,12 @@ import type { TOTP } from "otpauth";
 import { BANK_DETAILS_CHANGED_DEFAULT } from "../src/emails/bank-details-changed";
 import {
   BANK_SAVED,
+  PAYMENT_CHANGE_FORBIDDEN,
   PAYMENT_FORBIDDEN,
   PAYMENT_QR_SAVED,
+  PAYMENT_VIEW_ENROL,
   STEP_UP_CONFIRMED,
+  STEP_UP_ENROL,
   STEP_UP_EXPIRED,
   WRONG_CODE,
 } from "../src/lib/auth/messages";
@@ -23,9 +26,11 @@ import {
   PASSWORD,
   respectRateLimit,
   setMemberRole,
+  setTwoFactorEnabled,
   signIn,
   signUp,
   submitTotpCode,
+  switchTo,
   uniqueEmail,
 } from "./helpers";
 
@@ -269,26 +274,84 @@ test("keyboard only: step up, fill and save the bank details with visible focus 
   await expect(saveButton(page)).toBeFocused();
 });
 
-test("an Admin sees no Bank link, and the page refuses them (Owner only, spec line 798)", async ({ page }) => {
-  const email = uniqueEmail();
-  await signUp(page, email);
-  await signIn(page, email);
-  await createWorkspace(page, "Admin Studio");
+// A denied Bank page (Staff, or an Admin or Owner without 2FA) shows none of the saved values: not as text, not in an
+// input's value, a hidden field or the page's serialized data, and no saved-data form or input (Bob PR 83 R1 P2).
+const SAVED_VALUES = ["Maybank", HOLDER, ACCOUNT_NUMBER, "MBBEMYKL"];
+async function expectNoSavedDetails(page: Page): Promise<void> {
+  const main = page.getByRole("main");
+  await expect(main.getByRole("heading", { level: 1, name: "Bank details" })).toBeVisible();
+  for (const value of SAVED_VALUES) await expect(page.locator("body")).not.toContainText(value);
+  await expect(main.locator("form, input, textarea, select")).toHaveCount(0);
+  const html = await page.content();
+  for (const value of SAVED_VALUES) expect(html).not.toContain(value);
+}
+
+// Spec revision 13: an Admin with 2FA views the bank details and the QR, with no step-up and no forms; Staff are
+// refused; the QR is refused to anyone without 2FA, also with require_2fa off (the workspace default here).
+test("an Admin with 2FA sees the Bank link and a view-only page; Staff and members without 2FA see no details", async ({
+  page,
+}) => {
+  const owner = await openAsOwner(page, "Admin Studio");
+  await stepUp(page, owner);
+  await fillBank(page, "Maybank");
+  await saveButton(page).click();
+  await expect(bankForm(page).getByRole("status")).toHaveText(BANK_SAVED);
+  // The QR form still holds the version it was rendered with, so the page is loaded again first (step-up stays fresh).
+  await page.reload();
+  const qr = png(200, 200);
+  await page.getByLabel("DuitNow QR image").setInputFiles({ name: "qr.png", mimeType: "image/png", buffer: qr });
+  await page.getByRole("button", { name: "Upload QR code" }).click();
+  await expect(page.getByRole("main").getByRole("status").filter({ hasText: PAYMENT_QR_SAVED })).toBeVisible();
+  const qrUrl = `/files/payment-qr?id=${createHash("sha256").update(qr).digest("hex")}`;
+
+  await setMemberRole(owner.email, "admin");
+  await page.goto("/workspaces");
   // The full nav (the drawer below md); the quick bar never lists Bank.
   const nav = page.getByRole("navigation", { name: "Main" });
   await openShellMenu(page);
-  await expect(nav.getByRole("link", { name: "Bank", exact: true })).toBeVisible();
+  await nav.getByRole("link", { name: "Bank", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/payment$/);
   await closeShellMenu(page);
+  const main = page.getByRole("main");
+  await expect(main).toContainText(PAYMENT_CHANGE_FORBIDDEN);
+  for (const value of SAVED_VALUES) {
+    await expect(main.getByRole("definition").filter({ hasText: value })).toHaveCount(1);
+  }
+  const preview = main.getByRole("img", { name: "Your DuitNow QR code" });
+  await expect(preview).toHaveAttribute("src", qrUrl);
+  await expect.poll(() => preview.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth)).toBe(200);
+  await expect(main.locator("form")).toHaveCount(0);
+  await expect(codeField(page)).toHaveCount(0);
+  const served = await page.request.get(qrUrl);
+  expect(served.status()).toBe(200);
+  expect(served.headers()["cache-control"]).toBe("private, max-age=3600, must-revalidate");
+  await expectAccessible(page, "/settings/payment as Admin");
 
-  await setMemberRole(email, "admin");
+  await setMemberRole(owner.email, "staff");
   await page.reload();
+  await expectNoSavedDetails(page);
+  await expect(main).toContainText(PAYMENT_FORBIDDEN);
+  await expect(main.getByRole("definition")).toHaveCount(0);
+  await expect(main.getByRole("img")).toHaveCount(0);
+  expect((await page.request.get(qrUrl)).status()).toBe(404);
   await openShellMenu(page);
-  await expect(nav.getByRole("link", { name: "Email", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Bank", exact: true })).toHaveCount(0);
   await closeShellMenu(page);
+  await expectAccessible(page, "/settings/payment as Staff");
 
-  await page.goto("/settings/payment");
-  await expect(page.getByRole("main")).toContainText(PAYMENT_FORBIDDEN);
-  await expect(page.getByRole("main").locator("form")).toHaveCount(0);
-  await expectAccessible(page, "/settings/payment as Admin");
+  // 2FA turned off (as if never enrolled): no values and no QR on the page, and the route refuses the member as Admin
+  // and as Owner, with require_2fa off. Turning 2FA off ends the user's sessions (AUTH-07), so they sign in again.
+  await setTwoFactorEnabled(owner.email, false);
+  await signIn(page, owner.email);
+  await expect(page).toHaveURL(/\/workspaces$/);
+  await switchTo(page, owner.workspace);
+  for (const role of ["admin", "owner"] as const) {
+    await setMemberRole(owner.email, role);
+    await page.goto("/settings/payment");
+    await expectNoSavedDetails(page);
+    await expect(main).toContainText(role === "admin" ? PAYMENT_VIEW_ENROL : STEP_UP_ENROL);
+    await expect(main.getByRole("definition")).toHaveCount(0);
+    await expect(main.getByRole("img")).toHaveCount(0);
+    expect((await page.request.get(qrUrl)).status()).toBe(404);
+  }
 });

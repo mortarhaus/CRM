@@ -26,3 +26,15 @@ export async function setMemberRole(email: string, role: "owner" | "admin" | "st
     await sql.end();
   }
 }
+
+// Turns the user's 2FA flag on or off, for E2E (spec revision 13: the Bank QR and view need 2FA on). "user" is a
+// system table with no RLS, owned by crm_migrator.
+export async function setTwoFactorEnabled(email: string, enabled: boolean): Promise<void> {
+  const sql = postgres(migratorUrl(), { max: 1, onnotice: () => {} });
+  try {
+    const updated = await sql`update "user" set two_factor_enabled = ${enabled} where email = ${email} returning id`;
+    if (updated.length !== 1) throw new Error(`expected one user, updated ${updated.length}`);
+  } finally {
+    await sql.end();
+  }
+}

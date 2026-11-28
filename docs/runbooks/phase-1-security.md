@@ -105,7 +105,9 @@ could be used once more, by a user who must sign in again anyway. The IP counter
   A user without 2FA gets `TWO_FACTOR_REQUIRED` and enrols at `/settings/security`. An accepted code is refused
   for any later step-up of the same user for 120 s (`STEP_UP_CODE_REUSE_SECONDS`). A Better Auth 5xx is an error, not
   `WRONG_CODE`, and keeps its unit spent. The prompt is on `/settings/payment` (PR 5b), above the bank details and QR
-  forms, which are Owner only and need step-up.
+  forms, which are Owner only and need step-up. An Admin with 2FA sees the same page view only (the saved values and
+  the current QR), with no prompt and no forms; an Admin or Owner without 2FA sees no values and no QR, whatever
+  `require_2fa` says (spec revision 13).
 - **`require_2fa`** (per workspace, default false): when true, an Admin or Owner without 2FA is refused
   `TWO_FACTOR_REQUIRED` by every action and admin settings page, and the pages send them to `/settings/security`.
   Staff are not affected, and nobody is signed out: the check runs on each request. No page sets the flag yet
@@ -221,7 +223,9 @@ reads only `DATABASE_WORKER_URL`, so it needs no email setting.
   queue and `email.bank_details_changed.dead`; retries 5, first delay 30 s, backoff, as `email.send`). Job data is
   `{ workspaceId, changeId, userId }` (the change is its audit entry; no bank value, name or address), and the job id
   is derived from the change and the Owner, so the same change never makes two jobs for one Owner. The worker reads
-  the names and the address when it sends, so it needs no new setting. A recipient who is no longer an Owner, or has
+  the names and the address when it sends, so it needs no new setting. From the audit entry it reads only the actor,
+  the time and the changed column names (`findAuditEntry`), never a before or after value. From the settings it reads only the
+  country, the time zone and the date format (`findEmailSettings`), never the current bank values. A recipient who is no longer an Owner, or has
   no address, is skipped: the job completes and the worker logs `{"level":"info","msg":"owner email skipped",
   "queue":"email.bank_details_changed","reason":"not_owner"|"no_address"|"no_workspace"}` (no id, no address). A
   change it cannot find fails the job (retries, then the dead-letter queue; redrive with `jobs:retry -- --queue

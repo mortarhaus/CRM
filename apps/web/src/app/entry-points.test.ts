@@ -47,10 +47,12 @@ const ENTRY_POINTS: Record<string, { exports: string[]; coveredBy: string }> = {
   "apps/web/src/app/(app)/files/payment-qr/route.ts": {
     exports: ["GET"],
     coveredBy:
-      "Read-only: streams the active workspace's current payment QR to its Owner (requireWorkspaceMember('owner'), " +
-      "then withWorkspace and a match against workspace_settings.duitnow_qr_key); 404 for anything else, including " +
-      "an Admin and another workspace's Owner (TEN-05). No mutating method; the upload is the uploadPaymentQr server " +
-      "action (settings/payment/actions.test.ts; Phase 2 plan Task 14).",
+      "Read-only: streams the active workspace's current payment QR to its Admin or Owner with 2FA turned on, even " +
+      "when require_2fa is off (requireWorkspaceMember('admin') and twoFactorEnabled, then withWorkspace and a match " +
+      "against workspace_settings.duitnow_qr_key); 404 with no-store for anything else, including Staff, an Admin or " +
+      "Owner without 2FA and another workspace's member (TEN-05). The scoped FILE-04 alternative (PROJECT.md §9). No " +
+      "mutating method; the upload is the uploadPaymentQr server action, Owner only with step-up " +
+      "(settings/payment/actions.test.ts, files/payment-qr/route.cache.test.ts; Phase 2 plan Task 14; spec revision 13).",
   },
   "apps/web/src/proxy.ts": {
     exports: ["proxy"],
