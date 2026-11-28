@@ -2,6 +2,17 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-28 — Phase 3 plan started (customers and team)
+- **Decision:** write the Phase 3 implementation plan next, drafted by an Opus 5.5 sub-agent and checked, committed and opened as a documents PR by the builder session (Sonnet 5.5). No app code.
+- **Owner answers (Charlie, 2026-11-28, question dialog, before the plan was started):** (1) asked what to do now, as the Phase 3 plan starts a new phase (customers, contacts, CSV import, invitations and the two-factor switch): "Write Phase 3 plan (Recommended)". (2) asked how to use Opus 5.5 from a Sonnet 5.5 session, with the cost named: "Opus sub-agent (Recommended)".
+- **Why:** Phase 2 is closed and the spec revision 13 follow-up merged (PR #83); the plan is deep-tier work (`agents/PROJECT.md` §6) and the first PR of a milestone (`agents/roles/builder.md` §8).
+- **Not decided here:** every question in plan §7 and the gates in plan §0. The `builder.md` §8 stop before the first code PR of the phase still applies.
+- **Alternatives rejected:** fixing the QR upload stale-version bug first (offered, not chosen; still open).
+- **Scope / affects:** `docs/superpowers/plans/2026-11-28-phase-3-customers-team.md`; `CLAUDE.md` Status.
+- **Versions:** none.
+- **Exception to a rule?** no.
+- **Decided by:** owner (Charlie).
+
 ## 2026-11-28 — The logo preview route (`/files/logo`) is an accepted FILE-04 exception
 - **Owner decision:** the builder asked Charlie on 2026-11-28: "should the logo preview be recorded as an accepted exception to the 10-minute download link rule? I recommend yes, in the next documents change." **Charlie's reply, verbatim: "yes"**, the second line of a three-line message whose other lines were "run as subagent for opus" and "build". The builder read "yes" as the answer to this question and told Charlie so.
 - **Decision:** the workspace logo preview, `GET /files/logo` (`apps/web/src/app/(app)/files/logo/route.ts`), is an accepted exception to FILE-04 ("Download via signed URLs with short expiry (≤ 10 min), `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`"). It is an authenticated same-origin route, not a signed URL, and answers with `Cache-Control: private, max-age=3600`: a browser may reuse its copy for up to an hour without the checks. Its behaviour does not change here. Every signed download keeps FILE-04 as written.
