@@ -124,4 +124,18 @@ describe("findAuditEntry", () => {
     for (const value of ["Bank", "1111", "6789", "[pii]", "Holder"]) expect(JSON.stringify(entry)).not.toContain(value);
     expect(await runInWorkspace(handle.db, workspaceA, (tx) => findAuditEntry(tx, id, "other.action"))).toBeNull();
   });
+
+  // TEN-08 (Bob PR 83 R1 P1): RLS hides another workspace's entry from the lookup, even by its exact id and action.
+  it("returns null for the same id and action looked up from another workspace", async () => {
+    const action = `settings.${randomUUID()}`;
+    const id = await runInWorkspace(handle.db, workspaceA, (tx) =>
+      recordAudit(tx, { actorUserId: actorId, action, targetType: "workspace_settings", targetId: workspaceA, after: { bank_name: "B" } }),
+    );
+    const [workspaceB] = await admin<{ id: string }[]>`
+      insert into organization (name, slug, created_at) values ('audit-b', ${`audit-b-${randomUUID()}`}, now()) returning id`;
+    if (!workspaceB) throw new Error("workspace not created");
+    expect(await runInWorkspace(handle.db, workspaceB.id, (tx) => findAuditEntry(tx, id, action))).toBeNull();
+    // Positive control: the same lookup in its own workspace finds it.
+    expect(await runInWorkspace(handle.db, workspaceA, (tx) => findAuditEntry(tx, id, action))).not.toBeNull();
+  });
 });
