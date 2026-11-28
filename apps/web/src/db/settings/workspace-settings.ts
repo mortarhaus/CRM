@@ -58,6 +58,19 @@ export async function getSettings(tx: Tx, options: { forUpdate?: boolean } = {})
   return row;
 }
 
+// What the owner email on a bank or QR change formats with: the country (the QR's name), the time zone and the date
+// format; never a bank value (Bob PR 83 R1 P2). A missing row throws, as getSettings does, so the job retries.
+export async function findEmailSettings(
+  tx: Tx,
+): Promise<Pick<WorkspaceSettings, "country" | "timezone" | "dateFormat">> {
+  const [row] = await tx
+    .select({ country: workspaceSettings.country, timezone: workspaceSettings.timezone, dateFormat: workspaceSettings.dateFormat })
+    .from(workspaceSettings)
+    .where(eq(workspaceSettings.workspaceId, workspaceId()));
+  if (!row) throw new Error("workspace_settings row missing");
+  return row;
+}
+
 // Whether the workspace requires 2FA of its Admins and Owners (spec "Authentication and sessions"; ASK 9). False when
 // the row is still to be healed (the column's default).
 export async function requiresTwoFactor(tx: Tx): Promise<boolean> {

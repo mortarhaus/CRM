@@ -1,7 +1,7 @@
 import { type DateFormat, DATE_FORMATS, formatDateTime, isSupportedCountry } from "@crm/core/settings";
 import { z } from "zod";
 import { createEmailAdapter, type EmailAdapter } from "../adapters/email";
-import { BANK_DETAILS_AUDIT_ACTION, getSettings } from "../db/settings/workspace-settings";
+import { BANK_DETAILS_AUDIT_ACTION, findEmailSettings } from "../db/settings/workspace-settings";
 import { findMembership, getUserContact, getWorkspaceName } from "../db/system";
 import { withWorkspace } from "../db/workspace";
 import { renderBankDetailsChangedEmail } from "../emails/bank-details-changed";
@@ -72,7 +72,7 @@ export function bankDetailsEmailHandler(adapter: () => EmailAdapter = adapterFro
 
     const change = await withWorkspace(workspaceId, async (tx) => {
       const entry = await findAuditEntry(tx, changeId, BANK_DETAILS_AUDIT_ACTION);
-      return entry && { ...entry, settings: await getSettings(tx) };
+      return entry && { ...entry, settings: await findEmailSettings(tx) };
     });
     if (!change) throw new BankDetailsChangeNotFoundError();
 

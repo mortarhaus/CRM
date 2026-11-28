@@ -6,7 +6,7 @@ import { sqlState, startDatabase, type TestDatabase } from "../../test/postgres"
 import { createDb, type DbHandle } from "../client";
 import { organization, workspaceSettings } from "../schema";
 import { runInWorkspace } from "../workspace";
-import { findShellSettings, getSettings, StaleSettingsError, updateSettings } from "./workspace-settings";
+import { findEmailSettings, findShellSettings, getSettings, StaleSettingsError, updateSettings } from "./workspace-settings";
 
 // Phase 2 plan Tasks 4-5: the CHECKs and the settings data layer, as crm_app under RLS.
 let database: TestDatabase;
@@ -122,5 +122,21 @@ describe("findShellSettings", () => {
       .returning({ id: organization.id });
     if (!other) throw new Error("workspace not created");
     expect(await runInWorkspace(handle.db, other.id, (tx) => findShellSettings(tx))).toEqual({ brandColour: null, country: null });
+  });
+
+  // The owner email job's read (Bob PR 83 R1 P2): the three formatting fields only, never a bank value; a missing
+  // row still throws, as getSettings does, so the job fails and retries.
+  it("reads only the country, time zone and date format for the owner email, and throws for a missing row", async () => {
+    await setRaw(sql`country = 'MY', timezone = 'Asia/Kuala_Lumpur', date_format = 'dd-mmm-yyyy',
+      bank_name = 'Synthetic Bank', bank_account_holder = 'Synthetic Holder', bank_account_number = '5140123456789'`);
+    const read = await inWorkspace((tx) => findEmailSettings(tx));
+    expect(read).toEqual({ country: "MY", timezone: "Asia/Kuala_Lumpur", dateFormat: "dd-mmm-yyyy" });
+    for (const value of ["Synthetic", "5140", "6789"]) expect(JSON.stringify(read)).not.toContain(value);
+    const [other] = await handle.db
+      .insert(organization)
+      .values({ name: "no settings", slug: `no-settings-${randomUUID()}`, createdAt: new Date() })
+      .returning({ id: organization.id });
+    if (!other) throw new Error("workspace not created");
+    await expect(runInWorkspace(handle.db, other.id, (tx) => findEmailSettings(tx))).rejects.toThrow("workspace_settings row missing");
   });
 });

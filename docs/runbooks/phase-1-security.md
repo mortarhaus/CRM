@@ -224,7 +224,8 @@ reads only `DATABASE_WORKER_URL`, so it needs no email setting.
   `{ workspaceId, changeId, userId }` (the change is its audit entry; no bank value, name or address), and the job id
   is derived from the change and the Owner, so the same change never makes two jobs for one Owner. The worker reads
   the names and the address when it sends, so it needs no new setting. From the audit entry it reads only the actor,
-  the time and the changed column names (`findAuditEntry`), never a before or after value. A recipient who is no longer an Owner, or has
+  the time and the changed column names (`findAuditEntry`), never a before or after value. From the settings it reads only the
+  country, the time zone and the date format (`findEmailSettings`), never the current bank values. A recipient who is no longer an Owner, or has
   no address, is skipped: the job completes and the worker logs `{"level":"info","msg":"owner email skipped",
   "queue":"email.bank_details_changed","reason":"not_owner"|"no_address"|"no_workspace"}` (no id, no address). A
   change it cannot find fails the job (retries, then the dead-letter queue; redrive with `jobs:retry -- --queue
