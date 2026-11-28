@@ -1,4 +1,4 @@
-# Handoff — 2026-11-28 · PR 83 merged and logged, main CI passed, repo private; next: Phase 3 plan
+# Handoff — 2026-11-28 · PR 84 (Phase 3 plan) open for Bob; CI running; questions in plan section 7 not yet asked or answered
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -7,12 +7,12 @@
 
 ## 0. Active target
 - Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md`. On main: v4.7 rev 13, hash `bf633eb3850c101134e682d4cea21dcc19cd93af`, approved by Charlie 2026-11-28 (Status text still says draft). Spec and reconcile gates pass.
-- No active PR or build worktree. Log worktree: `.agent/worktrees/agent-logs`.
+- Active plan (draft, PR 84): `docs/superpowers/plans/2026-11-28-phase-3-customers-team.md`. Build worktree `.agent/worktrees/build-docs-phase-3-plan`. Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- Last merged: PR 83 2026-11-28T13:25:33Z, merge `83cea4691808c047151974f688a9f5719d3086a6`, head `8a65f4c`, no gate breach, log on agent-logs (`e9914b3`). Log gate clear. No open PR.
-- Removed after the merge: worktree `build-feat-bank-admin-view` and local branch `feat/bank-admin-view-qr-revalidate` (tip `8a65f4c`). Remote branch kept.
-- Repo `mortarhaus/CRM` made PRIVATE 2026-11-28 after main run 46149556648 passed on `83cea46` (all eight jobs, finished 13:58:34Z); no open PR.
+- PR 84 https://github.com/mortarhaus/CRM/pull/84, branch `docs/phase-3-plan`, base `83cea46`, head `6e15f54c4518ecc629efc0bcf5f69d6aa68e023c` (commits `5fd4f78`, `6e15f54`). Documents only: plan, DECISIONS entry, CLAUDE.md status line. CI run 46154989074 queued at open.
+- Repo `mortarhaus/CRM` made PUBLIC 2026-11-28 for PR 84; make private in `merged 84`.
+- Last merged: PR 83 2026-11-28T13:25:33Z, merge `83cea4691808c047151974f688a9f5719d3086a6`, no gate breach, log on agent-logs (`e9914b3`). Log gate clear.
 - GitHub order: push first, then make public.
 
 ## 2. Milestones
@@ -21,7 +21,7 @@
 - Progress artifact (https://claude.ai/artifact/6de91JGVRQedUZ9YB3z3UQ): updated after PR 83 (version 18, logo decision removed); source in this session's scratchpad `crm-progress.html` (scratchpad can be cleared: rebuild by reading the artifact with path index.html). Republish after every merged PR.
 
 ## 3. Git state
-Main checkout: `main` at `3a50c26`, behind `origin/main` `83cea46` (not pulled), untracked (not mine):
+Main checkout: `main` at `83cea46`, equal to `origin/main` (fast-forwarded 2026-11-28 at `build`), untracked (not mine):
 | Path | Status | Content hash |
 |---|---|---|
 | `.playwright-mcp/` | untracked, not mine | directory |
@@ -29,6 +29,9 @@ Main checkout: `main` at `3a50c26`, behind `origin/main` `83cea46` (not pulled),
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
 ## 4. Just finished
+2026-11-28 PR 84 opened. Sub-agent draft read in full by Andy; spot-checked spec lines, DECISIONS entries, code lines and Better Auth 1.7.14 `crud-invites.mjs` lines (after `pnpm install` in the build worktree). Corrected: dropped the bank-work question (already merged, PR 83), CI time note, composite-key line numbers, node_modules notes; added UNI-16 and UNI-19. Not run: typecheck, lint, test, build (documents only).
+2026-11-28 owner answers (question dialog). Next work: "Write Phase 3 plan (Recommended)". Model: "Opus sub-agent (Recommended)". Record both in DECISIONS in the plan PR. Sub-agent launched; draft goes to this session's scratchpad `phase3/2026-11-28-phase-3-customers-team.md`.
+2026-11-28 `build`: startup checks passed (spec gate: Round 32 Approved with conditions on `bf633eb3`; reconcile gate matches; review archive in step; log gate clear; handoff copy matched). Phase 3 plan is the next step; it is the first PR of a milestone (builder s8) and deep tier, session model Sonnet 5.5. Asked Charlie before starting.
 2026-11-28, Charlie: "yes, cleanup the worktree" (asked about PR 81's old folder). Checked: host MERGED, tip `733aae4` equals the PR head and is on origin/main, clean; removed worktree `build-docs-spec-bank-audit-qr-view` and local branch `docs/spec-bank-audit-qr-view`. Remote branch kept.
 2026-11-28 `merged 83`: merge proven (host MERGED by charliekhc, `83cea46` on origin/main, tree equals `8a65f4c`), receipt 50 s before the merge, log pushed (`e9914b3`), worktree and branch removed, progress artifact republished (version 18).
 2026-11-28 `approved 83`: Round 2 Approved, head `8a65f4c`, PR open; review archived (commit `5afec23`, blob `4945ac4`) and receipt written 2026-11-28T13:24:43Z (receipt commit `8cf9ac7`).
@@ -46,8 +49,9 @@ Main checkout: `main` at `3a50c26`, behind `origin/main` `83cea46` (not pulled),
 2026-11-28 `merged 81`. Merge proven (host state MERGED, merge `826f70d` on origin/main, parents `b0dbc52` + `733aae4`, tree equals the reviewed head); receipt before the merge; log pushed to agent-logs (`2d193cf`); progress artifact republished (version 16). A stale `CLAUDE.md` inside the agent-logs worktree (spec v4.5 era) is old branch content, not current project rules.
 
 ## 5. Next step (file-level)
+0. NOW: check CI run 46154989074; then Bob reviews PR 84 (`review 84`); Charlie answers plan section 7 (19 questions); one `fix` round can take both. G1 to G3 need a spec revision PR before PR 1, 5, 6; G4 needs Charlie. After approval: `approved 84`, merge, `merged 84`.
 1. Done 2026-11-28: repo private; handoff copy refreshed.
-2. Main checkout must be fast-forwarded to `origin/main` before the next session reads project files.
+2. Done 2026-11-28: main checkout fast-forwarded to `83cea46`.
 3. Phase 3 plan (customers and team; require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 4. Small follow-up PR: Owner saves bank details then uploads a QR without reloading, refused as stale (existing behaviour).
 5. Next docs change or setup: CLAUDE.md "Still to build" line is stale. Next spec PR: rev 13 Status label and "needs no audit code change" (spec line 100).
@@ -66,7 +70,7 @@ Main checkout: `main` at `3a50c26`, behind `origin/main` `83cea46` (not pulled),
 - Raise with Bob: Next dev mode logs arguments of the 2FA actions, incl. setup keys of throwaway e2e accounts (dev only).
 
 ## 7. Open review findings (P0/P1) and verdict
-No open PR. PR 83 merged with Round 2 Approved.
+PR 84: not reviewed yet. PR 83 merged with Round 2 Approved.
 PR 83 Round 2 (2026-11-28, Approved, head `8a65f4c`): Round 1 findings resolved, no new ones, no deferred conditions (the PR 81 Unicode condition is satisfied).
 PR 83 Round 1 (2026-11-28, Revision required, head `ad07b73`): [P1] TEN-08 self-check; [P2, before merge] notification settings projection; [P2, before merge] denial assertions. All three fixed and pushed in `8a65f4c`; CI run 46145946571 passed all eight jobs, PR body updated; waiting for Round 2.
 PR 82 Round 2 (2026-11-28, Approved with conditions, head `c51ee12`): R1 P1 and P2 resolved, no new findings; carried condition: the PR 81 Unicode audit mask, to the Bank settings Admin-view and QR revalidation implementation PR.
@@ -82,4 +86,4 @@ None blocking elsewhere. PR 80 Approved (R2), one optional P3 open: an auth smok
 None (all in PR 83's DECISIONS entries).
 
 ## 9. Files touched but not committed
-None. Draft copies of the three files are in this session's scratchpad `reconcile/` (no longer needed).
+None.
