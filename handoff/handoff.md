@@ -1,4 +1,4 @@
-# Handoff — 2026-11-28 · PR 83 open (bank settings Admin view and QR revalidation), CI running, waiting for Bob's review
+# Handoff — 2026-11-28 · PR 83 open, CI passed on `ad07b73`, waiting for Bob's review
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -10,7 +10,7 @@
 - Working folder: `.agent/worktrees/build-feat-bank-admin-view`, branch `feat/bank-admin-view-qr-revalidate` from `3a50c26`, upstream `origin/feat/bank-admin-view-qr-revalidate`. Main checkout `main` fast-forwarded to `3a50c26` on 2026-11-28. Merged worktree `.agent/worktrees/build-docs-spec-bank-audit-qr-view` (PR 81) still present. Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- OPEN: PR 83 https://github.com/mortarhaus/CRM/pull/83, head `ad07b730e153aa0e8bb8d79c8788afb9a6855562`, base `3a50c26`, 4 commits (`aafda3f` feat, `f78d05c` logo exception docs, `63d97dd` stale-entry test, `ad07b73` approval records). Body source: scratchpad `bank-pr-body.md`. CI watch running (background).
+- OPEN: PR 83 https://github.com/mortarhaus/CRM/pull/83, head `ad07b730e153aa0e8bb8d79c8788afb9a6855562`, base `3a50c26`, 4 commits (`aafda3f` feat, `f78d05c` logo exception docs, `63d97dd` stale-entry test, `ad07b73` approval records). Body source: scratchpad `bank-pr-body.md`. CI run 46137046404 on `ad07b73`: all eight jobs passed; PR body updated with it.
 - Last merged: PR 82 2026-11-28T05:37:15Z, merge `3a50c26`, head `c51ee12`, no gate breach, log on agent-logs (`f07215a`). Log gate clear.
 - Removed after the merge: worktree `build-chore-setup-reconcile-v4-7-rev13` and local branch `chore/setup-reconcile-v4-7-rev13` (tip `c51ee12`). Remote branch kept.
 - Repo `mortarhaus/CRM` PUBLIC for PR 83 (flipped 2026-11-28 after the push); make PRIVATE in `merged 83` if no other PR is open.
@@ -45,7 +45,7 @@ Main checkout: `main` at `3a50c26`, untracked (not mine):
 ## 5. Next step (file-level)
 1. Done 2026-11-28: repo private; handoff copy refreshed.
 2. Done in PR 82: PROJECT.md and CLAUDE.md reconciled; Charlie's rev 13 approval recorded in DECISIONS. Spec Status label waits for the next spec PR (it also corrects "needs no audit code change", spec line 100).
-3. PR 83: check CI; then Bob reviews (deep tier). Then `fix`, or `approved 83` before Charlie merges, `merged 83` after. After the merge, CLAUDE.md "Still to build: the bank settings Admin-view and QR revalidation change" is stale (next docs change or setup).
+3. PR 83: Bob reviews the head `ad07b73` (deep tier). Then `fix`, or `approved 83` before Charlie merges, `merged 83` after. After the merge, CLAUDE.md "Still to build: the bank settings Admin-view and QR revalidation change" is stale (next docs change or setup).
 4. Then the Phase 3 plan (require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 5. With the next CI change: PR 80 R1 P3 (Compose logs on smoke failure); skipped E2E matrix job shows raw name.
 
