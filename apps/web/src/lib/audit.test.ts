@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createDb, type DbHandle } from "../db/client";
 import { NoWorkspaceError, runInWorkspace, type Tx } from "../db/workspace";
 import { sqlState, startDatabase, type TestDatabase } from "../test/postgres";
-import { recordAudit } from "./audit";
+import { findAuditEntry, recordAudit } from "./audit";
 
 let database: TestDatabase;
 let admin: postgres.Sql;
@@ -98,5 +98,30 @@ describe("recordAudit", () => {
       await sqlState(runInWorkspace(handle.db, workspaceA, (tx) => tx.execute(sql`update audit_log set action = 'changed'`))),
     ).toBe("42501");
     expect(await sqlState(runInWorkspace(handle.db, workspaceA, (tx) => tx.execute(sql`delete from audit_log`)))).toBe("42501");
+  });
+});
+
+describe("findAuditEntry", () => {
+  it("returns the actor, the time and the changed column names only: no before or after value (synthetic values)", async () => {
+    const action = `settings.${randomUUID()}`;
+    const id = await runInWorkspace(handle.db, workspaceA, (tx) =>
+      recordAudit(tx, {
+        actorUserId: actorId,
+        action,
+        targetType: "workspace_settings",
+        targetId: workspaceA,
+        before: { bank_name: "Old Bank", bank_account_number: { last4: "1111" }, version: 1 },
+        after: { bank_name: "New Bank", bank_account_number: { last4: "6789" }, bank_account_holder: "Holder", version: 2 },
+        piiFields: ["bank_account_holder"],
+      }),
+    );
+    const entry = await runInWorkspace(handle.db, workspaceA, (tx) => findAuditEntry(tx, id, action));
+    expect(entry).toEqual({
+      actorUserId: actorId,
+      changedColumns: ["bank_account_holder", "bank_account_number", "bank_name", "version"],
+      createdAt: expect.any(Date),
+    });
+    for (const value of ["Bank", "1111", "6789", "[pii]", "Holder"]) expect(JSON.stringify(entry)).not.toContain(value);
+    expect(await runInWorkspace(handle.db, workspaceA, (tx) => findAuditEntry(tx, id, "other.action"))).toBeNull();
   });
 });

@@ -3,7 +3,7 @@ import type { TOTP } from "otpauth";
 import { totpFromUri } from "../src/test/totp";
 
 // Opens its own database connection, so it lives under src/test (TEN-10 lint).
-export { setMemberRole } from "../src/test/member-role";
+export { setMemberRole, setTwoFactorEnabled } from "../src/test/member-role";
 
 export const PASSWORD = "correct horse battery staple 42";
 

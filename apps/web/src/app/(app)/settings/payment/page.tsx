@@ -7,34 +7,45 @@ import { getSettings } from "@/db/settings/workspace-settings";
 import { withWorkspace } from "@/db/workspace";
 import { ActionRefusedError, requireWorkspaceMember } from "@/lib/auth/action";
 import {
+  BANK_ACCOUNT_HOLDER,
+  BANK_ACCOUNT_NUMBER,
+  BANK_NAME,
+  BANK_SWIFT_CODE,
+  NOT_SET,
+  PAYMENT_CHANGE_FORBIDDEN,
   PAYMENT_FORBIDDEN,
   PAYMENT_INTRO,
   PAYMENT_QR_GENERIC,
   PAYMENT_QR_NAMES,
   PAYMENT_QR_NONE,
   PAYMENT_TITLE,
+  PAYMENT_VIEW_ENROL,
   paymentQrAlt,
   STEP_UP_CONFIRMED,
   STEP_UP_ENROL,
   STEP_UP_ENROL_LINK,
 } from "@/lib/auth/messages";
 import { hasFreshStepUp } from "@/lib/auth/step-up";
+import { cn } from "@/lib/utils";
 import { paymentQrUrl } from "@/lib/uploads/payment-qr";
 import { confirmStepUp, saveBankDetails, uploadPaymentQr } from "./actions";
-import { BankDetailsForm } from "./bank-details-form";
+import { type BankDetails, BankDetailsForm } from "./bank-details-form";
 import { PaymentQrForm } from "./payment-qr-form";
 
 export const metadata: Metadata = { title: "Bank details · CRM" };
 
-// Bank details and the payment QR are Owner only, with step-up (spec lines 788 and 798). This check is for the page;
-// each action checks the role and step-up again (AUTH-02). A user without 2FA cannot step up, so they are sent to
-// enrol (plan Q16).
+// Changing the bank details and the payment QR is Owner only, with step-up; an Admin may view them, with no step-up
+// (spec "Authorization", revision 13). This check is for the page; each action checks the role and step-up again
+// (AUTH-02). Without 2FA nobody sees the values, whatever require_2fa says: an Owner cannot step up, and an Admin
+// must have 2FA on to view; both are sent to enrol (plan Q16).
 async function loadPayment() {
   try {
-    const member = await requireWorkspaceMember("owner");
+    const member = await requireWorkspaceMember("admin");
+    const isOwner = member.role === "owner";
     return await withWorkspace(member.workspaceId, async (tx) => ({
       settings: await getSettings(tx),
-      steppedUp: await hasFreshStepUp(tx, { id: member.sessionId }),
+      isOwner,
+      steppedUp: isOwner && (await hasFreshStepUp(tx, { id: member.sessionId })),
       twoFactorEnabled: member.twoFactorEnabled,
     }));
   } catch (error) {
@@ -44,6 +55,29 @@ async function loadPayment() {
     if (error.status === "TWO_FACTOR_REQUIRED") redirect("/settings/security");
     return null;
   }
+}
+
+const BANK_FIELDS = [
+  { name: "bankName", label: BANK_NAME },
+  { name: "bankAccountHolder", label: BANK_ACCOUNT_HOLDER },
+  { name: "bankAccountNumber", label: BANK_ACCOUNT_NUMBER },
+  { name: "bankSwiftCode", label: BANK_SWIFT_CODE },
+] as const;
+
+// The Admin's view: the saved values, no form and no step-up prompt.
+function BankDetailsList({ saved }: { saved: BankDetails }) {
+  return (
+    <dl className="flex max-w-sm flex-col gap-4">
+      {BANK_FIELDS.map((field) => (
+        <div key={field.name} className="flex flex-col gap-1">
+          <dt className="text-sm font-medium">{field.label}</dt>
+          <dd className={cn("break-words text-sm", saved[field.name] === null && "text-muted-foreground")}>
+            {saved[field.name] ?? NOT_SET}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 export default async function PaymentSettingsPage() {
@@ -56,7 +90,13 @@ export default async function PaymentSettingsPage() {
       </>
     );
   }
-  const { settings, steppedUp, twoFactorEnabled } = payment;
+  const { settings, isOwner, steppedUp, twoFactorEnabled } = payment;
+  const saved: BankDetails = {
+    bankName: settings.bankName,
+    bankAccountHolder: settings.bankAccountHolder,
+    bankAccountNumber: settings.bankAccountNumber,
+    bankSwiftCode: settings.bankSwiftCode,
+  };
   const qrName = settings.country && isSupportedCountry(settings.country) ? PAYMENT_QR_NAMES[settings.country] : PAYMENT_QR_GENERIC;
 
   return (
@@ -66,14 +106,16 @@ export default async function PaymentSettingsPage() {
         <p className="text-sm text-muted-foreground">{PAYMENT_INTRO}</p>
         {!twoFactorEnabled ? (
           <p className="text-sm">
-            {STEP_UP_ENROL}{" "}
+            {isOwner ? STEP_UP_ENROL : PAYMENT_VIEW_ENROL}{" "}
             <Link href="/settings/security" className="underline underline-offset-4">
               {STEP_UP_ENROL_LINK}
             </Link>
           </p>
         ) : (
           <>
-            {steppedUp ? (
+            {!isOwner ? (
+              <p className="text-sm">{PAYMENT_CHANGE_FORBIDDEN}</p>
+            ) : steppedUp ? (
               <p role="status" className="text-sm">
                 {STEP_UP_CONFIRMED}
               </p>
@@ -82,19 +124,18 @@ export default async function PaymentSettingsPage() {
             )}
             {/* Keyed by workspace (as every bound form): a workspace switch starts fresh forms, never ones holding
                 another workspace's values. Sibling keys differ, or the prompt's return would remount this form. */}
-            <BankDetailsForm
-              key={`bank:${settings.workspaceId}`}
-              action={saveBankDetails}
-              workspaceId={settings.workspaceId}
-              version={settings.version}
-              saved={{
-                bankName: settings.bankName,
-                bankAccountHolder: settings.bankAccountHolder,
-                bankAccountNumber: settings.bankAccountNumber,
-                bankSwiftCode: settings.bankSwiftCode,
-              }}
-              steppedUp={steppedUp}
-            />
+            {isOwner ? (
+              <BankDetailsForm
+                key={`bank:${settings.workspaceId}`}
+                action={saveBankDetails}
+                workspaceId={settings.workspaceId}
+                version={settings.version}
+                saved={saved}
+                steppedUp={steppedUp}
+              />
+            ) : (
+              <BankDetailsList saved={saved} />
+            )}
             <section aria-labelledby="qr-heading" className="flex flex-col gap-4 border-t border-border pt-6">
               <h2 id="qr-heading" className="text-lg font-semibold">
                 {qrName}
@@ -114,14 +155,16 @@ export default async function PaymentSettingsPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">{PAYMENT_QR_NONE}</p>
               )}
-              <PaymentQrForm
-                key={settings.workspaceId}
-                action={uploadPaymentQr}
-                version={settings.version}
-                name={qrName}
-                steppedUp={steppedUp}
-                workspaceId={settings.workspaceId}
-              />
+              {isOwner && (
+                <PaymentQrForm
+                  key={settings.workspaceId}
+                  action={uploadPaymentQr}
+                  version={settings.version}
+                  name={qrName}
+                  steppedUp={steppedUp}
+                  workspaceId={settings.workspaceId}
+                />
+              )}
             </section>
           </>
         )}

@@ -5,8 +5,6 @@ const ICON = "size-5";
 
 interface NavLinksProps {
   showAdminSettings: boolean;
-  // Bank details: Owner only (spec line 798).
-  showOwnerSettings?: boolean;
   layout: NavItemProps["layout"];
   // The phone tab bar: four 4.5rem items do not fit at 320px, so General and Branding are reached through the menu
   // drawer there.
@@ -15,9 +13,10 @@ interface NavLinksProps {
 }
 
 // The destinations that exist today, shared by the rail, the phone tab bar and the menu drawer (UNI-05: nothing
-// from a later phase). Email, General, Branding, Numbering and email Templates settings and the Catalog are Admin and Owner only (AUTH-03); each page
-// and action checks the role. Bank details are Owner only.
-export function NavLinks({ showAdminSettings, showOwnerSettings = false, layout, quick = false, className }: NavLinksProps) {
+// from a later phase). Email, General, Branding, Numbering and email Templates settings, the Catalog and Bank details
+// are Admin and Owner only (AUTH-03; an Admin views the bank details, only an Owner changes them); each page and
+// action checks the role.
+export function NavLinks({ showAdminSettings, layout, quick = false, className }: NavLinksProps) {
   return (
     <ul className={className}>
       <li>
@@ -71,7 +70,7 @@ export function NavLinks({ showAdminSettings, showOwnerSettings = false, layout,
           <NavItem href="/catalog" label="Catalog" layout={layout} icon={<Package aria-hidden className={ICON} />} />
         </li>
       )}
-      {showOwnerSettings && !quick && (
+      {showAdminSettings && !quick && (
         <li>
           <NavItem href="/settings/payment" label="Bank" layout={layout} icon={<Landmark aria-hidden className={ICON} />} />
         </li>

@@ -16,7 +16,8 @@ const BANK_DETAILS_EMAIL_QUEUE = "email.bank_details_changed";
 // z.object drops keys it does not name, so job data from a later producer version still works (EVT-03).
 const jobData = z.object({ workspaceId: z.uuid(), changeId: z.uuid(), userId: z.uuid() });
 
-// The audit entry's changed columns name the kind of change, never its value (the entry holds no full value either).
+// The audit entry's changed column names give the kind of change; the job reads only those names, never a value
+// (findAuditEntry), so no account number fragment or "[pii]" marker reaches the worker (DECISIONS 2026-11-27).
 const BANK_COLUMNS = ["bank_name", "bank_account_holder", "bank_account_number", "bank_swift_code"];
 const QR_COLUMN = "duitnow_qr_key";
 // A workspace changes its payment details only once onboarded (NOT_ONBOARDED), so both are set; these are for a row
@@ -42,8 +43,7 @@ function adapterFromEnv(): EmailAdapter {
   return workerAdapter;
 }
 
-function whatChanged(after: Record<string, unknown> | null, qrName: string): string {
-  const columns = Object.keys(after ?? {});
+function whatChanged(columns: string[], qrName: string): string {
   const kinds = [
     ...(columns.some((column) => BANK_COLUMNS.includes(column)) ? ["bank details"] : []),
     ...(columns.includes(QR_COLUMN) ? [`the ${qrName}`] : []),
@@ -99,7 +99,7 @@ export function bankDetailsEmailHandler(adapter: () => EmailAdapter = adapterFro
         isDateFormat(dateFormat) ? dateFormat : FALLBACK_DATE_FORMAT,
       ),
       changed_by: actor?.name ?? UNKNOWN_ACTOR,
-      what_changed: whatChanged(change.after, qrName),
+      what_changed: whatChanged(change.changedColumns, qrName),
     });
     await adapter().send({ to: owner.email, ...email });
   };
