@@ -216,7 +216,7 @@ Migration numbers move up by one per earlier PR that adds one (PR 2 if Q4 = dele
 
 ### PR 6b: accepting an invitation (≈350 LOC)
 
-**Guardrails:** AUTH-05, AUTH-07, AUTH-08, AUTH-12, TEN-11, UNI-09, FE-32, A11Y-03.
+**Guardrails:** AUTH-05, AUTH-07, AUTH-08, AUTH-12, TEN-11, UNI-09, UNI-16, UNI-19, FE-32, A11Y-03.
 
 - **Task 19. Accept route.** `app/(auth)/invite/[token]/page.tsx` + server action outside `action()` (no workspace yet; an `entry-points.test.ts` exempt row with reason).
   - [ ] Hash the token, load by hash; refuse with one neutral message if missing, expired, cancelled or used (AUTH-05).
@@ -235,6 +235,10 @@ Migration numbers move up by one per earlier PR that adds one (PR 2 if Q4 = dele
   - [ ] The page lists Admins and Owners without 2FA before the Owner confirms.
 - **Task 22. Tests.** Admin refused; Owner without step-up `STEP_UP_REQUIRED`; after switching on, an Admin without 2FA gets `TWO_FACTOR_REQUIRED` and lands on `/settings/security`; E2E three projects.
 - **Task 23. Close.** Done-when map (§5) evidenced; DECISIONS "Phase 3 close"; CLAUDE.md Status; Build Progress artifact (memory note).
+
+---
+
+**Every PR that changes auth, roles or a queue (5, 6a, 6b, 7)** updates its runbook in the same PR (UNI-16).
 
 ---
 
@@ -265,6 +269,7 @@ Migration numbers move up by one per earlier PR that adds one (PR 2 if Q4 = dele
 | TEN-10 | 1, 5, 6 | yes | `member`/`invitation` only via `db/system` |
 | TEN-12 | — | n-a | no bypass helper |
 | AUTH-01–AUTH-03 | 2–7 | yes | accept route is the one exempt entry point, with a reason row |
+| AUTH-04 | — | n-a | sign-up from an invitation uses the existing password hashing; no change |
 | AUTH-05 | 6b | yes | neutral refusals |
 | AUTH-06 | 6a | yes | DB counters |
 | AUTH-07 | — | n-a | no password, 2FA or email change here |
@@ -278,6 +283,8 @@ Migration numbers move up by one per earlier PR that adds one (PR 2 if Q4 = dele
 | FILE-03, FILE-04 | 4 | n-a if not stored | Q14 |
 | FILE-05, FILE-06 | 6a | yes | invitation email template |
 | EVT-01, EVT-03, EVT-05 | 2, 4, 6a | yes | event and job in the same transaction; DLQ |
+| UNI-16 | 5, 6a, 6b, 7 | yes | each updates its runbook in the same PR (`docs/runbooks/phase-1-security.md`; the new queue and its redrive in 6a) |
+| UNI-19 | 6b | yes | the accept page is new signed-out surface: listed in the runbook and `entry-points.test.ts`; Better Auth member and invitation paths stay 404 (Q7) |
 | EVT-04, EVT-07–EVT-12 | — | n-a | `PROJECT.md` §8 |
 | REC-04 | 2, 3 | yes | archive; delete only per Q4 |
 | REC-02, REC-03, REC-05–REC-12 | — | n-a | no finalized records in Phase 3 |
