@@ -2,6 +2,23 @@
 
 <!-- Committed. Newest at the top. One entry per decision. A settled decision is reopened only by the owner. -->
 
+## 2026-11-28 — The logo preview route (`/files/logo`) is an accepted FILE-04 exception
+- **Owner decision:** the builder asked Charlie on 2026-11-28: "should the logo preview be recorded as an accepted exception to the 10-minute download link rule? I recommend yes, in the next documents change." **Charlie's reply, verbatim: "yes"**, the second line of a three-line message whose other lines were "run as subagent for opus" and "build". The builder read "yes" as the answer to this question and told Charlie so.
+- **Decision:** the workspace logo preview, `GET /files/logo` (`apps/web/src/app/(app)/files/logo/route.ts`), is an accepted exception to FILE-04 ("Download via signed URLs with short expiry (≤ 10 min), `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`"). It is an authenticated same-origin route, not a signed URL, and answers with `Cache-Control: private, max-age=3600`: a browser may reuse its copy for up to an hour without the checks. Its behaviour does not change here. Every signed download keeps FILE-04 as written.
+- **Why:** the logo has been served this way since Phase 2 PR 4 (plan Q13; 2026-11-11 entry: no signed URL can carry `nosniff` on S3 or R2); `agents/PROJECT.md` §8 names the logo preview (setup reconcile, PR #82), but §9 recorded only the Bank QR route as a FILE-04 alternative. Recording it keeps §9 complete.
+- **How each affected rule's outcome is tested:**
+  - FILE-04, `attachment` and `nosniff` and the exact cache header: `apps/web/src/app/(app)/files/logo/route.test.ts:75`; in a browser, `apps/web/e2e/logo.spec.ts:69`.
+  - FILE-04, no signed URL and no bucket link: the storage adapter has no signed-URL method (`docs/runbooks/phase-2-storage.md`, "No signed URLs"); `logo.spec.ts:69` checks the image `src` is `/files/logo?id=<uuid>` with no CSP violation.
+  - The checks replacing the short expiry, at the origin: the active workspace from the session and a membership of it, another workspace refused (TEN-05, TEN-11): `route.test.ts:90`, and in a browser `logo.spec.ts:124`; signed out, old or unknown id, malformed id, storage off: `route.test.ts:102`; a stored type other than PNG or JPG: `route.test.ts:118`.
+  - No refusal is cacheable: every refusal above is asserted as a 404 with `Cache-Control: no-store`, no type and no body (`expectRefused`, `route.test.ts:52`; added with this entry).
+  - Upload rules beside it: Staff cannot upload, `logo.spec.ts:112`.
+- **Trade-offs (accepted):** for up to an hour, the logo copy in a browser may be seen without the checks by anyone using that browser profile, also after sign-out or removal. The logo is workspace branding, not payment or personal data. No `must-revalidate`: a stale copy may be reused by a disconnected browser (RFC 9111 §4.2.4); not asked, so not changed.
+- **Alternatives rejected:** a signed URL to the bucket (no `nosniff` on S3 or R2, and `img-src` would need the storage host); `no-store` (refetches the logo on every page view, not asked).
+- **Scope / affects:** `agents/PROJECT.md` §9 ("Accepted spec exceptions to kit rules"); `apps/web/src/app/(app)/files/logo/route.test.ts` (refusal assertions). No change to the route. Review: with the FILE-03 and Bank QR review at the Phase 4 gate.
+- **Versions:** none.
+- **Exception to a rule?** yes, FILE-04 (owner-accepted, above).
+- **Decided by:** owner (Charlie, 2026-11-28, "yes"). Builder: the wording and the test mapping.
+
 ## 2026-11-28 — Bank settings: Admin view, QR route for Admin and Owner with 2FA and `must-revalidate`, audit mask by code point (spec revision 13 build)
 - **Decision:** the code follow-ups of spec v4.7 revision 13 (2026-11-27 revision 10 to 13 entry, "After approval and merge, these must follow"; 2026-11-28 approval entry, deferred condition):
   - `/settings/payment`: an Admin with 2FA sees the saved bank details (a description list) and the current QR, view only, with no step-up prompt and no forms; an Owner keeps the forms and step-up; an Admin or Owner without 2FA sees no values and no QR, whatever `require_2fa` says; Staff are refused. The Bank link shows for Admins and Owners (`showOwnerSettings` removed from the shell). Every change action stays `minRole: "owner"` with step-up.
