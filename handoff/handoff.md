@@ -1,4 +1,4 @@
-# Handoff — 2026-11-28 · PR 81 merged and logged, main CI passed, repo private again; next: new conversation (`/clear`), then `setup`
+# Handoff — 2026-11-28 · `setup` reconcile to spec rev 13 open as PR 82 (head `8b87dba`), CI passed; next: Bob `review 82`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -6,13 +6,14 @@
 <!-- Fixed sections 0–10. Don't add, rename or renumber sections. -->
 
 ## 0. Active target
-- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md`. On main: v4.7 rev 13, hash `bf633eb3850c101134e682d4cea21dcc19cd93af`, approved by Charlie 2026-11-28 (Status text still says draft). No open PR.
-- Working folder: main checkout on `main` (local `b0dbc52`, behind `origin/main` `826f70d`; not pulled). Merged build worktree `.agent/worktrees/build-docs-spec-bank-audit-qr-view` still present. Log worktree: `.agent/worktrees/agent-logs`.
+- Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md`. On main: v4.7 rev 13, hash `bf633eb3850c101134e682d4cea21dcc19cd93af`, approved by Charlie 2026-11-28 (Status text still says draft).
+- Working folder: `.agent/worktrees/build-chore-setup-reconcile-v4-7-rev13` (branch `chore/setup-reconcile-v4-7-rev13`). Main checkout on `main`, local `b0dbc52`, behind `origin/main` `826f70d`; not pulled. Merged worktree `.agent/worktrees/build-docs-spec-bank-audit-qr-view` still present.
 
 ## 1. Current PR / branch
-- Last merged: PR 81 2026-11-28T03:19:01Z, merge `826f70d`, head `733aae4`, no gate breach, log on agent-logs (`2d193cf`). Log gate clear.
-- Repo `mortarhaus/CRM` made PRIVATE 2026-11-28 after main run 46102264079 passed on `826f70d` (all eight jobs, finished 03:50:22Z); no open PR.
-- GitHub order: push first, then make public (a push right after the switch returned 403 "Repository is disabled" twice on 2026-11-26; cause unverified).
+- Open: PR 82 "docs: setup reconcile to spec v4.7 revision 13", base `main`, head `8b87dba1ac3b1bc3a070dfc4b4f2ffab81cc2a06`, CI run 46108440925 passed (four jobs; image and E2E skipped, docs only); waiting for Bob.
+- Repo `mortarhaus/CRM` made PUBLIC 2026-11-28 for PR 82's CI; make PRIVATE after it merges (`merged 82`) if no other PR is open.
+- GitHub order: push first, then make public.
+- Last merged: PR 81 (`826f70d`), logged, no gate breach.
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1; Phase 2 (closed 2026-11-26 by PR 79; DECISIONS "2026-11-26 — Phase 2 close" holds evidence and carried items).
@@ -20,31 +21,25 @@
 - Progress artifact (https://claude.ai/artifact/6de91JGVRQedUZ9YB3z3UQ): updated after PR 81 (version 16, `1795836014-ee39`); source in this session's scratchpad `crm-progress.html` (scratchpad can be cleared: rebuild by reading the artifact with path index.html). Republish after every merged PR.
 
 ## 3. Git state
-Main checkout:
-```
-## main  (local b0dbc52; origin/main 826f70d)
-?? .playwright-mcp/
-?? docker/sync-export.sh
-?? docker/sync-import.sh
-```
+Build worktree: HEAD `8b87dba`, clean, tracks `origin/chore/setup-reconcile-v4-7-rev13`.
+Main checkout: `main` at `b0dbc52`, untracked (not mine):
 | Path | Status | Content hash |
 |---|---|---|
 | `.playwright-mcp/` | untracked, not mine | directory |
 | `docker/sync-export.sh` | untracked, not mine | `51dcde23b372ecaaf041cea716ec3f95fa70226a` |
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
-Build worktree (merged branch): HEAD `733aae4`, clean.
-
 ## 4. Just finished
+2026-11-28 PR 82 opened; CI passed on `8b87dba`; PR body UNI-07 and UNI-13 rows filled. Opus draft checked by Sonnet 5.5, with two wording changes (CLAUDE.md next step; DECISIONS builder note on spec line 100). Local typecheck, lint, test and build not run (docs only).
+2026-11-28 `setup` started. Owner answer on the model (asked: switch to Opus, or continue on Sonnet 5.5): "subagent on opus". Worktree `.agent/worktrees/build-chore-setup-reconcile-v4-7-rev13`, branch `chore/setup-reconcile-v4-7-rev13` from `826f70d` (no upstream set), nothing changed in it yet. Opus 5.5 sub-agent drafting in this session's scratchpad `reconcile/` (copies of PROJECT.md, CLAUDE.md, DECISIONS.md); next: review its diff, apply, check, commit, PR. Log gate clear (no merged PR after #3 without a log).
 2026-11-28 `merged 81`. Merge proven (host state MERGED, merge `826f70d` on origin/main, parents `b0dbc52` + `733aae4`, tree equals the reviewed head); receipt before the merge; log pushed to agent-logs (`2d193cf`); progress artifact republished (version 16). A stale `CLAUDE.md` inside the agent-logs worktree (spec v4.5 era) is old branch content, not current project rules.
 
 ## 5. Next step (file-level)
-1. Done 2026-11-28: repo private; handoff copy refreshed.
-2. Charlie runs `setup` (reconcile PROJECT.md incl. section 11 "line 803" item and the Phase 7 gate, and CLAUDE.md, to spec `bf633eb3`).
-3. In that or the next reviewed PR: record Charlie's approval in `docs/DECISIONS.md` ("I approve spec revision 13", 2026-11-28, Andy session, after `approved 81`, before the merge) and relabel the spec Status.
-4. Implementation PR (Bank settings Admin-view and QR revalidation): QR route `must-revalidate`; Admin view with 2FA check; Unicode-safe audit mask (4 whole code points) with a synthetic test on a settings change; owner email job reads changed column names only; optional mask tests and two comment fixes. The `last4` shape stays.
-5. Then the Phase 3 plan (require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
-6. With the next CI change: PR 80 R1 P3 (Compose logs on smoke failure); skipped E2E matrix job shows raw name.
+1. Charlie runs `review 82` in a reviewer window; then `approved 82`, merge, `merged 82` (repo private again).
+2. Done in PR 82: PROJECT.md and CLAUDE.md reconciled; Charlie's rev 13 approval recorded in DECISIONS. Spec Status label waits for the next spec PR (it also corrects "needs no audit code change", spec line 100).
+3. Implementation PR (Bank settings Admin-view and QR revalidation): QR route `must-revalidate`; Admin view with 2FA check; Unicode-safe audit mask (4 whole code points) with a synthetic test on a settings change; owner email job reads changed column names only; optional mask tests and two comment fixes. The `last4` shape stays.
+4. Then the Phase 3 plan (require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
+5. With the next CI change: PR 80 R1 P3 (Compose logs on smoke failure); skipped E2E matrix job shows raw name.
 
 ## 6. Open ASK items, blockers, and owner answers
 - 2026-11-28 11:42: this conversation (session `c0de8f2c`) is open in three running windows (the CRM one, one other busy and one other idle), seen in `~/.claude/sessions/`. Charlie asked what that meant. Advised: after the repo is private, start a new conversation here (`/clear`), then `setup`. Do not touch the other windows.
@@ -66,7 +61,7 @@ Spec Round 30 (2026-11-27, Revision required, on rev 11): [P1] cache policy, [P2
 None blocking elsewhere. PR 80 Approved (R2), one optional P3 open: an auth smoke failure after the stack starts shows no Compose logs (ci.yml image job). PR 79 Approved (R2). Builder suggestion, not decided: weigh the QR route's cache at the Phase 4 FILE-03 review. Residuals: catalog form action state may carry to another service across Edit links (source reading only); two unexplained CATALOG_FAILED results in flaky local runs; new catalog browser tests desktop Chromium only; PR 77 no stale-workspace no-JS e2e, no test races two first template saves, cold-dev-server accessibility.spec failures unverified. Older optional P3s: PR 73 non-ASCII upper-casing in shortCode; PR 74 DB currency list vs code table test, edit link for a missing service, long name at 320 px e2e; PR 72 clock option, preview timing, time zone pause.
 
 ## 8. Decisions made this session, not yet in the decisions log
-- Charlie's approval of spec rev 13 (2026-11-28, verbatim in section 5): not yet in `docs/DECISIONS.md`.
+- none (rev 13 approval is in PR 82's DECISIONS entry).
 
 ## 9. Files touched but not committed
-None of mine (build worktree clean at `733aae4`). Local `.env` and `.agent/q23-email-templates.md` are gitignored.
+None. Draft copies of the three files are in this session's scratchpad `reconcile/` (no longer needed).
