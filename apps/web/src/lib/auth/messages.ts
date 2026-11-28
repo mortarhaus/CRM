@@ -215,7 +215,7 @@ export const STEP_UP_ENROL_LINK = "Go to Security settings";
 // workspace country; a workspace without a country cannot reach this page (onboarding comes first).
 export const PAYMENT_TITLE = "Bank details";
 export const PAYMENT_INTRO = "The bank account clients pay into. Every Owner is notified when it changes.";
-// Admins view only, with 2FA on (spec revision 13; builder copy, to be confirmed by Charlie).
+// Admins view only, with 2FA on (spec revision 13; wording confirmed by Charlie, 2026-11-28).
 export const PAYMENT_FORBIDDEN = "Only an Admin or Owner can see the bank details.";
 export const PAYMENT_CHANGE_FORBIDDEN = "Only an Owner can change the bank details.";
 export const PAYMENT_VIEW_ENROL = "Turn on two-factor authentication to see these details.";
