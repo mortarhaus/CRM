@@ -7,7 +7,7 @@
 
 ## 0. Active target
 - Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md`. On main: v4.7 rev 13, hash `bf633eb3850c101134e682d4cea21dcc19cd93af`, approved by Charlie 2026-11-28 (Status text still says draft). Spec and reconcile gates pass.
-- No active PR or build worktree. Merged worktree `.agent/worktrees/build-docs-spec-bank-audit-qr-view` (PR 81) still present. Log worktree: `.agent/worktrees/agent-logs`.
+- No active PR or build worktree. Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
 - Last merged: PR 83 2026-11-28T13:25:33Z, merge `83cea4691808c047151974f688a9f5719d3086a6`, head `8a65f4c`, no gate breach, log on agent-logs (`e9914b3`). Log gate clear. No open PR.
@@ -29,6 +29,7 @@ Main checkout: `main` at `3a50c26`, behind `origin/main` `83cea46` (not pulled),
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
 ## 4. Just finished
+2026-11-28, Charlie: "yes, cleanup the worktree" (asked about PR 81's old folder). Checked: host MERGED, tip `733aae4` equals the PR head and is on origin/main, clean; removed worktree `build-docs-spec-bank-audit-qr-view` and local branch `docs/spec-bank-audit-qr-view`. Remote branch kept.
 2026-11-28 `merged 83`: merge proven (host MERGED by charliekhc, `83cea46` on origin/main, tree equals `8a65f4c`), receipt 50 s before the merge, log pushed (`e9914b3`), worktree and branch removed, progress artifact republished (version 18).
 2026-11-28 `approved 83`: Round 2 Approved, head `8a65f4c`, PR open; review archived (commit `5afec23`, blob `4945ac4`) and receipt written 2026-11-28T13:24:43Z (receipt commit `8cf9ac7`).
 2026-11-28 R1 fixes: sub-agent ran bank-details E2E 15/15 and two mutation checks; Andy read the diff, reran typecheck, lint, test (83 files, 1543 passed, 1 skipped) and build: exit 0. Committed, pushed, PR body updated.
