@@ -1,4 +1,4 @@
-# Handoff — 2026-11-28 · PR 83 Round 1 fixes pushed (`8a65f4c`), CI running, then Bob re-reviews
+# Handoff — 2026-11-28 · PR 83 Round 1 fixed, CI passed on `8a65f4c`, waiting for Bob's Round 2
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -47,7 +47,7 @@ Main checkout: `main` at `3a50c26`, untracked (not mine):
 ## 5. Next step (file-level)
 1. Done 2026-11-28: repo private; handoff copy refreshed.
 2. Done in PR 82: PROJECT.md and CLAUDE.md reconciled; Charlie's rev 13 approval recorded in DECISIONS. Spec Status label waits for the next spec PR (it also corrects "needs no audit code change", spec line 100).
-3. PR 83: confirm CI on `8a65f4c` (background watch), add the run id to the PR body, then Bob re-reviews (deep tier). Then `fix`, or `approved 83` before Charlie merges, `merged 83` after. After the merge, CLAUDE.md "Still to build: the bank settings Admin-view and QR revalidation change" is stale (next docs change or setup).
+3. PR 83: Bob re-reviews the head `8a65f4c` (deep tier). Then `fix`, or `approved 83` before Charlie merges, `merged 83` after. After the merge, CLAUDE.md "Still to build: the bank settings Admin-view and QR revalidation change" is stale (next docs change or setup).
 4. Then the Phase 3 plan (require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 5. With the next CI change: PR 80 R1 P3 (Compose logs on smoke failure); skipped E2E matrix job shows raw name.
 
@@ -64,7 +64,7 @@ Main checkout: `main` at `3a50c26`, untracked (not mine):
 - Raise with Bob: Next dev mode logs arguments of the 2FA actions, incl. setup keys of throwaway e2e accounts (dev only).
 
 ## 7. Open review findings (P0/P1) and verdict
-PR 83 Round 1 (2026-11-28, Revision required, head `ad07b73`): [P1] TEN-08 self-check; [P2, before merge] notification settings projection; [P2, before merge] denial assertions. All three fixed and pushed in `8a65f4c`; waiting for CI and Round 2.
+PR 83 Round 1 (2026-11-28, Revision required, head `ad07b73`): [P1] TEN-08 self-check; [P2, before merge] notification settings projection; [P2, before merge] denial assertions. All three fixed and pushed in `8a65f4c`; CI run 46145946571 passed all eight jobs, PR body updated; waiting for Round 2.
 PR 82 Round 2 (2026-11-28, Approved with conditions, head `c51ee12`): R1 P1 and P2 resolved, no new findings; carried condition: the PR 81 Unicode audit mask, to the Bank settings Admin-view and QR revalidation implementation PR.
 PR 82 Round 1 (2026-11-28, Revision required): [P1] record the authorization check (AUTH-03 row) for the QR alternative; [P2, before merge] storage summary and the logo preview. Both fixed at `c51ee12` (P1 in the PR body), resolved in Round 2.
 PR 81 Round 3 (2026-11-28, Approved with conditions, head `733aae4`): R1 P1 resolved; Unicode audit-mask P2 deferred. Nothing blocking from review.
