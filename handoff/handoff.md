@@ -1,4 +1,4 @@
-# Handoff — 2026-11-28 · PR 83 approved and receipt recorded; waiting for Charlie to merge, then `merged 83`
+# Handoff — 2026-11-28 · PR 83 merged and logged; waiting for main CI run 46149556648, then repo private; next: Phase 3 plan
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -7,23 +7,21 @@
 
 ## 0. Active target
 - Active spec path: `docs/superpowers/specs/2026-09-27-core-sales-design.md`. On main: v4.7 rev 13, hash `bf633eb3850c101134e682d4cea21dcc19cd93af`, approved by Charlie 2026-11-28 (Status text still says draft). Spec and reconcile gates pass.
-- Working folder: `.agent/worktrees/build-feat-bank-admin-view`, branch `feat/bank-admin-view-qr-revalidate` from `3a50c26`, upstream `origin/feat/bank-admin-view-qr-revalidate`. Main checkout `main` fast-forwarded to `3a50c26` on 2026-11-28. Merged worktree `.agent/worktrees/build-docs-spec-bank-audit-qr-view` (PR 81) still present. Log worktree: `.agent/worktrees/agent-logs`.
+- No active PR or build worktree. Merged worktree `.agent/worktrees/build-docs-spec-bank-audit-qr-view` (PR 81) still present. Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- OPEN: PR 83 https://github.com/mortarhaus/CRM/pull/83, head `8a65f4c276415c63978ad97e3d576fda36f400e2`, base `3a50c26`, 7 commits: R1 fixes `c33b076`, `b3a0a99`, `8a65f4c` on top of (`aafda3f` feat, `f78d05c` logo exception docs, `63d97dd` stale-entry test, `ad07b73` approval records). Body source: scratchpad `bank-pr-body.md`. CI run 46137046404 on `ad07b73`: all eight jobs passed; PR body updated with it.
-- Last merged: PR 82 2026-11-28T05:37:15Z, merge `3a50c26`, head `c51ee12`, no gate breach, log on agent-logs (`f07215a`). Log gate clear.
-- Removed after the merge: worktree `build-chore-setup-reconcile-v4-7-rev13` and local branch `chore/setup-reconcile-v4-7-rev13` (tip `c51ee12`). Remote branch kept.
-- Repo `mortarhaus/CRM` PUBLIC for PR 83 (flipped 2026-11-28 after the push); make PRIVATE in `merged 83` if no other PR is open.
+- Last merged: PR 83 2026-11-28T13:25:33Z, merge `83cea4691808c047151974f688a9f5719d3086a6`, head `8a65f4c`, no gate breach, log on agent-logs (`e9914b3`). Log gate clear. No open PR.
+- Removed after the merge: worktree `build-feat-bank-admin-view` and local branch `feat/bank-admin-view-qr-revalidate` (tip `8a65f4c`). Remote branch kept.
+- Repo `mortarhaus/CRM` PUBLIC until main CI run 46149556648 passes, then PRIVATE.
 - GitHub order: push first, then make public.
 
 ## 2. Milestones
 - Done: Phase 0; Phase 1; Phase 2 (closed 2026-11-26 by PR 79; DECISIONS "2026-11-26 — Phase 2 close" holds evidence and carried items).
-- Done: E2E job split (PR 80). Spec PR 81 (rev 13) and setup reconcile PR 82 merged 2026-11-28. Next: bank settings implementation PR, then the Phase 3 plan (customers and team).
-- Progress artifact (https://claude.ai/artifact/6de91JGVRQedUZ9YB3z3UQ): updated after PR 82 (version 17); source in this session's scratchpad `crm-progress.html` (scratchpad can be cleared: rebuild by reading the artifact with path index.html). Republish after every merged PR.
+- Done: E2E job split (PR 80). Spec PR 81 (rev 13) and setup reconcile PR 82 merged 2026-11-28. Bank settings follow-up merged 2026-11-28 (PR 83). Next: the Phase 3 plan (customers and team).
+- Progress artifact (https://claude.ai/artifact/6de91JGVRQedUZ9YB3z3UQ): updated after PR 83 (version 18, logo decision removed); source in this session's scratchpad `crm-progress.html` (scratchpad can be cleared: rebuild by reading the artifact with path index.html). Republish after every merged PR.
 
 ## 3. Git state
-Build worktree `.agent/worktrees/build-feat-bank-admin-view`: HEAD `8a65f4c`, clean.
-Main checkout: `main` at `3a50c26`, untracked (not mine):
+Main checkout: `main` at `3a50c26`, behind `origin/main` `83cea46` (not pulled), untracked (not mine):
 | Path | Status | Content hash |
 |---|---|---|
 | `.playwright-mcp/` | untracked, not mine | directory |
@@ -31,6 +29,7 @@ Main checkout: `main` at `3a50c26`, untracked (not mine):
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
 ## 4. Just finished
+2026-11-28 `merged 83`: merge proven (host MERGED by charliekhc, `83cea46` on origin/main, tree equals `8a65f4c`), receipt 50 s before the merge, log pushed (`e9914b3`), worktree and branch removed, progress artifact republished (version 18).
 2026-11-28 `approved 83`: Round 2 Approved, head `8a65f4c`, PR open; review archived (commit `5afec23`, blob `4945ac4`) and receipt written 2026-11-28T13:24:43Z (receipt commit `8cf9ac7`).
 2026-11-28 R1 fixes: sub-agent ran bank-details E2E 15/15 and two mutation checks; Andy read the diff, reran typecheck, lint, test (83 files, 1543 passed, 1 skipped) and build: exit 0. Committed, pushed, PR body updated.
 2026-11-28 `fix`: PR 83 Round 1 (Revision required, head `ad07b73`) archived on agent-logs (`5a5e723`, blob `54f59b66`). Preflight: build worktree clean at `ad07b73`. Findings: [P1] no TEN-08 self-check row (add a same-id lookup from the second workspace to the audit test); [P2, before merge] the email job still reads the whole settings row, limit it to country, time zone, date format; [P2, before merge] denied Bank views must assert the saved values are absent. Next: check the sub-agent's diff, commit, push, update PR body, watch CI.
@@ -46,15 +45,16 @@ Main checkout: `main` at `3a50c26`, untracked (not mine):
 2026-11-28 `merged 81`. Merge proven (host state MERGED, merge `826f70d` on origin/main, parents `b0dbc52` + `733aae4`, tree equals the reviewed head); receipt before the merge; log pushed to agent-logs (`2d193cf`); progress artifact republished (version 16). A stale `CLAUDE.md` inside the agent-logs worktree (spec v4.5 era) is old branch content, not current project rules.
 
 ## 5. Next step (file-level)
-1. Done 2026-11-28: repo private; handoff copy refreshed.
-2. Done in PR 82: PROJECT.md and CLAUDE.md reconciled; Charlie's rev 13 approval recorded in DECISIONS. Spec Status label waits for the next spec PR (it also corrects "needs no audit code change", spec line 100).
-3. PR 83: Charlie merges, then `merged 83` (log, cleanup, repo private, progress artifact). Then `fix`, or `approved 83` before Charlie merges, `merged 83` after. After the merge, CLAUDE.md "Still to build: the bank settings Admin-view and QR revalidation change" is stale (next docs change or setup).
-4. Then the Phase 3 plan (require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
-5. With the next CI change: PR 80 R1 P3 (Compose logs on smoke failure); skipped E2E matrix job shows raw name.
+1. When main CI run 46149556648 passes: repo private, refresh the handoff copy.
+2. Main checkout must be fast-forwarded to `origin/main` before the next session reads project files.
+3. Phase 3 plan (customers and team; require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
+4. Small follow-up PR: Owner saves bank details then uploads a QR without reloading, refused as stale (existing behaviour).
+5. Next docs change or setup: CLAUDE.md "Still to build" line is stale. Next spec PR: rev 13 Status label and "needs no audit code change" (spec line 100).
+6. With the next CI change: PR 80 R1 P3 (Compose logs on smoke failure); skipped E2E matrix job shows raw name.
 
 ## 6. Open ASK items, blockers, and owner answers
 - ANSWERED 2026-11-28: logo preview accepted as a FILE-04 exception ("yes"); recorded in PROJECT.md section 9 and DECISIONS in PR 83 (`f78d05c`).
-- Found during the PR 83 build, not changed (not yet raised as work): (a) saving bank details then uploading a QR without reloading is refused as stale (existing Owner behaviour on main); worth a follow-up. (b) root `.env` DB credentials do not match the dev compose stack (E2E used the committed dev-only URLs as process env). (c) container `tt-1d3-pg` is running, not started by this project's build; left alone.
+- Found during the PR 83 build, not changed (not yet raised as work): (a) the stale-version bug (section 5 item 4). (b) root `.env` DB credentials do not match the dev compose stack (E2E used the committed dev-only URLs as process env). (c) container `tt-1d3-pg` is running, not started by this project's build; left alone.
 - ASK before the Phase 7 plan: confirm the client link 30-day default (spec Current gates (e)).
 - Superseded 2026-11-27 (Charlie chose "1" on Round 31): the full-account-number points told to Charlie no longer apply. Still open: he may correct the builder reading that the QR stays recorded as its storage key.
 - Bob ruled in spec Round 32 (see section 7).
@@ -65,6 +65,7 @@ Main checkout: `main` at `3a50c26`, untracked (not mine):
 - Raise with Bob: Next dev mode logs arguments of the 2FA actions, incl. setup keys of throwaway e2e accounts (dev only).
 
 ## 7. Open review findings (P0/P1) and verdict
+No open PR. PR 83 merged with Round 2 Approved.
 PR 83 Round 2 (2026-11-28, Approved, head `8a65f4c`): Round 1 findings resolved, no new ones, no deferred conditions (the PR 81 Unicode condition is satisfied).
 PR 83 Round 1 (2026-11-28, Revision required, head `ad07b73`): [P1] TEN-08 self-check; [P2, before merge] notification settings projection; [P2, before merge] denial assertions. All three fixed and pushed in `8a65f4c`; CI run 46145946571 passed all eight jobs, PR body updated; waiting for Round 2.
 PR 82 Round 2 (2026-11-28, Approved with conditions, head `c51ee12`): R1 P1 and P2 resolved, no new findings; carried condition: the PR 81 Unicode audit mask, to the Bank settings Admin-view and QR revalidation implementation PR.
