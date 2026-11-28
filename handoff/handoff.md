@@ -1,4 +1,4 @@
-# Handoff — 2026-11-28 · PR 84 (Phase 3 plan) open for Bob; CI running; questions in plan section 7 not yet asked or answered
+# Handoff — 2026-11-28 · PR 84 (Phase 3 plan) open for Bob; CI passed; asked Charlie plan section 7 (19 questions), not yet answered
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -10,7 +10,7 @@
 - Active plan (draft, PR 84): `docs/superpowers/plans/2026-11-28-phase-3-customers-team.md`. Build worktree `.agent/worktrees/build-docs-phase-3-plan`. Log worktree: `.agent/worktrees/agent-logs`.
 
 ## 1. Current PR / branch
-- PR 84 https://github.com/mortarhaus/CRM/pull/84, branch `docs/phase-3-plan`, base `83cea46`, head `6e15f54c4518ecc629efc0bcf5f69d6aa68e023c` (commits `5fd4f78`, `6e15f54`). Documents only: plan, DECISIONS entry, CLAUDE.md status line. CI run 46154989074 queued at open.
+- PR 84 https://github.com/mortarhaus/CRM/pull/84, branch `docs/phase-3-plan`, base `83cea46`, head `6e15f54c4518ecc629efc0bcf5f69d6aa68e023c` (commits `5fd4f78`, `6e15f54`). Documents only: plan, DECISIONS entry, CLAUDE.md status line. CI run 46154989074 passed 2026-11-28 on `6e15f54` (checks, audit, secret scan, changed files; image and E2E skipped, documents only); PR body UNI-07 and UNI-13 rows filled.
 - Repo `mortarhaus/CRM` made PUBLIC 2026-11-28 for PR 84; make private in `merged 84`.
 - Last merged: PR 83 2026-11-28T13:25:33Z, merge `83cea4691808c047151974f688a9f5719d3086a6`, no gate breach, log on agent-logs (`e9914b3`). Log gate clear.
 - GitHub order: push first, then make public.
@@ -49,7 +49,7 @@ Main checkout: `main` at `83cea46`, equal to `origin/main` (fast-forwarded 2026-
 2026-11-28 `merged 81`. Merge proven (host state MERGED, merge `826f70d` on origin/main, parents `b0dbc52` + `733aae4`, tree equals the reviewed head); receipt before the merge; log pushed to agent-logs (`2d193cf`); progress artifact republished (version 16). A stale `CLAUDE.md` inside the agent-logs worktree (spec v4.5 era) is old branch content, not current project rules.
 
 ## 5. Next step (file-level)
-0. NOW: check CI run 46154989074; then Bob reviews PR 84 (`review 84`); Charlie answers plan section 7 (19 questions); one `fix` round can take both. G1 to G3 need a spec revision PR before PR 1, 5, 6; G4 needs Charlie. After approval: `approved 84`, merge, `merged 84`.
+0. NOW: waiting for Charlie's answers to plan section 7 (asked in the reply of 2026-11-28 22:30: "accept all" or numbers to change; recommended answering before Bob reviews). Record answers in DECISIONS and plan section 7 on the same branch, then Bob reviews PR 84. G1 to G3 need a spec revision PR before PR 1, 5, 6; G4 needs Charlie. After approval: `approved 84`, merge, `merged 84`.
 1. Done 2026-11-28: repo private; handoff copy refreshed.
 2. Done 2026-11-28: main checkout fast-forwarded to `83cea46`.
 3. Phase 3 plan (customers and team; require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
