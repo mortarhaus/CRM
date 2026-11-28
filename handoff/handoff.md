@@ -1,4 +1,4 @@
-# Handoff — 2026-11-28 · PR 83 Round 1 fixed, CI passed on `8a65f4c`, waiting for Bob's Round 2
+# Handoff — 2026-11-28 · PR 83 approved and receipt recorded; waiting for Charlie to merge, then `merged 83`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -31,6 +31,7 @@ Main checkout: `main` at `3a50c26`, untracked (not mine):
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
 ## 4. Just finished
+2026-11-28 `approved 83`: Round 2 Approved, head `8a65f4c`, PR open; review archived (commit `5afec23`, blob `4945ac4`) and receipt written 2026-11-28T13:24:43Z (receipt commit `8cf9ac7`).
 2026-11-28 R1 fixes: sub-agent ran bank-details E2E 15/15 and two mutation checks; Andy read the diff, reran typecheck, lint, test (83 files, 1543 passed, 1 skipped) and build: exit 0. Committed, pushed, PR body updated.
 2026-11-28 `fix`: PR 83 Round 1 (Revision required, head `ad07b73`) archived on agent-logs (`5a5e723`, blob `54f59b66`). Preflight: build worktree clean at `ad07b73`. Findings: [P1] no TEN-08 self-check row (add a same-id lookup from the second workspace to the audit test); [P2, before merge] the email job still reads the whole settings row, limit it to country, time zone, date format; [P2, before merge] denied Bank views must assert the saved values are absent. Next: check the sub-agent's diff, commit, push, update PR body, watch CI.
 2026-11-28 PR 83 opened. Owner answers before opening (asked by question dialog): new Admin-view wording, three messages: "Use all three (Recommended)"; add `undici` 8.12.3 as a test-only dependency: "Add it (Recommended)". Both recorded in DECISIONS (`ad07b73`). Andy reran lint and typecheck after that commit: ok.
@@ -47,7 +48,7 @@ Main checkout: `main` at `3a50c26`, untracked (not mine):
 ## 5. Next step (file-level)
 1. Done 2026-11-28: repo private; handoff copy refreshed.
 2. Done in PR 82: PROJECT.md and CLAUDE.md reconciled; Charlie's rev 13 approval recorded in DECISIONS. Spec Status label waits for the next spec PR (it also corrects "needs no audit code change", spec line 100).
-3. PR 83: Bob re-reviews the head `8a65f4c` (deep tier). Then `fix`, or `approved 83` before Charlie merges, `merged 83` after. After the merge, CLAUDE.md "Still to build: the bank settings Admin-view and QR revalidation change" is stale (next docs change or setup).
+3. PR 83: Charlie merges, then `merged 83` (log, cleanup, repo private, progress artifact). Then `fix`, or `approved 83` before Charlie merges, `merged 83` after. After the merge, CLAUDE.md "Still to build: the bank settings Admin-view and QR revalidation change" is stale (next docs change or setup).
 4. Then the Phase 3 plan (require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 5. With the next CI change: PR 80 R1 P3 (Compose logs on smoke failure); skipped E2E matrix job shows raw name.
 
@@ -64,6 +65,7 @@ Main checkout: `main` at `3a50c26`, untracked (not mine):
 - Raise with Bob: Next dev mode logs arguments of the 2FA actions, incl. setup keys of throwaway e2e accounts (dev only).
 
 ## 7. Open review findings (P0/P1) and verdict
+PR 83 Round 2 (2026-11-28, Approved, head `8a65f4c`): Round 1 findings resolved, no new ones, no deferred conditions (the PR 81 Unicode condition is satisfied).
 PR 83 Round 1 (2026-11-28, Revision required, head `ad07b73`): [P1] TEN-08 self-check; [P2, before merge] notification settings projection; [P2, before merge] denial assertions. All three fixed and pushed in `8a65f4c`; CI run 46145946571 passed all eight jobs, PR body updated; waiting for Round 2.
 PR 82 Round 2 (2026-11-28, Approved with conditions, head `c51ee12`): R1 P1 and P2 resolved, no new findings; carried condition: the PR 81 Unicode audit mask, to the Bank settings Admin-view and QR revalidation implementation PR.
 PR 82 Round 1 (2026-11-28, Revision required): [P1] record the authorization check (AUTH-03 row) for the QR alternative; [P2, before merge] storage summary and the logo preview. Both fixed at `c51ee12` (P1 in the PR body), resolved in Round 2.
