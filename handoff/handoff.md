@@ -1,4 +1,4 @@
-# Handoff — 2026-11-28 · PR 83 merged and logged; waiting for main CI run 46149556648, then repo private; next: Phase 3 plan
+# Handoff — 2026-11-28 · PR 83 merged and logged, main CI passed, repo private; next: Phase 3 plan
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -12,7 +12,7 @@
 ## 1. Current PR / branch
 - Last merged: PR 83 2026-11-28T13:25:33Z, merge `83cea4691808c047151974f688a9f5719d3086a6`, head `8a65f4c`, no gate breach, log on agent-logs (`e9914b3`). Log gate clear. No open PR.
 - Removed after the merge: worktree `build-feat-bank-admin-view` and local branch `feat/bank-admin-view-qr-revalidate` (tip `8a65f4c`). Remote branch kept.
-- Repo `mortarhaus/CRM` PUBLIC until main CI run 46149556648 passes, then PRIVATE.
+- Repo `mortarhaus/CRM` made PRIVATE 2026-11-28 after main run 46149556648 passed on `83cea46` (all eight jobs, finished 13:58:34Z); no open PR.
 - GitHub order: push first, then make public.
 
 ## 2. Milestones
@@ -46,7 +46,7 @@ Main checkout: `main` at `3a50c26`, behind `origin/main` `83cea46` (not pulled),
 2026-11-28 `merged 81`. Merge proven (host state MERGED, merge `826f70d` on origin/main, parents `b0dbc52` + `733aae4`, tree equals the reviewed head); receipt before the merge; log pushed to agent-logs (`2d193cf`); progress artifact republished (version 16). A stale `CLAUDE.md` inside the agent-logs worktree (spec v4.5 era) is old branch content, not current project rules.
 
 ## 5. Next step (file-level)
-1. When main CI run 46149556648 passes: repo private, refresh the handoff copy.
+1. Done 2026-11-28: repo private; handoff copy refreshed.
 2. Main checkout must be fast-forwarded to `origin/main` before the next session reads project files.
 3. Phase 3 plan (customers and team; require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
 4. Small follow-up PR: Owner saves bank details then uploads a QR without reloading, refused as stale (existing behaviour).
