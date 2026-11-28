@@ -274,6 +274,18 @@ test("keyboard only: step up, fill and save the bank details with visible focus 
   await expect(saveButton(page)).toBeFocused();
 });
 
+// A denied Bank page (Staff, or an Admin or Owner without 2FA) shows none of the saved values: not as text, not in an
+// input's value, a hidden field or the page's serialized data, and no saved-data form or input (Bob PR 83 R1 P2).
+const SAVED_VALUES = ["Maybank", HOLDER, ACCOUNT_NUMBER, "MBBEMYKL"];
+async function expectNoSavedDetails(page: Page): Promise<void> {
+  const main = page.getByRole("main");
+  await expect(main.getByRole("heading", { level: 1, name: "Bank details" })).toBeVisible();
+  for (const value of SAVED_VALUES) await expect(page.locator("body")).not.toContainText(value);
+  await expect(main.locator("form, input, textarea, select")).toHaveCount(0);
+  const html = await page.content();
+  for (const value of SAVED_VALUES) expect(html).not.toContain(value);
+}
+
 // Spec revision 13: an Admin with 2FA views the bank details and the QR, with no step-up and no forms; Staff are
 // refused; the QR is refused to anyone without 2FA, also with require_2fa off (the workspace default here).
 test("an Admin with 2FA sees the Bank link and a view-only page; Staff and members without 2FA see no details", async ({
@@ -302,7 +314,7 @@ test("an Admin with 2FA sees the Bank link and a view-only page; Staff and membe
   await closeShellMenu(page);
   const main = page.getByRole("main");
   await expect(main).toContainText(PAYMENT_CHANGE_FORBIDDEN);
-  for (const value of ["Maybank", HOLDER, ACCOUNT_NUMBER, "MBBEMYKL"]) {
+  for (const value of SAVED_VALUES) {
     await expect(main.getByRole("definition").filter({ hasText: value })).toHaveCount(1);
   }
   const preview = main.getByRole("img", { name: "Your DuitNow QR code" });
@@ -317,6 +329,7 @@ test("an Admin with 2FA sees the Bank link and a view-only page; Staff and membe
 
   await setMemberRole(owner.email, "staff");
   await page.reload();
+  await expectNoSavedDetails(page);
   await expect(main).toContainText(PAYMENT_FORBIDDEN);
   await expect(main.getByRole("definition")).toHaveCount(0);
   await expect(main.getByRole("img")).toHaveCount(0);
@@ -335,6 +348,7 @@ test("an Admin with 2FA sees the Bank link and a view-only page; Staff and membe
   for (const role of ["admin", "owner"] as const) {
     await setMemberRole(owner.email, role);
     await page.goto("/settings/payment");
+    await expectNoSavedDetails(page);
     await expect(main).toContainText(role === "admin" ? PAYMENT_VIEW_ENROL : STEP_UP_ENROL);
     await expect(main.getByRole("definition")).toHaveCount(0);
     await expect(main.getByRole("img")).toHaveCount(0);
