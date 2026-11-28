@@ -1,4 +1,4 @@
-# Handoff — 2026-11-28 · PR 82 R1 fixed, head `c51ee12`, CI passed; next: Bob `review 82` (round 2)
+# Handoff — 2026-11-28 · PR 82 approved (R2) and archived with receipt, head `c51ee12`; next: Charlie merges, then `merged 82`
 
 > In-flight state only. Never committed. Updated after every decision, owner answer, verification,
 > commit and PR change (roles/builder.md §11), not only at session end. Redact per START.md.
@@ -10,7 +10,7 @@
 - Working folder: `.agent/worktrees/build-chore-setup-reconcile-v4-7-rev13` (branch `chore/setup-reconcile-v4-7-rev13`). Main checkout on `main`, local `b0dbc52`, behind `origin/main` `826f70d`; not pulled. Merged worktree `.agent/worktrees/build-docs-spec-bank-audit-qr-view` still present.
 
 ## 1. Current PR / branch
-- Open: PR 82 "docs: setup reconcile to spec v4.7 revision 13", base `main`, head `c51ee12de8939fa3036f22d256f93f90c8f22e5d`, CI run 46111470791 passed (four jobs; image and E2E skipped, docs only); PR body updated with the R1 rows; waiting for Bob round 2.
+- Open: PR 82 "docs: setup reconcile to spec v4.7 revision 13", base `main`, head `c51ee12de8939fa3036f22d256f93f90c8f22e5d`, CI run 46111470791 passed (four jobs; image and E2E skipped, docs only); PR body updated with the R1 rows; Bob round 2 approved; waiting for Charlie to merge.
 - Repo `mortarhaus/CRM` PUBLIC since 2026-11-28 for PR 82's CI; make PRIVATE in `merged 82` if no other PR is open.
 - GitHub order: push first, then make public.
 - Last merged: PR 81 (`826f70d`), logged, no gate breach.
@@ -30,6 +30,7 @@ Main checkout: `main` at `b0dbc52`, untracked (not mine):
 | `docker/sync-import.sh` | untracked, not mine | `9f2c1205bbf77be1c82eded28974f9f3f1d648b8` |
 
 ## 4. Just finished
+2026-11-28 `approved 82`: Round 2 Approved with conditions, head `c51ee12`, PR open; review archived and receipt written on agent-logs (review commit `f50d750`, receipt commit `c3746c7`, 2026-11-28T05:35:03Z, review blob `edcbcd8`).
 2026-11-28 commit `c51ee12de8939fa3036f22d256f93f90c8f22e5d` pushed (PROJECT.md section 8, R1 P2). R1 P1 is a PR body change, drafted at scratchpad `fix-pr-body.md`, not yet applied (apply after CI with the new head and run id). Build worktree clean. Open owner question from the draft: `/files/logo` has no FILE-04 alternative recorded in PROJECT.md section 9.
 2026-11-28 `fix`: PR 82 review Round 1 (Revision required, head `8b87dba`) archived on agent-logs (`7146d58`, blob `e2af7d57`). Findings: [P1] no AUTH-03 self-check row (PR body); [P2, before merge] PROJECT.md section 8 storage summary omits the same-origin logo preview. Preflight: build worktree clean at `8b87dba`. Same Opus 5.5 sub-agent drafting in the session scratchpad (`fix-pr-body.md`, `fix-PROJECT.md`); next: check, commit, push, update PR body, watch CI.
 2026-11-28 PR 82 opened; CI passed on `8b87dba`; PR body UNI-07 and UNI-13 rows filled. Opus draft checked by Sonnet 5.5, with two wording changes (CLAUDE.md next step; DECISIONS builder note on spec line 100). Local typecheck, lint, test and build not run (docs only).
@@ -37,7 +38,7 @@ Main checkout: `main` at `b0dbc52`, untracked (not mine):
 2026-11-28 `merged 81`. Merge proven (host state MERGED, merge `826f70d` on origin/main, parents `b0dbc52` + `733aae4`, tree equals the reviewed head); receipt before the merge; log pushed to agent-logs (`2d193cf`); progress artifact republished (version 16). A stale `CLAUDE.md` inside the agent-logs worktree (spec v4.5 era) is old branch content, not current project rules.
 
 ## 5. Next step (file-level)
-1. Charlie runs `review 82` (round 2) in a reviewer window; then `approved 82`, merge, `merged 82` (repo private again).
+1. Charlie merges PR 82 (head `c51ee12` only), then `merged 82` (log, repo private again).
 2. Done in PR 82: PROJECT.md and CLAUDE.md reconciled; Charlie's rev 13 approval recorded in DECISIONS. Spec Status label waits for the next spec PR (it also corrects "needs no audit code change", spec line 100).
 3. Implementation PR (Bank settings Admin-view and QR revalidation): QR route `must-revalidate`; Admin view with 2FA check; Unicode-safe audit mask (4 whole code points) with a synthetic test on a settings change; owner email job reads changed column names only; optional mask tests and two comment fixes. The `last4` shape stays.
 4. Then the Phase 3 plan (require_2fa switch: Owner only, step-up; first PR of a milestone, builder s8 ask; deep tier).
@@ -56,7 +57,8 @@ Main checkout: `main` at `b0dbc52`, untracked (not mine):
 - Raise with Bob: Next dev mode logs arguments of the 2FA actions, incl. setup keys of throwaway e2e accounts (dev only).
 
 ## 7. Open review findings (P0/P1) and verdict
-PR 82 Round 1 (2026-11-28, Revision required): [P1] record the authorization check (AUTH-03 row) for the QR alternative; [P2, before merge] storage summary and the logo preview. Both fixed at `c51ee12` (P1 in the PR body), awaiting Bob.
+PR 82 Round 2 (2026-11-28, Approved with conditions, head `c51ee12`): R1 P1 and P2 resolved, no new findings; carried condition: the PR 81 Unicode audit mask, to the Bank settings Admin-view and QR revalidation implementation PR.
+PR 82 Round 1 (2026-11-28, Revision required): [P1] record the authorization check (AUTH-03 row) for the QR alternative; [P2, before merge] storage summary and the logo preview. Both fixed at `c51ee12` (P1 in the PR body), resolved in Round 2.
 PR 81 Round 3 (2026-11-28, Approved with conditions, head `733aae4`): R1 P1 resolved; Unicode audit-mask P2 deferred. Nothing blocking from review.
 PR 81 Round 1 (2026-11-27, Revision required, head `733aae4`): [P1] missing self-check rows: resolved (R2). [P2, deferred] Unicode audit mask, to the Bank settings Admin-view and QR revalidation implementation PR.
 Spec Round 32 (2026-11-27, Approved with conditions, rev 13 `bf633eb3`): same P2 deferred. Rulings: no new `[pii]` exception; QR preview stays scoped FILE-04 alternative; stale-copy test method chosen in the code PR (stale response + unreachable origin + header assert).
